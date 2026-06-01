@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>库仑定律交互实验</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f7fb;
+            color: #1c1c1c;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.4rem;
+        }
+        header p {
+            margin: 10px 0 0;
+            color: #555;
+            font-size: 1rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(280px, 320px) 1fr;
+            gap: 24px;
+        }
+        .panel {
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            padding: 22px;
+        }
+        .panel h2 {
+            margin-top: 0;
+        }
+        .slider-group {
+            margin-bottom: 18px;
+        }
+        .slider-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .value-label {
+            text-align: right;
+            font-size: 0.95rem;
+            color: #333;
+        }
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .metric {
+            background: #eef5ff;
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .metric-title {
+            margin: 0 0 6px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+        .metric-value {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #003d9a;
+        }
+        .note {
+            margin-top: 18px;
+            padding: 14px 16px;
+            background: #fff8e6;
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+            color: #6b4a00;
+        }
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+        .footer a {
+            color: #1a73e8;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>库仑定律交互实验</h1>
+            <p>纯 HTML + JavaScript 实现，直接用浏览器打开即可，无需 Python 环境。</p>
+        </header>
+
+        <div class="grid">
+            <div class="panel">
+                <h2>参数设置</h2>
+                <div class="slider-group">
+                    <label for="q1">电荷 q₁ (nC)：<span id="q1Value">10</span></label>
+                    <input id="q1" type="range" min="-100" max="100" value="10" step="1" />
+                </div>
+                <div class="slider-group">
+                    <label for="q2">电荷 q₂ (nC)：<span id="q2Value">-10</span></label>
+                    <input id="q2" type="range" min="-100" max="100" value="-10" step="1" />
+                </div>
+                <div class="slider-group">
+                    <label for="r">距离 r (cm)：<span id="rValue">10</span></label>
+                    <input id="r" type="range" min="1" max="50" value="10" step="1" />
+                </div>
+                <div class="slider-group">
+                    <label for="rmax">显示距离上限 (cm)：<span id="rmaxValue">30</span></label>
+                    <input id="rmax" type="range" min="10" max="60" value="30" step="5" />
+                </div>
+                <div class="note">
+                    支持练习：
+                    <ol>
+                        <li>保持 q₁ 与 q₂ 同号，看力如何变化。</li>
+                        <li>保持 q₁ 与 q₂ 异号，看“吸引/排斥”变化。</li>
+                        <li>把距离从 10cm 变成 20cm，观察力大小比。</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>实验结果</h2>
+                <div class="result-grid">
+                    <div class="metric">
+                        <p class="metric-title">当前力的性质</p>
+                        <p class="metric-value" id="forceType">排斥</p>
+                    </div>
+                    <div class="metric">
+                        <p class="metric-title">力的大小</p>
+                        <p class="metric-value" id="forceValue">0</p>
+                    </div>
+                    <div class="metric">
+                        <p class="metric-title">电荷 q₁</p>
+                        <p class="metric-value" id="displayQ1">10 nC</p>
+                    </div>
+                    <div class="metric">
+                        <p class="metric-title">电荷 q₂</p>
+                        <p class="metric-value" id="displayQ2">-10 nC</p>
+                    </div>
+                </div>
+                <div class="note">
+                    说明：当 q₁×q₂ > 0 时为排斥，q₁×q₂ < 0 时为吸引。力随距离平方反比。
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top: 24px;">
+            <h2>可视化与力的变化</h2>
+            <div id="visual" style="position:relative; height:180px; margin-bottom:16px; background:linear-gradient(135deg,#0f0c29,#302b63,#24243e); border-radius:12px; overflow:hidden;">
+                <div id="chargeArea" style="position:absolute; left:5%; right:5%; top:10px; bottom:10px;">
+                    <svg id="svgArrows" viewBox="0 0 1000 200" preserveAspectRatio="none" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; overflow:visible; z-index:1;">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="14" markerHeight="10" refX="12" refY="5" orient="auto">
+                                <polygon points="0 0, 14 5, 0 10" fill="#00f5ff"></polygon>
+                            </marker>
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="2" result="blur"/>
+                                <feMerge>
+                                    <feMergeNode in="blur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        <line id="arrow1" x1="200" y1="100" x2="280" y2="100" stroke="#00f5ff" stroke-width="6" marker-end="url(#arrowhead)" filter="url(#glow)" stroke-linecap="round" />
+                        <line id="arrow2" x1="700" y1="100" x2="620" y2="100" stroke="#00f5ff" stroke-width="6" marker-end="url(#arrowhead)" filter="url(#glow)" stroke-linecap="round" />
+                    </svg>
+                    <div id="leftCharge" style="position:absolute; left:20%; top:30px; width:80px; height:80px; border-radius:50%; background:#ff4d4d; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 20px rgba(255,77,77,0.5); border:3px solid rgba(255,255,255,0.3); color:#fff; font-weight:700; font-size:14px; z-index:2;">
+                        <span id="labelQ1">q1</span>
+                    </div>
+                    <div id="rightCharge" style="position:absolute; left:65%; top:30px; width:80px; height:80px; border-radius:50%; background:#4da6ff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 20px rgba(77,166,255,0.5); border:3px solid rgba(255,255,255,0.3); color:#fff; font-weight:700; font-size:14px; z-index:2;">
+                        <span id="labelQ2">q2</span>
+                    </div>
+                    <div id="forceLabelQ1" style="position:absolute; color:#ffdd57; font-weight:600; font-size:13px; white-space:nowrap; z-index:3; text-shadow:0 0 8px rgba(0,0,0,0.8);"></div>
+                    <div id="forceLabelQ2" style="position:absolute; color:#ffdd57; font-weight:600; font-size:13px; white-space:nowrap; z-index:3; text-shadow:0 0 8px rgba(0,0,0,0.8);"></div>
+                </div>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center; margin-bottom:10px;">
+                <div style="flex:1">
+                    <label><strong>电荷 1 (μC)</strong></label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button id="q1Dec">-</button>
+                        <input id="q1Num" type="number" step="0.1" min="-100" max="100" value="10" style="width:90px" />
+                        <button id="q1Inc">+</button>
+                        <input id="q1Slider" type="range" min="-100" max="100" value="10" step="0.1" style="flex:1" />
+                    </div>
+                </div>
+                <div style="flex:1">
+                    <label><strong>电荷 2 (μC)</strong></label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button id="q2Dec">-</button>
+                        <input id="q2Num" type="number" step="0.1" min="-100" max="100" value="-10" style="width:90px" />
+                        <button id="q2Inc">+</button>
+                        <input id="q2Slider" type="range" min="-100" max="100" value="-10" step="0.1" style="flex:1" />
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-top:6px; margin-bottom:6px">力与距离的变化</h3>
+            <canvas id="forceChart"></canvas>
+        </div>
+
+        <div class="panel footer">
+            <p>使用方法：将此 HTML 文件保存后，用浏览器直接打开即可。可以插入 PPT 的 Web Viewer 或幻灯片中的浏览器窗口。</p>
+            <p>建议在课堂上用真实电脑展示，学生也可以在自己的浏览器中体验。</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const k = 8.99e9;
+
+        // legacy sliders
+        const q1Input = document.getElementById('q1');
+        const q2Input = document.getElementById('q2');
+        // enhanced controls
+        const q1Num = document.getElementById('q1Num');
+        const q1Inc = document.getElementById('q1Inc');
+        const q1Dec = document.getElementById('q1Dec');
+        const q1Slider = document.getElementById('q1Slider');
+
+        const q2Num = document.getElementById('q2Num');
+        const q2Inc = document.getElementById('q2Inc');
+        const q2Dec = document.getElementById('q2Dec');
+        const q2Slider = document.getElementById('q2Slider');
+        const rInput = document.getElementById('r');
+        const rmaxInput = document.getElementById('rmax');
+
+        const q1Value = document.getElementById('q1Value');
+        const q2Value = document.getElementById('q2Value');
+        const rValue = document.getElementById('rValue');
+        const rmaxValue = document.getElementById('rmaxValue');
+
+        const forceType = document.getElementById('forceType');
+        const forceValue = document.getElementById('forceValue');
+        const displayQ1 = document.getElementById('displayQ1');
+        const displayQ2 = document.getElementById('displayQ2');
+        const labelQ1 = document.getElementById('labelQ1');
+        const labelQ2 = document.getElementById('labelQ2');
+        const leftCharge = document.getElementById('leftCharge');
+        const rightCharge = document.getElementById('rightCharge');
+        const svgArrows = document.getElementById('svgArrows');
+        const arrow1 = document.getElementById('arrow1');
+        const arrow2 = document.getElementById('arrow2');
+        const forceLabelQ1 = document.getElementById('forceLabelQ1');
+        const forceLabelQ2 = document.getElementById('forceLabelQ2');
+
+        const ctx = document.getElementById('forceChart').getContext('2d');
+
+        function calculateForce(q1, q2, r) {
+            const q1C = q1 * 1e-9;
+            const q2C = q2 * 1e-9;
+            const rM = Math.max(r * 1e-2, 1e-5);
+            const magnitude = k * Math.abs(q1C * q2C) / (rM * rM);
+            const interaction = q1 * q2 < 0 ? '吸引' : '排斥';
+            return { magnitude, interaction };
+        }
+
+        function updateData() {
+            // prefer numeric input when available (μC values)
+            const q1 = Number(q1Num ? q1Num.value : q1Input.value);
+            const q2 = Number(q2Num ? q2Num.value : q2Input.value);
+            const r = Number(rInput.value);
+            const rmax = Number(rmaxInput.value);
+
+            q1Value.textContent = q1;
+            q2Value.textContent = q2;
+            rValue.textContent = r;
+            rmaxValue.textContent = rmax;
+            displayQ1.textContent = `${q1} μC`;
+            displayQ2.textContent = `${q2} μC`;
+
+            const result = calculateForce(q1, q2, r);
+            // update enhanced controls to stay in sync
+            if (q1Num) q1Num.value = q1;
+            if (q1Slider) q1Slider.value = q1;
+            if (q2Num) q2Num.value = q2;
+            if (q2Slider) q2Slider.value = q2;
+
+            // labels
+            labelQ1.textContent = `${q1} μC`;
+            labelQ2.textContent = `${q2} μC`;
+            // color charges: positive red, negative blue
+            leftCharge.style.background = q1 >= 0 ? '#ff4d4d' : '#4da6ff';
+            rightCharge.style.background = q2 >= 0 ? '#ff4d4d' : '#4da6ff';
+
+            // update SVG arrows and force labels
+            const rectArea = document.getElementById('chargeArea').getBoundingClientRect();
+            const rectL = leftCharge.getBoundingClientRect();
+            const rectR = rightCharge.getBoundingClientRect();
+
+            // CSS pixel coordinates relative to chargeArea
+            const cssXL = rectL.left - rectArea.left + rectL.width / 2;
+            const cssXR = rectR.left - rectArea.left + rectR.width / 2;
+            const cssY = rectL.top - rectArea.top + rectL.height / 2;
+
+            // Convert CSS pixel coords to SVG viewBox coords (viewBox="0 0 1000 200")
+            const svgW = 1000, svgH = 200;
+            const scaleX = svgW / rectArea.width;
+            const scaleY = svgH / rectArea.height;
+            const svgXL = cssXL * scaleX;
+            const svgXR = cssXR * scaleX;
+            const svgY = cssY * scaleY;
+
+            // Calculate charge radius in SVG coords (charge circle is 80px wide in CSS)
+            const chargeRadiusSVG = (80 / 2) * scaleX;
+
+            // arrow direction: attraction -> point towards each other; repulsion -> point away
+            const isAttract = q1 * q2 < 0;
+            const maxLen = Math.min(200, Math.abs(svgXR - svgXL) * 0.4);
+            // Start arrow from edge of charge circle, not center
+            const offset = chargeRadiusSVG + 5;
+            const dir = isAttract ? 1 : -1;
+            // arrow for q1 (force on q1 due to q2): start from right edge, point right (repel) or left (attract)
+            const x1s = svgXL + (isAttract ? -offset : offset);
+            const x1e = x1s + dir * maxLen;
+            arrow1.setAttribute('x1', x1s);
+            arrow1.setAttribute('y1', svgY);
+            arrow1.setAttribute('x2', x1e);
+            arrow1.setAttribute('y2', svgY);
+            // arrow for q2 (force on q2 due to q1): start from left edge, point left (repel) or right (attract)
+            const x2s = svgXR + (isAttract ? offset : -offset);
+            const x2e = x2s - dir * maxLen;
+            arrow2.setAttribute('x1', x2s);
+            arrow2.setAttribute('y1', svgY);
+            arrow2.setAttribute('x2', x2e);
+            arrow2.setAttribute('y2', svgY);
+
+            // arrow width scales with magnitude (log-ish)
+            const mag = result.magnitude;
+            const strokeW = Math.max(4, Math.min(12, Math.log10(mag + 1) * 2 + 4));
+            arrow1.setAttribute('stroke-width', strokeW);
+            arrow2.setAttribute('stroke-width', strokeW);
+
+            // force labels: position below charges
+            const pctL = (cssXL / rectArea.width) * 100;
+            const pctR = (cssXR / rectArea.width) * 100;
+            forceLabelQ1.style.left = `${pctL}%`;
+            forceLabelQ1.style.top = '68%';
+            forceLabelQ1.style.transform = 'translateX(-50%)';
+            forceLabelQ2.style.left = `${pctR}%`;
+            forceLabelQ2.style.top = '68%';
+            forceLabelQ2.style.transform = 'translateX(-50%)';
+            const forceStr = result.magnitude.toExponential(3);
+            forceLabelQ1.textContent = `F₁ = ${forceStr} N`;
+            forceLabelQ2.textContent = `F₂ = ${forceStr} N`;
+
+            forceType.textContent = result.interaction;
+            forceValue.textContent = `${result.magnitude.toExponential(3)} N`;
+
+            const labels = [];
+            const data = [];
+            for (let dist = 1; dist <= rmax; dist += Math.max(1, Math.floor(rmax / 100))) {
+                labels.push(dist);
+                data.push(calculateForce(q1, q2, dist).magnitude);
+            }
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.options.scales.y.type = 'linear';
+            chart.update();
+        }
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'F (N)',
+                    data: [],
+                    borderColor: '#1f77b4',
+                    backgroundColor: 'rgba(31,119,180,0.15)',
+                    tension: 0.3,
+                    pointRadius: 2,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '距离 r (cm)'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: '力 F (N)'
+                        }
+                    }
+                }
+            }
+        });
+
+        [q1Input, q2Input, rInput, rmaxInput].forEach(el => {
+            el.addEventListener('input', updateData);
+        });
+
+        // enhanced control events
+        if (q1Num) {
+            q1Num.addEventListener('input', () => updateData());
+            q1Inc.addEventListener('click', () => { q1Num.value = Number(q1Num.value) + 0.1; updateData(); });
+            q1Dec.addEventListener('click', () => { q1Num.value = Number(q1Num.value) - 0.1; updateData(); });
+            q1Slider.addEventListener('input', () => { q1Num.value = q1Slider.value; updateData(); });
+        }
+        if (q2Num) {
+            q2Num.addEventListener('input', () => updateData());
+            q2Inc.addEventListener('click', () => { q2Num.value = Number(q2Num.value) + 0.1; updateData(); });
+            q2Dec.addEventListener('click', () => { q2Num.value = Number(q2Num.value) - 0.1; updateData(); });
+            q2Slider.addEventListener('input', () => { q2Num.value = q2Slider.value; updateData(); });
+        }
+
+        updateData();
+    </script>
+</body>
+</html>
