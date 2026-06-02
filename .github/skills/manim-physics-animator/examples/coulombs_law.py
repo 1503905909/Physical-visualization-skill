@@ -1,157 +1,309 @@
+import numpy as np
 from manim import *
-from manim.utils.tex_templates import TexTemplateLibrary
 
-# 启用中文 LaTeX 模板
-config.tex_template = TexTemplateLibrary.ctex
+
+config.frame_width = 14.222
+config.frame_height = 8.0
+config.pixel_width = 1280
+config.pixel_height = 720
+config.background_color = "#0b1020"
+config.media_dir = r"d:\PycharmProjects1\Physical-visualization-skill\build\videos\manim"
+
+
+FONT = "Microsoft YaHei"
+POSITIVE = "#ff4d4f"
+NEGATIVE = "#4f6dff"
+FORCE = "#ffd166"
+DISTANCE = "#33d17a"
+PANEL = "#111827"
+
+
+def cn(text, font_size=30, color=WHITE, weight="NORMAL"):
+    return Text(text, font=FONT, font_size=font_size, color=color, weight=weight)
+
+
+def charge_mobject(value, label, radius=0.45):
+    color = POSITIVE if value >= 0 else NEGATIVE
+    circle = Circle(radius=radius, stroke_color=WHITE, stroke_width=2)
+    circle.set_fill(color, opacity=0.95)
+    sign = "+" if value > 0 else "-" if value < 0 else "0"
+    sign_text = cn(sign, font_size=36, weight="BOLD").move_to(circle.get_center() + UP * 0.12)
+    label_text = MathTex(label, font_size=34, color=WHITE).move_to(circle.get_center() + DOWN * 0.18)
+    return VGroup(circle, sign_text, label_text)
+
+
+def force_arrow(start, direction, length=1.2, label=None, color=FORCE):
+    arrow = Arrow(
+        start=start,
+        end=start + direction * length,
+        buff=0,
+        stroke_width=7,
+        max_tip_length_to_length_ratio=0.22,
+        color=color,
+    )
+    if label is None:
+        return arrow
+    text = MathTex(label, font_size=30, color=color).next_to(arrow, UP, buff=0.12)
+    return VGroup(arrow, text)
+
 
 class CoulombsLawScene(Scene):
-    """高中物理：库仑定律动画演示"""
+    """高中物理：库仑定律课堂演示动画。"""
 
     def construct(self):
-        self.show_title()
-        self.show_physical_background()
-        self.show_force_equation()
-        self.show_repulsion_and_attraction()
-        self.show_distance_effect_graph()
-        self.summary_scene()
+        self.opening_question()
+        self.same_and_opposite_charges()
+        self.distance_changes_force()
+        self.inverse_square_graph()
+        self.summary()
 
-    def show_title(self):
-        title = Title("库仑定律：电荷间的相互作用力")
-        subtitle = VGroup(
-            Text("同号相斥，异号相吸；", font="Microsoft YaHei", font_size=36),
-            MathTex(r"F = k \frac{q_1 q_2}{r^2}")
+    def scene_title(self, text):
+        title = cn(text, font_size=34, weight="BOLD")
+        title.to_edge(UP, buff=0.28)
+        line = Line(LEFT * 6.4, RIGHT * 6.4, color="#334155", stroke_width=2)
+        line.next_to(title, DOWN, buff=0.18)
+        return VGroup(title, line)
+
+    def opening_question(self):
+        title = cn("库仑定律：电荷之间的相互作用", font_size=42, weight="BOLD")
+        title.to_edge(UP, buff=0.55)
+
+        q1 = charge_mobject(1, "q_1").shift(LEFT * 2.2)
+        q2 = charge_mobject(-1, "q_2").shift(RIGHT * 2.2)
+        connector = DashedLine(q1.get_center(), q2.get_center(), color=GREY_B, stroke_width=3)
+        distance = BraceBetweenPoints(q1.get_center(), q2.get_center(), DOWN, color=DISTANCE)
+        distance_label = MathTex("r", font_size=36, color=DISTANCE).next_to(distance, DOWN, buff=0.15)
+
+        question = cn("两个电荷之间的力由什么决定？", font_size=34, color=YELLOW, weight="BOLD")
+        question.next_to(connector, DOWN, buff=1.2)
+
+        formula = MathTex(
+            r"F = k\frac{|q_1q_2|}{r^2}",
+            font_size=50,
+            color=WHITE,
+        ).next_to(question, DOWN, buff=0.45)
+        formula.set_color_by_tex("F", FORCE)
+        formula.set_color_by_tex("q_1", POSITIVE)
+        formula.set_color_by_tex("q_2", NEGATIVE)
+        formula.set_color_by_tex("r", DISTANCE)
+
+        self.play(FadeIn(title, shift=DOWN), run_time=0.8)
+        self.play(FadeIn(q1, shift=LEFT), FadeIn(q2, shift=RIGHT), Create(connector), run_time=1.0)
+        self.play(GrowFromCenter(distance), Write(distance_label), run_time=0.8)
+        self.play(Write(question), run_time=0.9)
+        self.play(Write(formula), run_time=1.0)
+        self.wait(1.2)
+        self.play(FadeOut(VGroup(title, q1, q2, connector, distance, distance_label, question, formula)))
+
+    def same_and_opposite_charges(self):
+        header = self.scene_title("一、力的方向：同号相斥，异号相吸")
+        self.play(FadeIn(header))
+
+        left_panel = RoundedRectangle(width=5.7, height=4.2, corner_radius=0.18)
+        right_panel = RoundedRectangle(width=5.7, height=4.2, corner_radius=0.18)
+        for panel in (left_panel, right_panel):
+            panel.set_stroke("#475569", width=2)
+            panel.set_fill(PANEL, opacity=0.55)
+        left_panel.shift(LEFT * 3.05 + DOWN * 0.25)
+        right_panel.shift(RIGHT * 3.05 + DOWN * 0.25)
+
+        same_label = cn("同号电荷", font_size=28, weight="BOLD").next_to(left_panel, UP, buff=0.18)
+        opposite_label = cn("异号电荷", font_size=28, weight="BOLD").next_to(right_panel, UP, buff=0.18)
+
+        same_q1 = charge_mobject(1, "q_1").move_to(left_panel.get_center() + LEFT * 1.05)
+        same_q2 = charge_mobject(1, "q_2").move_to(left_panel.get_center() + RIGHT * 1.05)
+        opp_q1 = charge_mobject(1, "q_1").move_to(right_panel.get_center() + LEFT * 1.05)
+        opp_q2 = charge_mobject(-1, "q_2").move_to(right_panel.get_center() + RIGHT * 1.05)
+
+        same_line = Line(same_q1.get_center(), same_q2.get_center(), color=GREY_B, stroke_width=3)
+        opp_line = Line(opp_q1.get_center(), opp_q2.get_center(), color=GREY_B, stroke_width=3)
+
+        same_arrows = VGroup(
+            force_arrow(same_q1.get_left() + LEFT * 0.05, LEFT, 1.05, r"\vec F_{12}"),
+            force_arrow(same_q2.get_right() + RIGHT * 0.05, RIGHT, 1.05, r"\vec F_{21}"),
         )
-        subtitle.arrange(DOWN)
-        subtitle.next_to(title, DOWN)
-
-        self.play(Write(title), FadeIn(subtitle, shift=DOWN))
-        self.wait(2)
-        self.play(FadeOut(title), FadeOut(subtitle))
-
-    def show_physical_background(self):
-        items = VGroup(
-            Text("两个点电荷之间存在相互作用力", font="Microsoft YaHei", font_size=36),
-            Text("力的大小与电荷量成正比，与距离的平方成反比", font="Microsoft YaHei", font_size=36),
-            Text("力的方向沿连线，且具有吸引或排斥性质", font="Microsoft YaHei", font_size=36),
+        opp_arrows = VGroup(
+            force_arrow(opp_q1.get_right() + RIGHT * 0.05, RIGHT, 1.05, r"\vec F_{12}"),
+            force_arrow(opp_q2.get_left() + LEFT * 0.05, LEFT, 1.05, r"\vec F_{21}"),
         )
-        items.arrange(DOWN, aligned_edge=LEFT)
-        items.scale(0.8)
-        self.play(Create(items))
-        self.wait(3)
-        self.play(FadeOut(items))
+        same_conclusion = cn("排斥：受力方向相互远离", font_size=24, color=FORCE)
+        same_conclusion.next_to(left_panel, DOWN, buff=0.24)
+        opp_conclusion = cn("吸引：受力方向相互靠近", font_size=24, color=FORCE)
+        opp_conclusion.next_to(right_panel, DOWN, buff=0.24)
 
-    def show_force_equation(self):
-        equation = MathTex(r"F = k \frac{q_1 q_2}{r^2}")
-        equation.set_color_by_tex("F", YELLOW)
-        equation.set_color_by_tex("k", BLUE)
-        equation.set_color_by_tex("q_1", RED)
-        equation.set_color_by_tex("q_2", RED)
-        equation.set_color_by_tex("r", GREEN)
-
-        definitions = VGroup(
-            Text("F：电荷间相互作用力，单位 N", font="Microsoft YaHei", font_size=28),
-            Text("k：库仑常数，8.99 × 10^9 N·m^2/C^2", font="Microsoft YaHei", font_size=28),
-            Text("q_1, q_2：电荷量，单位 C", font="Microsoft YaHei", font_size=28),
-            Text("r：电荷间距离，单位 m", font="Microsoft YaHei", font_size=28),
+        self.play(
+            FadeIn(left_panel),
+            FadeIn(right_panel),
+            Write(same_label),
+            Write(opposite_label),
+            run_time=0.8,
         )
-        definitions.arrange(DOWN, aligned_edge=LEFT)
-        definitions.next_to(equation, DOWN, buff=0.8)
-
-        self.play(Write(equation))
-        self.wait(1.5)
-        self.play(FadeIn(definitions, shift=UP))
-        self.wait(3)
-        self.play(FadeOut(equation), FadeOut(definitions))
-
-    def create_charge_pair(self, sign1, sign2, color1, color2, distance=3.5):
-        charge_1 = Circle(radius=0.35, color=color1, fill_opacity=1)
-        charge_2 = Circle(radius=0.35, color=color2, fill_opacity=1)
-        charge_1.move_to(LEFT * distance / 2)
-        charge_2.move_to(RIGHT * distance / 2)
-
-        label_1 = MathTex(sign1, font_size=48).move_to(charge_1.get_center())
-        label_2 = MathTex(sign2, font_size=48).move_to(charge_2.get_center())
-
-        return VGroup(charge_1, charge_2, label_1, label_2)
-
-    def show_repulsion_and_attraction(self):
-        repulsion = self.create_charge_pair(
-            "+", "+", RED, RED, distance=3.5
+        self.play(
+            FadeIn(VGroup(same_q1, same_q2, opp_q1, opp_q2)),
+            Create(same_line),
+            Create(opp_line),
+            run_time=0.9,
         )
-        repulsion_text = Text("同号电荷相互排斥", font="Microsoft YaHei", font_size=36, color=RED)
-        repulsion_text.next_to(repulsion, DOWN, buff=0.8)
+        self.play(Create(same_arrows), Write(same_conclusion), run_time=1.1)
+        self.play(Create(opp_arrows), Write(opp_conclusion), run_time=1.1)
+        self.wait(1.2)
+        self.play(FadeOut(VGroup(header, left_panel, right_panel, same_label, opposite_label,
+                                 same_q1, same_q2, opp_q1, opp_q2, same_line, opp_line,
+                                 same_arrows, opp_arrows, same_conclusion, opp_conclusion)))
 
-        arrow1 = Arrow(repulsion[0].get_right(), repulsion[0].get_right() + LEFT * 1.2, buff=0.05, color=YELLOW)
-        arrow2 = Arrow(repulsion[1].get_left(), repulsion[1].get_left() + RIGHT * 1.2, buff=0.05, color=YELLOW)
-        arrow1_label = MathTex(r"\vec{F}_{12}", color=YELLOW).next_to(arrow1, UP)
-        arrow2_label = MathTex(r"\vec{F}_{21}", color=YELLOW).next_to(arrow2, UP)
+    def distance_changes_force(self):
+        header = self.scene_title("二、力的大小：距离越大，静电力越小")
+        self.play(FadeIn(header))
 
-        attraction = self.create_charge_pair(
-            "+", "-", RED, BLUE, distance=3.5
-        )
-        attraction_text = Text("异号电荷相互吸引", font="Microsoft YaHei", font_size=36, color=BLUE)
-        attraction_text.next_to(attraction, DOWN, buff=0.8)
+        q1_tracker = ValueTracker(-2.0)
+        q2_tracker = ValueTracker(2.0)
 
-        arrow3 = Arrow(attraction[0].get_right(), attraction[0].get_right() + RIGHT * 1.0, buff=0.05, color=GREEN)
-        arrow4 = Arrow(attraction[1].get_left(), attraction[1].get_left() + LEFT * 1.0, buff=0.05, color=GREEN)
-        arrow3_label = MathTex(r"\vec{F}_{12}", color=GREEN).next_to(arrow3, UP)
-        arrow4_label = MathTex(r"\vec{F}_{21}", color=GREEN).next_to(arrow4, UP)
+        def q1_group():
+            return charge_mobject(1, "q_1").move_to([q1_tracker.get_value(), 0.15, 0])
 
-        self.play(FadeIn(repulsion), Write(repulsion_text))
-        self.wait(1)
-        self.play(Create(arrow1), Create(arrow2), Write(arrow1_label), Write(arrow2_label))
-        self.wait(2)
-        self.play(FadeOut(repulsion), FadeOut(repulsion_text), FadeOut(arrow1), FadeOut(arrow2), FadeOut(arrow1_label), FadeOut(arrow2_label))
+        def q2_group():
+            return charge_mobject(-1, "q_2").move_to([q2_tracker.get_value(), 0.15, 0])
 
-        self.play(FadeIn(attraction), Write(attraction_text))
-        self.wait(1)
-        self.play(Create(arrow3), Create(arrow4), Write(arrow3_label), Write(arrow4_label))
-        self.wait(2)
-        self.play(FadeOut(attraction), FadeOut(attraction_text), FadeOut(arrow3), FadeOut(arrow4), FadeOut(arrow3_label), FadeOut(arrow4_label))
+        q1 = always_redraw(q1_group)
+        q2 = always_redraw(q2_group)
 
-    def show_distance_effect_graph(self):
+        line = always_redraw(lambda: Line(
+            [q1_tracker.get_value(), 0.15, 0],
+            [q2_tracker.get_value(), 0.15, 0],
+            color=GREY_B,
+            stroke_width=3,
+        ))
+        brace = always_redraw(lambda: BraceBetweenPoints(
+            [q1_tracker.get_value(), 0.15, 0],
+            [q2_tracker.get_value(), 0.15, 0],
+            DOWN,
+            color=DISTANCE,
+        ))
+
+        def distance_text():
+            distance = q2_tracker.get_value() - q1_tracker.get_value()
+            return MathTex(
+                rf"r = {distance:.1f}\,\mathrm{{cm}}",
+                font_size=32,
+                color=DISTANCE,
+            ).next_to(brace, DOWN, buff=0.15)
+
+        r_label = always_redraw(distance_text)
+
+        def force_text():
+            distance = q2_tracker.get_value() - q1_tracker.get_value()
+            relative_force = 16 / (distance ** 2)
+            return MathTex(
+                rf"F \propto \frac{{1}}{{r^2}} = {relative_force:.2f}",
+                font_size=42,
+                color=FORCE,
+            ).to_edge(DOWN, buff=0.55)
+
+        formula = always_redraw(force_text)
+
+        def arrows():
+            distance = q2_tracker.get_value() - q1_tracker.get_value()
+            length = min(1.65, max(0.42, 2.5 / distance))
+            left_start = np.array([q1_tracker.get_value() + 0.48, 1.05, 0.0])
+            right_start = np.array([q2_tracker.get_value() - 0.48, 1.05, 0.0])
+            return VGroup(
+                force_arrow(left_start, RIGHT, length),
+                force_arrow(right_start, LEFT, length),
+            )
+
+        force_arrows = always_redraw(arrows)
+        note = cn("保持电荷量不变，只改变距离 r", font_size=28, color=YELLOW)
+        note.to_edge(LEFT, buff=0.85).shift(UP * 2.0)
+
+        self.play(Write(note), FadeIn(q1), FadeIn(q2), Create(line), GrowFromCenter(brace), Write(r_label))
+        self.play(Create(force_arrows), Write(formula), run_time=0.8)
+        self.wait(0.8)
+        self.play(q1_tracker.animate.set_value(-3.1), q2_tracker.animate.set_value(3.1), run_time=2.4)
+        self.wait(0.8)
+        self.play(q1_tracker.animate.set_value(-1.5), q2_tracker.animate.set_value(1.5), run_time=2.0)
+        self.wait(1.0)
+        self.play(FadeOut(VGroup(header, q1, q2, line, brace, r_label, formula, force_arrows, note)))
+
+    def inverse_square_graph(self):
+        header = self.scene_title("三、图像表达：反平方关系")
+        self.play(FadeIn(header))
+
         axes = Axes(
             x_range=[0, 5.5, 1],
-            y_range=[0, 8, 2],
-            x_length=6,
-            y_length=4,
-            axis_config={"include_tip": True}
+            y_range=[0, 5.5, 1],
+            x_length=7.0,
+            y_length=4.3,
+            tips=False,
+            axis_config={"color": GREY_B, "stroke_width": 2},
+        ).shift(LEFT * 1.0 + DOWN * 0.2)
+        x_label = axes.get_x_axis_label(MathTex("r", font_size=30), edge=RIGHT, direction=DOWN)
+        y_label = axes.get_y_axis_label(MathTex("F", font_size=30), edge=UP, direction=LEFT)
+        graph = axes.plot(lambda x: 4 / (x ** 2 + 0.25), x_range=[0.55, 5.2], color=FORCE, stroke_width=5)
+
+        moving_x = ValueTracker(1.0)
+
+        dot = always_redraw(lambda: Dot(
+            axes.c2p(moving_x.get_value(), 4 / (moving_x.get_value() ** 2 + 0.25)),
+            color=YELLOW,
+            radius=0.07,
+        ))
+        v_line = always_redraw(lambda: DashedLine(
+            axes.c2p(moving_x.get_value(), 0),
+            axes.c2p(moving_x.get_value(), 4 / (moving_x.get_value() ** 2 + 0.25)),
+            color=DISTANCE,
+        ))
+        h_line = always_redraw(lambda: DashedLine(
+            axes.c2p(0, 4 / (moving_x.get_value() ** 2 + 0.25)),
+            axes.c2p(moving_x.get_value(), 4 / (moving_x.get_value() ** 2 + 0.25)),
+            color=DISTANCE,
+        ))
+        readout = always_redraw(lambda: MathTex(
+            rf"r={moving_x.get_value():.1f},\quad F\approx{4 / (moving_x.get_value() ** 2 + 0.25):.2f}",
+            font_size=32,
+            color=WHITE,
+        ).next_to(axes, RIGHT, buff=0.65).shift(UP * 0.8))
+
+        conclusion = VGroup(
+            cn("距离变为 2 倍", font_size=30),
+            MathTex(r"F \rightarrow \frac{1}{4}F", font_size=44, color=FORCE),
+            cn("这就是反平方关系", font_size=28, color=YELLOW),
+        ).arrange(DOWN, buff=0.35).next_to(axes, RIGHT, buff=0.9).shift(DOWN * 0.65)
+
+        self.play(Create(axes), Write(x_label), Write(y_label), run_time=1.0)
+        self.play(Create(graph), run_time=1.2)
+        self.play(Create(dot), Create(v_line), Create(h_line), Write(readout), run_time=0.8)
+        self.play(moving_x.animate.set_value(2.0), run_time=1.7)
+        self.play(FadeIn(conclusion, shift=UP), run_time=0.9)
+        self.play(moving_x.animate.set_value(4.0), run_time=1.8)
+        self.wait(1.0)
+        self.play(FadeOut(VGroup(header, axes, x_label, y_label, graph, dot, v_line, h_line, readout, conclusion)))
+
+    def summary(self):
+        title = cn("课堂小结", font_size=42, weight="BOLD").to_edge(UP, buff=0.6)
+        items = VGroup(
+            VGroup(cn("1.", 30, FORCE), cn("同号电荷相斥，异号电荷相吸。", 30)),
+            VGroup(cn("2.", 30, FORCE), cn("库仑力沿两电荷连线方向。", 30)),
+            VGroup(cn("3.", 30, FORCE), cn("力的大小与电荷量乘积成正比，与距离平方成反比。", 30)),
         )
-        axes.to_edge(LEFT, buff=1)
+        for item in items:
+            item.arrange(RIGHT, buff=0.18)
+        items.arrange(DOWN, aligned_edge=LEFT, buff=0.35).move_to(ORIGIN + DOWN * 0.3)
 
-        x_label = axes.get_x_axis_label(r"r\, (m)")
-        y_label = axes.get_y_axis_label(r"F\, (N)")
-        graph = axes.plot(lambda x: 8 / (x**2 + 0.5), color=BLUE)
-        graph_label = axes.get_graph_label(graph, label="F(r)", x_val=4.5, direction=UR)
+        formula = MathTex(r"F = k\frac{|q_1q_2|}{r^2}", font_size=54, color=YELLOW)
+        formula.next_to(items, DOWN, buff=0.55)
 
-        point = Dot(axes.c2p(1.5, 3.0), color=YELLOW)
-        point_label = MathTex("(r, F)", font_size=28).next_to(point, UR)
-        explanation = Text("距离越大，力的大小迅速减小，符合反平方规律", font="Microsoft YaHei", font_size=28).scale(0.8)
-        explanation.next_to(axes, RIGHT, buff=0.8)
-
-        self.play(Create(axes), Write(x_label), Write(y_label))
-        self.wait(1)
-        self.play(Create(graph), Write(graph_label))
-        self.wait(1)
-        self.play(Create(point), Write(point_label), Write(explanation))
-        self.wait(3)
-        self.play(FadeOut(axes), FadeOut(x_label), FadeOut(y_label), FadeOut(graph), FadeOut(graph_label), FadeOut(point), FadeOut(point_label), FadeOut(explanation))
-
-    def summary_scene(self):
-        summary = VGroup(
-            Text("库仑定律表达为：F = k q_1 q_2 / r^2", font="Microsoft YaHei", font_size=32),
-            Text("同号电荷排斥，异号电荷吸引", font="Microsoft YaHei", font_size=32),
-            Text("力的大小与电荷量成正比，与距离的平方成反比", font="Microsoft YaHei", font_size=32),
-        )
-        summary.arrange(DOWN, aligned_edge=LEFT)
-        summary.scale(0.8)
-        self.play(Create(summary))
-        self.wait(4)
-        self.play(FadeOut(summary))
+        self.play(FadeIn(title, shift=DOWN))
+        for item in items:
+            self.play(FadeIn(item, shift=RIGHT), run_time=0.45)
+        self.play(Write(formula))
+        self.wait(1.6)
+        self.play(FadeOut(VGroup(title, items, formula)))
 
 
 if __name__ == "__main__":
-    """运行命令示例：
-    manim -pqh coulombs_law.py CoulombsLawScene
-    """
+    # Quick preview:
+    # manim -pql coulombs_law.py CoulombsLawScene
+    #
+    # Final render:
+    # manim -pqh coulombs_law.py CoulombsLawScene
     pass

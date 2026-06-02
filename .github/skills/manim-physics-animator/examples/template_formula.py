@@ -1,153 +1,184 @@
-"""
-Manim 物理动画模板 - 基础公式推导
-适用于: 定义、推导、定律演示
-"""
-
 from manim import *
-from manim.utils.tex_templates import TexTemplateLibrary
 
-# 如果需要中文支持，取消下面的注释
-# config.tex_template = TexTemplateLibrary.ctex
+
+config.frame_width = 14.222
+config.frame_height = 8.0
+config.pixel_width = 1280
+config.pixel_height = 720
+config.background_color = "#0b1020"
+
+
+FONT = "Microsoft YaHei"
+ACCENT = "#ffd166"
+BLUE = "#5aa9ff"
+GREEN = "#33d17a"
+RED = "#ff4d4f"
+
+
+def cn(text, font_size=30, color=WHITE, weight="NORMAL"):
+    return Text(text, font=FONT, font_size=font_size, color=color, weight=weight)
+
 
 class FormulaDerivationTemplate(Scene):
-    """
-    这是一个基础模板，展示如何用 Manim 推导和展示物理公式。
-    
-    典型步骤：
-    1. 标题
-    2. 显示基本定义或已知量
-    3. 逐步推导，每次添加一个新的关系
-    4. 显示最终结果
-    5. 可视化结果（如曲线、矢量等）
-    """
-    
+    """公式推导类动画模板：适合定义、定律、比例关系和推导过程。"""
+
     def construct(self):
-        # ========== 第一幕：标题 ==========
-        title = Tex("公式推导示例")
-        self.play(Write(title))
-        self.wait(1)
-        self.play(FadeOut(title))
-        
-        # ========== 第二幕：基本定义 ==========
-        definition = Tex(r"定义: 物理量 $X = \frac{Y}{Z}$")
-        self.play(Write(definition))
-        self.wait(2)
-        
-        # ========== 第三幕：推导过程 ==========
-        # 显示第一个等式
-        eq1 = Tex(r"$Y = k \cdot A$")
-        eq1.shift(UP * 2)
+        self.show_title()
+        self.show_known_relations()
+        self.derive_formula()
+        self.apply_formula()
+
+    def show_title(self):
+        title = cn("公式推导动画模板", font_size=44, weight="BOLD")
+        subtitle = cn("一屏只讲一个关系，让学生跟得上推导过程", font_size=28, color=GREY_A)
+        subtitle.next_to(title, DOWN, buff=0.35)
+        self.play(FadeIn(title, shift=DOWN), FadeIn(subtitle, shift=DOWN), run_time=0.8)
+        self.wait(0.8)
+        self.play(FadeOut(VGroup(title, subtitle)))
+
+    def show_known_relations(self):
+        heading = cn("第一步：写出已知关系", font_size=34, color=ACCENT, weight="BOLD")
+        heading.to_edge(UP, buff=0.55)
+
+        relation_1 = MathTex(r"X = \frac{Y}{Z}", font_size=48)
+        relation_2 = MathTex(r"Y = kA,\quad Z = B", font_size=48)
+        relations = VGroup(relation_1, relation_2).arrange(DOWN, buff=0.55).move_to(ORIGIN)
+
+        labels = VGroup(
+            cn("先出现定义式", font_size=25, color=GREY_A).next_to(relation_1, LEFT, buff=0.55),
+            cn("再补充可替换关系", font_size=25, color=GREY_A).next_to(relation_2, LEFT, buff=0.55),
+        )
+
+        self.play(FadeIn(heading))
+        self.play(Write(relation_1), FadeIn(labels[0], shift=RIGHT), run_time=0.8)
+        self.play(Write(relation_2), FadeIn(labels[1], shift=RIGHT), run_time=0.8)
+        self.wait(0.8)
+        self.play(FadeOut(VGroup(heading, relations, labels)))
+
+    def derive_formula(self):
+        heading = cn("第二步：代入并得到结论", font_size=34, color=ACCENT, weight="BOLD")
+        heading.to_edge(UP, buff=0.55)
+
+        eq1 = MathTex(r"X = \frac{Y}{Z}", font_size=46)
+        eq2 = MathTex(r"X = \frac{kA}{B}", font_size=50, color=ACCENT)
+        eq3 = MathTex(r"\therefore\quad X \propto A,\quad X \propto \frac{1}{B}", font_size=42, color=GREEN)
+        equations = VGroup(eq1, eq2, eq3).arrange(DOWN, buff=0.55).move_to(ORIGIN)
+
+        arrow_1 = Arrow(eq1.get_bottom(), eq2.get_top(), color=GREY_B, buff=0.15)
+        arrow_2 = Arrow(eq2.get_bottom(), eq3.get_top(), color=GREY_B, buff=0.15)
+
+        self.play(FadeIn(heading))
         self.play(Write(eq1))
-        self.wait(1)
-        
-        # 显示第二个等式
-        eq2 = Tex(r"$Z = B$")
-        eq2.shift(DOWN * 1)
-        self.play(Write(eq2))
-        self.wait(1)
-        
-        # 显示推导结果
-        eq3 = Tex(r"$\therefore X = \frac{k \cdot A}{B}$", color=YELLOW)
-        eq3.shift(DOWN * 3)
-        self.play(Write(eq3))
-        self.wait(2)
-        
-        # ========== 第四幕：数值验证 ==========
-        values = Tex(r"数值: $k = 9 \times 10^9$, $A = 2$, $B = 4$")
-        values.shift(DOWN * 4.5)
-        self.play(Write(values))
-        self.wait(1)
-        
-        result = Tex(r"$X = \frac{9 \times 10^9 \times 2}{4} = 4.5 \times 10^9$", color=GREEN)
-        result.shift(DOWN * 5.5)
-        self.play(Write(result))
-        self.wait(2)
-        
-        self.play(FadeOut(definition), FadeOut(eq1), FadeOut(eq2), 
-                  FadeOut(eq3), FadeOut(values), FadeOut(result))
+        self.play(Create(arrow_1), TransformFromCopy(eq1, eq2), run_time=0.9)
+        self.play(Create(arrow_2), Write(eq3), run_time=0.9)
+        self.wait(1.0)
+        self.play(FadeOut(VGroup(heading, equations, arrow_1, arrow_2)))
+
+    def apply_formula(self):
+        heading = cn("第三步：用数值检验公式含义", font_size=34, color=ACCENT, weight="BOLD")
+        heading.to_edge(UP, buff=0.55)
+
+        axes = Axes(
+            x_range=[0, 5, 1],
+            y_range=[0, 6, 1],
+            x_length=6,
+            y_length=3.8,
+            tips=False,
+            axis_config={"color": GREY_B},
+        ).shift(LEFT * 1.0 + DOWN * 0.3)
+        labels = axes.get_axis_labels(MathTex("B"), MathTex("X"))
+        curve = axes.plot(lambda x: 5 / (x + 0.4), x_range=[0.4, 5], color=BLUE, stroke_width=5)
+
+        note = VGroup(
+            cn("当 B 增大时", font_size=30),
+            MathTex(r"X=\frac{kA}{B}", font_size=46, color=ACCENT),
+            cn("对应的 X 逐渐减小", font_size=30, color=GREEN),
+        ).arrange(DOWN, buff=0.25).next_to(axes, RIGHT, buff=0.75)
+
+        dot_tracker = ValueTracker(0.8)
+        dot = always_redraw(lambda: Dot(
+            axes.c2p(dot_tracker.get_value(), 5 / (dot_tracker.get_value() + 0.4)),
+            color=ACCENT,
+            radius=0.08,
+        ))
+
+        self.play(FadeIn(heading), Create(axes), Write(labels), run_time=0.9)
+        self.play(Create(curve), FadeIn(note, shift=LEFT), run_time=1.0)
+        self.play(FadeIn(dot))
+        self.play(dot_tracker.animate.set_value(4.2), run_time=2.2)
+        self.wait(0.8)
+        self.play(FadeOut(VGroup(heading, axes, labels, curve, note, dot)))
 
 
 class VectorDemonstrationTemplate(Scene):
-    """
-    展示矢量和箭头的使用。
-    适用于: 力、电场等矢量场的演示
-    """
-    
+    """矢量演示模板：适合力、电场强度、速度、加速度等方向性物理量。"""
+
     def construct(self):
-        # 创建坐标系
-        axes = Axes(
-            x_range=[-3, 3, 1],
-            y_range=[-3, 3, 1],
-            axis_config={"color": GREY_A},
-            tips=False,
+        title = cn("矢量合成演示模板", font_size=40, weight="BOLD").to_edge(UP, buff=0.55)
+        axes = NumberPlane(
+            x_range=[-4, 4, 1],
+            y_range=[-2.5, 2.5, 1],
+            background_line_style={"stroke_color": "#334155", "stroke_width": 1},
+            axis_config={"color": GREY_B},
         )
-        self.add(axes)
-        
-        # 创建矢量
-        v1 = Arrow(ORIGIN, [2, 1, 0], color=BLUE)
-        v2 = Arrow([2, 1, 0], [3, 2.5, 0], color=RED)
-        v_resultant = Arrow(ORIGIN, [3, 2.5, 0], color=GREEN, stroke_width=3)
-        
-        # 标签
-        label1 = MathTex(r"\vec{F}_1", color=BLUE).shift([1, 0.5, 0])
-        label2 = MathTex(r"\vec{F}_2", color=RED).shift([2.5, 1.75, 0])
-        label_result = MathTex(r"\vec{F}_{total}", color=GREEN).shift([1.5, 1.25, 0])
-        
-        # 演示
-        self.play(Create(v1), Write(label1))
-        self.wait(1)
-        self.play(Create(v2), Write(label2))
-        self.wait(1)
-        self.play(Create(v_resultant), Write(label_result))
-        self.wait(2)
+
+        vector_1 = Arrow(ORIGIN, RIGHT * 2.3 + UP * 0.8, color=BLUE, stroke_width=7, buff=0)
+        vector_2 = Arrow(vector_1.get_end(), vector_1.get_end() + RIGHT * 1.2 + UP * 1.0, color=RED, stroke_width=7, buff=0)
+        resultant = Arrow(ORIGIN, vector_2.get_end(), color=GREEN, stroke_width=8, buff=0)
+
+        labels = VGroup(
+            MathTex(r"\vec F_1", color=BLUE, font_size=34).next_to(vector_1, DOWN, buff=0.12),
+            MathTex(r"\vec F_2", color=RED, font_size=34).next_to(vector_2, RIGHT, buff=0.12),
+            MathTex(r"\vec F", color=GREEN, font_size=38).next_to(resultant, UP, buff=0.12),
+        )
+
+        self.play(FadeIn(title), Create(axes))
+        self.play(Create(vector_1), Write(labels[0]))
+        self.play(Create(vector_2), Write(labels[1]))
+        self.play(Create(resultant), Write(labels[2]))
+        self.wait(1.2)
 
 
 class CurveTraceTemplate(Scene):
-    """
-    展示函数曲线。
-    适用于: U-I 特性、电势分布等曲线演示
-    """
-    
+    """曲线追踪模板：适合 U-I 图像、F-r 图像、轨迹和变量关系。"""
+
     def construct(self):
-        # 创建坐标系
-        ax = Axes(
-            x_range=[0, 5, 1],
-            y_range=[0, 10, 2],
-            axis_config={"color": GREY_A},
+        title = cn("变量关系曲线模板", font_size=40, weight="BOLD").to_edge(UP, buff=0.55)
+        axes = Axes(
+            x_range=[0, 5.5, 1],
+            y_range=[0, 5.5, 1],
+            x_length=7,
+            y_length=4,
             tips=False,
-        )
-        labels = ax.get_axis_labels(x_label="x", y_label="y")
-        
-        # 绘制函数
-        curve = ax.plot(lambda x: x**2, color=BLUE, stroke_width=2)
-        
-        # 标题
-        title = MathTex("y = x^2", color=BLUE).to_corner(UP)
-        
-        self.add(ax, labels, title)
+            axis_config={"color": GREY_B},
+        ).shift(DOWN * 0.25)
+        labels = axes.get_axis_labels(MathTex("x"), MathTex("y"))
+        curve = axes.plot(lambda x: 0.22 * x ** 2 + 0.5, x_range=[0, 5], color=BLUE, stroke_width=5)
+
+        tracker = ValueTracker(0.5)
+        dot = always_redraw(lambda: Dot(
+            axes.c2p(tracker.get_value(), 0.22 * tracker.get_value() ** 2 + 0.5),
+            color=ACCENT,
+            radius=0.08,
+        ))
+        value_label = always_redraw(lambda: MathTex(
+            rf"x={tracker.get_value():.1f}",
+            font_size=32,
+            color=ACCENT,
+        ).next_to(dot, UP, buff=0.18))
+
+        self.play(FadeIn(title), Create(axes), Write(labels))
         self.play(Create(curve))
-        self.wait(2)
-        
-        # 在曲线上标注几个点
-        for x in [1, 2, 3]:
-            y = x ** 2
-            dot = Dot(ax.c2p(x, y), color=RED)
-            self.play(Create(dot))
-            self.wait(0.5)
+        self.play(FadeIn(dot), Write(value_label))
+        self.play(tracker.animate.set_value(5.0), run_time=2.5)
+        self.wait(0.8)
 
 
 if __name__ == "__main__":
-    """
-    运行命令示例：
-    
-    # 低质量快速预览
-    manim -ql template_formula.py FormulaDerivationTemplate
-    
-    # 高质量最终版本
-    manim -pqh template_formula.py FormulaDerivationTemplate
-    
-    # 其他场景
-    manim -pqh template_formula.py VectorDemonstrationTemplate
-    manim -pqh template_formula.py CurveTraceTemplate
-    """
+    # Quick preview:
+    # manim -pql template_formula.py FormulaDerivationTemplate
+    #
+    # Other scenes:
+    # manim -pql template_formula.py VectorDemonstrationTemplate
+    # manim -pql template_formula.py CurveTraceTemplate
     pass
