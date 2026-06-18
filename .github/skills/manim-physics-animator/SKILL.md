@@ -1,90 +1,131 @@
 ---
 name: manim-physics-animator
-description: Generate classroom-ready Python Manim animations for high school physics teaching, especially electromagnetism topics such as Coulomb's law, electric fields, electric potential, capacitors, circuits, electromagnetic induction, and charged-particle motion. Use when the user asks for Manim physics animation, formula derivation animation, concept visualization, teaching video, physics process animation, or PPT-ready MP4 resources.
+description: 生成面向高中物理课堂的 Manim 教学动画，尤其适用于必修第三册和选择性必修第二册中的电磁学内容，如库仑定律、电场线、电势、电容器、电路、电磁感应、带电粒子运动和回旋加速器。用户需要 Manim 物理动画、公式推导动画、概念可视化、课堂讲解视频、物理过程动画或可插入 PPT 的 MP4 资源时使用。
 ---
 
-# Manim Physics Animator
+# Manim 物理动画生成器
 
-Use this skill to create Manim Community Edition animations that serve classroom teaching, not just decorative formula videos.
+使用本 skill 创建服务课堂教学的 Manim Community Edition 动画。动画应帮助学生理解物理概念、规律、过程或图像关系，而不是只做装饰性公式视频。默认面向人教版高中物理必修第三册和选择性必修第二册中的电磁学内容。
 
-## Output Goal
+## 典型触发请求
 
-Produce a complete Manim `.py` scene that can be rendered as a 16:9 teaching video. The animation should help high school students understand one physical concept, law, process, or graph relationship.
+用户提出以下需求时，应优先使用本 skill：
 
-Default audience: high school physics teachers and students.
+- “生成一个电场线/等势面/带电粒子运动/回旋加速器 Manim 动画。”
+- “把某个高中物理电磁学知识点做成课堂讲解视频。”
+- “用动画分步展示公式、方向、轨迹或物理过程。”
+- “给我一个可插入 PPT 的 MP4 教学视频。”
 
-Default style: clean blackboard or dark-stage visual language, clear Chinese labels, readable formulas, restrained colors, and visible motion.
+如果用户同时需要“讲解动画”和“交互网页”，本 skill 负责 Manim 动画资源，`physics-interactive-sim-lab` 负责 HTML/JavaScript 交互资源。
 
-## Workflow
+## 输出目标
 
-1. Clarify the teaching target.
-   - Identify the exact concept, law, formula, graph relationship, or physical process.
-   - State the textbook-level learning goal in one sentence.
-   - If the user does not specify a grade or chapter, assume high school physics and keep the model simple.
+生成一个完整的 Manim `.py` 场景，可渲染为 16:9 教学视频。动画应帮助高中学生理解一个明确的物理概念、规律、过程或图像关系。
 
-2. Design a storyboard before coding.
-   - Use 4 to 6 short scenes.
-   - Each scene must have a teaching purpose, visible objects, animation action, and expected student takeaway.
-   - Avoid long paragraphs on screen. Prefer short labels, arrows, color emphasis, and one key formula at a time.
+默认对象：高中物理教师和高中学生。
 
-3. Check the physics model.
-   - Confirm formula, units, direction, sign convention, and model assumptions.
-   - For vector quantities, explicitly show direction with arrows.
-   - For inverse-square or proportional relations, include a dynamic comparison or graph.
-   - If a generated visual might be misleading, simplify or add an assumption label.
+默认风格：中文标签清晰、公式可读、色彩克制、运动过程可见；可根据资源主题采用浅色教材图解风格或简洁深色舞台风格。
 
-4. Write Manim code.
-   - Use Manim Community Edition APIs.
-   - Use `Text(..., font="Microsoft YaHei")` for Chinese labels by default.
-   - Use `MathTex` for formulas and symbols only.
-   - Use helper functions for repeated objects such as charges, arrows, axes, labels, and callouts.
-   - Prefer `ValueTracker` and `always_redraw` when showing variable changes.
-   - Avoid external images, audio, custom fonts, or network assets unless the user provides them.
+## 当前重点主题
 
-5. Provide render commands and classroom use notes.
-   - Quick preview: `manim -pql file.py SceneClass`
-   - Final render: `manim -pqh file.py SceneClass`
-   - Explain how the teacher can use the animation in导入、讲解、对比、总结 or课后预习.
+优先支持以下高中电磁学主题：
 
-## Required Animation Quality
+- 必修第三册：库仑定律、电场强度、电场线、电势、电势差、等势面、带电粒子在电场中的运动、电路和电容器。
+- 选择性必修第二册：磁场、洛伦兹力、带电粒子在磁场中的运动、质谱仪、回旋加速器、电磁感应相关基础演示。
 
-- The output must include real motion or transformation. A sequence of static formulas is not enough.
-- The first screen should show the topic and core question.
-- The main screen should show a physical model: objects, distance, direction, trajectory, field line, circuit path, coordinate axes, or graph.
-- Important physical quantities must have labels and units.
-- Use color consistently:
-  - positive charge: red
-  - negative charge: blue
-  - force/vector arrows: yellow or white
-  - distance/trajectory: green
-  - formulas/key conclusions: yellow
-- Keep text inside the safe area. Do not place dense Chinese text near the frame edge.
-- Do not overcrowd the frame with more than one complex idea at once.
+动画应服务教师讲解过程：先呈现物理情境，再突出方向或变量关系，最后归纳规律。不要只堆公式，也不要为了好看牺牲物理正确性。
 
-## Physics Guardrails
+## 工作流
 
-- Coulomb force: use magnitude `F = k |q1 q2| / r^2`; direction depends on charge signs.
-- Electric field of a positive charge points outward; electric field of a negative charge points inward.
-- Field lines do not cross.
-- For electric potential and equipotential lines, distinguish scalar potential from vector electric field.
-- For circuit topics, clearly distinguish current direction, conventional current, electron motion, voltage, resistance, and power.
-- For particle motion in electric or magnetic fields, state assumptions such as uniform field, neglecting gravity, or non-relativistic motion.
+1. 明确教学目标。
+   - 确定要讲解的具体概念、规律、公式、图像关系或物理过程。
+   - 用一句话说明教材层面的学习目标。
+   - 如果用户没有指定学段和章节，默认按高中物理处理，模型保持简洁。
 
-## Response Format
+2. 编写分镜脚本。
+   - 使用 4 到 6 个短分镜。
+   - 每个分镜都要有明确教学作用、可见物体、动画动作和学生应形成的理解。
+   - 屏幕上避免长段文字，优先使用短标签、箭头、颜色强调和单个关键公式。
 
-When using this skill, respond with:
+3. 检查物理模型。
+   - 确认公式、单位、方向、正负号约定和模型假设。
+   - 矢量量必须用箭头明确表示方向。
+   - 反平方、正比、反比等关系应尽量加入动态比较或图像。
+   - 如果生成图像可能误导学生，应简化图像或增加模型假设标注。
+
+4. 编写 Manim 代码。
+   - 使用 Manim Community Edition API。
+   - 中文文字默认使用 `Text(..., font="Microsoft YaHei")`。
+   - 公式和物理符号使用 `MathTex`。
+   - 重复对象如电荷、箭头、坐标轴、标签、提示框等应封装成辅助函数。
+   - 展示变量变化时优先使用 `ValueTracker` 和 `always_redraw`。
+   - 除非用户提供素材，否则避免外部图片、音频、自定义字体或网络资源。
+
+5. 提供渲染命令和课堂使用说明。
+   - 快速预览：`manim -pql file.py SceneClass`
+   - 高清渲染：`manim -pqh file.py SceneClass`
+   - 说明教师可如何用于导入、讲解、对比、总结或课后预习。
+
+## 动画质量要求
+
+- 必须包含真实运动或变换，不能只是静态公式堆叠。
+- 第一屏应显示主题和核心问题。
+- 主画面应呈现物理模型，如物体、距离、方向、轨迹、电场线、电路路径、坐标轴或图像。
+- 关键物理量必须有清晰标签和单位。
+- 颜色保持一致：
+  - 正电荷：红色
+  - 负电荷：蓝色
+  - 力或矢量箭头：黄色或白色
+  - 距离或轨迹：绿色
+  - 公式或关键结论：黄色或强调色
+- 文本必须在安全区域内，不要贴近画面边缘。
+- 每一屏只讲一个主要问题，避免画面过满。
+
+## 物理正确性要求
+
+- 库仑力：使用大小 `F = k |q1 q2| / r^2`，方向由电荷正负决定。
+- 正电荷电场方向向外，负电荷电场方向向内。
+- 电场线不能相交；双电荷场线应按合电场方向生成，不能画成简单连线。
+- 电势和等势线资源中，要区分标量电势和矢量电场强度。
+- 电路资源中，要区分电流方向、传统电流、电子运动、电压、电阻和功率。
+- 带电粒子在电场或磁场中运动时，应写清匀强场、忽略重力、非相对论等假设。
+
+## 默认文件组织
+
+- Manim 示例或新资源优先放在 `examples/` 目录。
+- 文件名使用小写英文和下划线，如 `electric_field_lines.py`。
+- 场景类名使用清晰的英文 PascalCase，如 `ElectricFieldLinesScene`。
+- 渲染输出放在项目 `build/videos/manim/` 目录，不放进 skill 目录。
+
+## 动画校验清单
+
+交付前至少检查：
+
+- 物理方向是否正确，尤其是电场线、受力方向、速度方向、磁场方向和洛伦兹力方向。
+- 双电荷电场线应按合电场方向生成，不能画成简单连线。
+- 每屏文字是否在安全区域内，是否有遮挡、溢出或过密。
+- 动画是否有真实运动或变换，不是静态幻灯片。
+- 本地环境可用时，至少运行 `py_compile`；Manim 可用时渲染低清预览或保存关键帧检查。
+
+## 回复格式
+
+使用本 skill 回答时，按以下结构说明：
 
 1. `动画目标`
 2. `分镜脚本`
 3. `物理模型与假设`
-4. `Manim代码`
+4. `Manim 代码`
 5. `运行命令`
 6. `课堂使用建议`
 
-If the user asks you to edit files directly, write or update the `.py` file and then run at least a syntax check. Render a preview when the local Manim environment is available.
+如果用户要求直接编辑文件，应直接更新 `.py` 文件，并至少运行语法检查；如果本地 Manim 环境可用，应渲染预览视频或保存关键帧检查。
 
-## Useful Examples
+## 可参考示例
 
-- `examples/coulombs_law.py`: classroom animation for Coulomb's law with charge signs, force arrows, distance comparison, and inverse-square relation.
-- `examples/template_formula.py`: reusable templates for formula derivation, vector demonstration, and curve tracing.
-- `examples/test_chinese.py`: quick Chinese text rendering test.
+- `examples/coulombs_law.py`：库仑定律课堂动画，包含电荷正负、力箭头、距离变化和反平方关系。
+- `examples/electric_field_lines.py`：点电荷和两点电荷电场线课堂动画，强调电场线方向和典型分布。
+- `examples/electric_potential_equipotential.py`：电势与等势面课堂动画，强调电势、等势线、电场方向和二者垂直关系。
+- `examples/charged_particle_uniform_field.py`：带电粒子在匀强电场中偏转的课堂动画，包含受力方向、运动分解、抛物线轨迹和参数比较。
+- `examples/cyclotron.py`：回旋加速器课堂动画，包含 D 形盒结构、磁场偏转、缝隙加速、半径增大和周期关系。
+- `examples/template_formula.py`：公式推导、矢量演示和曲线追踪的可复用模板。
+- `examples/test_chinese.py`：中文文字渲染测试示例。

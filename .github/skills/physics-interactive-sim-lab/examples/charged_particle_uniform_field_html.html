@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>带电粒子在匀强电场中的运动可视化资源</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --path: #ffd166;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 18px 0 24px; }
+    .topbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 14px; align-items: start; }
+    .stage-panel, .side-panel, .control-panel, .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .stage-panel { padding: 12px; }
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 430px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+    #motionCanvas { width: 100%; height: 100%; display: block; }
+    .stage-readout {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+    .readout-item {
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+    .side-panel { padding: 14px; }
+    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
+    .metric { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: #f8fafc; }
+    .metric-label { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+    .metric-value { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.25; overflow-wrap: anywhere; }
+    .metric-value.positive { color: var(--positive); }
+    .metric-value.negative { color: var(--negative); }
+    .metric-value.neutral { color: var(--accent); }
+    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .control-panel { margin-top: 14px; padding: 14px; }
+    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
+    .field { margin-top: 10px; }
+    .field label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    button {
+      min-height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: #f1f5f9; }
+    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
+    button.active:hover, .primary-btn:hover { background: #0d665f; }
+    .toggles { display: grid; gap: 9px; }
+    .toggle { display: flex; align-items: center; gap: 9px; font-size: 15px; user-select: none; }
+    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .inquiry-panel { margin-top: 14px; padding: 14px; }
+    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    @media (max-width: 960px) {
+      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
+      .topbar { align-items: start; flex-direction: column; }
+      .formula { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>带电粒子在匀强电场中的运动可视化资源</h1>
+        <p class="subtitle">观察粒子进入平行板电场后的受力、速度分解和偏转轨迹。</p>
+      </div>
+      <div class="formula">F = qE，a = qE / m，y = 1/2 at²</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="运动演示区">
+          <div class="stage-wrap">
+            <canvas id="motionCanvas" width="960" height="540"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">粒子：<span id="stageParticle">正电荷</span></div>
+              <div class="readout-item">偏转：<span id="stageDeflection">0.00</span></div>
+              <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>参数调节</h2>
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">电场与粒子</div>
+              <div class="field">
+                <label for="fieldSlider"><span>电场强度 E</span><span id="fieldValue">1.0</span></label>
+                <input id="fieldSlider" type="range" min="0.3" max="2.4" value="1" step="0.1" />
+              </div>
+              <div class="field">
+                <label for="speedSlider"><span>初速度 v₀</span><span id="speedValue">1.4</span></label>
+                <input id="speedSlider" type="range" min="0.8" max="2.6" value="1.4" step="0.1" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">粒子电性</div>
+              <div class="segmented">
+                <button type="button" class="charge-btn active" data-charge="1">正电荷</button>
+                <button type="button" class="charge-btn" data-charge="-1">负电荷</button>
+              </div>
+              <div class="field">
+                <label for="massSlider"><span>质量倍率 m</span><span id="massValue">1.0</span></label>
+                <input id="massSlider" type="range" min="0.6" max="2.4" value="1" step="0.1" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">显示与播放</div>
+              <div class="toggles">
+                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示力和速度分解</span></label>
+                <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>显示运动分解参考</span></label>
+              </div>
+              <div class="field">
+                <button type="button" class="primary-btn" id="playBtn">播放</button>
+                <button type="button" id="resetBtn">重置</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>改变粒子电性后，受力方向和轨迹偏转方向如何变化？</li>
+            <li>增大电场强度时，偏转程度为什么会增大？</li>
+            <li>增大初速度时，粒子在电场中的运动时间怎样变化？偏转怎样变化？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="资源说明">
+        <h2>资源说明</h2>
+        <div class="metric">
+          <div class="metric-label">受力方向</div>
+          <div class="metric-value" id="forceDirection">向下</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">离开电场时偏转</div>
+          <div class="metric-value neutral" id="deflectionValue">0.00</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">运动分解</div>
+          <div class="metric-note" id="motionNote">水平方向近似匀速，竖直方向在电场力作用下做匀加速运动。</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("motionCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const controls = {
+      fieldSlider: document.getElementById("fieldSlider"),
+      speedSlider: document.getElementById("speedSlider"),
+      massSlider: document.getElementById("massSlider"),
+      showVectors: document.getElementById("showVectors"),
+      showGhosts: document.getElementById("showGhosts"),
+      playBtn: document.getElementById("playBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      chargeButtons: Array.from(document.querySelectorAll(".charge-btn"))
+    };
+
+    const output = {
+      fieldValue: document.getElementById("fieldValue"),
+      speedValue: document.getElementById("speedValue"),
+      massValue: document.getElementById("massValue"),
+      stageParticle: document.getElementById("stageParticle"),
+      stageDeflection: document.getElementById("stageDeflection"),
+      stageStatus: document.getElementById("stageStatus"),
+      forceDirection: document.getElementById("forceDirection"),
+      deflectionValue: document.getElementById("deflectionValue"),
+      motionNote: document.getElementById("motionNote")
+    };
+
+    const state = {
+      E: 1.0,
+      v0: 1.4,
+      mass: 1.0,
+      charge: 1,
+      playing: false,
+      progress: 0
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function geometry() {
+      return { left: 125, right: 835, top: 105, bottom: 435, midY: 270 };
+    }
+
+    function acceleration() {
+      return state.charge * state.E / state.mass;
+    }
+
+    function deflectionAt(t) {
+      const T = 1 / state.v0;
+      return 0.5 * acceleration() * Math.pow(t * T, 2);
+    }
+
+    function finalDeflection() {
+      return deflectionAt(1);
+    }
+
+    function pathPoint(t) {
+      const g = geometry();
+      const x = g.left + t * (g.right - g.left);
+      const yScale = 135;
+      const y = g.midY + deflectionAt(t) * yScale;
+      return { x, y };
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, width = 3, headLength = 12) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawStage() {
+      const g = geometry();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#080a0e";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.fillStyle = "rgba(255,48,48,0.16)";
+      ctx.fillRect(g.left, g.top - 38, g.right - g.left, 26);
+      ctx.fillStyle = "rgba(83,99,255,0.18)";
+      ctx.fillRect(g.left, g.bottom + 12, g.right - g.left, 26);
+      ctx.strokeStyle = "rgba(255,255,255,0.72)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(g.left, g.top - 38, g.right - g.left, 26);
+      ctx.strokeRect(g.left, g.bottom + 12, g.right - g.left, 26);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px Arial";
+      ctx.textAlign = "left";
+      ctx.fillText("+ 极板", g.left + 12, g.top - 18);
+      ctx.fillText("- 极板", g.left + 12, g.bottom + 32);
+
+      for (let x = g.left + 45; x < g.right; x += 76) {
+        drawArrow(x, g.top + 20, x, g.bottom - 20, "rgba(255,255,255,0.45)", 2, 9);
+      }
+      ctx.restore();
+
+      drawPath();
+      drawParticle();
+      drawLabels();
+    }
+
+    function drawPath() {
+      const g = geometry();
+      ctx.save();
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      for (let i = 0; i <= 140; i += 1) {
+        const p = pathPoint(i / 140);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+
+      if (controls.showGhosts.checked) {
+        ctx.setLineDash([8, 8]);
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(g.left, g.midY);
+        ctx.lineTo(g.right, g.midY);
+        ctx.stroke();
+        const p = pathPoint(1);
+        ctx.beginPath();
+        ctx.moveTo(g.right, g.midY);
+        ctx.lineTo(g.right, p.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }
+
+    function drawParticle() {
+      const t = clamp(state.progress, 0, 1);
+      const p = pathPoint(t);
+      const color = state.charge > 0 ? "#ff3030" : "#5363ff";
+      ctx.save();
+      ctx.shadowColor = state.charge > 0 ? "rgba(255,48,48,0.45)" : "rgba(83,99,255,0.45)";
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(state.charge > 0 ? "+" : "-", p.x, p.y);
+      ctx.restore();
+
+      if (controls.showVectors.checked) {
+        const forceSign = state.charge > 0 ? 1 : -1;
+        drawArrow(p.x, p.y, p.x, p.y + forceSign * 72, "#ffd166", 5, 15);
+        drawArrow(p.x, p.y, p.x + 74, p.y, "rgba(255,255,255,0.86)", 4, 12);
+        ctx.save();
+        ctx.fillStyle = "#ffd166";
+        ctx.font = "bold 18px Arial";
+        ctx.fillText("F=qE", p.x + 10, p.y + forceSign * 88);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("v₀", p.x + 83, p.y - 8);
+        ctx.restore();
+      }
+    }
+
+    function drawLabels() {
+      const g = geometry();
+      const p = pathPoint(1);
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "bold 18px Microsoft YaHei, Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("水平：近似匀速运动", (g.left + g.right) / 2, g.bottom + 73);
+      ctx.fillText("竖直：在电场力作用下做匀加速运动", (g.left + g.right) / 2, 49);
+      ctx.fillStyle = "#ffd166";
+      ctx.textAlign = "left";
+      ctx.fillText(`偏转量 y ≈ ${Math.abs(finalDeflection()).toFixed(2)}`, g.right - 130, p.y + (p.y < g.midY ? -18 : 30));
+      ctx.restore();
+    }
+
+    function updateOutputs() {
+      const def = finalDeflection();
+      const forceText = state.charge > 0 ? "向下，与电场方向一致" : "向上，与电场方向相反";
+      output.fieldValue.textContent = state.E.toFixed(1);
+      output.speedValue.textContent = state.v0.toFixed(1);
+      output.massValue.textContent = state.mass.toFixed(1);
+      output.stageParticle.textContent = state.charge > 0 ? "正电荷" : "负电荷";
+      output.stageDeflection.textContent = Math.abs(def).toFixed(2);
+      output.stageStatus.textContent = state.playing ? "播放" : "暂停";
+      output.forceDirection.textContent = forceText;
+      output.forceDirection.className = state.charge > 0 ? "metric-value positive" : "metric-value negative";
+      output.deflectionValue.textContent = `${Math.abs(def).toFixed(2)}（相对值）`;
+      output.motionNote.textContent = state.v0 > 1.8 ? "初速度较大，通过电场时间较短，因此偏转减小。" : "水平方向近似匀速，竖直方向在电场力作用下做匀加速运动。";
+    }
+
+    function render() {
+      updateOutputs();
+      drawStage();
+    }
+
+    function animate() {
+      if (state.playing) {
+        state.progress += 0.0065;
+        if (state.progress >= 1) {
+          state.progress = 1;
+          state.playing = false;
+          controls.playBtn.textContent = "播放";
+        }
+        render();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    controls.fieldSlider.addEventListener("input", () => { state.E = Number(controls.fieldSlider.value); render(); });
+    controls.speedSlider.addEventListener("input", () => { state.v0 = Number(controls.speedSlider.value); render(); });
+    controls.massSlider.addEventListener("input", () => { state.mass = Number(controls.massSlider.value); render(); });
+    controls.showVectors.addEventListener("change", render);
+    controls.showGhosts.addEventListener("change", render);
+    controls.chargeButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.charge = Number(button.dataset.charge);
+        controls.chargeButtons.forEach(btn => btn.classList.toggle("active", btn === button));
+        render();
+      });
+    });
+    controls.playBtn.addEventListener("click", () => {
+      state.playing = !state.playing;
+      controls.playBtn.textContent = state.playing ? "暂停" : "播放";
+      if (state.progress >= 1) state.progress = 0;
+      render();
+    });
+    controls.resetBtn.addEventListener("click", () => {
+      state.progress = 0;
+      state.playing = false;
+      controls.playBtn.textContent = "播放";
+      render();
+    });
+
+    window.addEventListener("resize", render);
+    render();
+    animate();
+  </script>
+</body>
+</html>

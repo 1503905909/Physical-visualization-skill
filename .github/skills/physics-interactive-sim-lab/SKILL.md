@@ -1,96 +1,133 @@
 ---
 name: physics-interactive-sim-lab
-description: Build classroom-ready interactive physics simulations for high school physics, especially electromagnetism topics such as Coulomb's law, electric fields, Ohm's law, capacitors, circuits, induction, and charged-particle motion. Use when the user asks for physics simulation, interactive experiment, adjustable parameter demo, HTML/JavaScript browser simulation, Streamlit physics app, classroom lab tool, or visualization resource with sliders, drag controls, live graphs, or real-time physical calculations.
+description: 生成面向高中物理课堂的交互式可视化仿真资源，尤其适用于必修第三册和选择性必修第二册中的电磁学内容，如库仑定律、电场线、电势与等势面、欧姆定律、电容器、电路、电磁感应、带电粒子运动和回旋加速器。用户需要 HTML/JavaScript 单文件仿真、Streamlit 物理应用、课堂交互实验、可调参数演示、滑块/拖拽/动态图像/实时计算型教学资源时使用。
 ---
 
-# Physics Interactive Sim Lab
+# 物理交互仿真实验室
 
-Use this skill to create interactive physics simulations that are useful in a real classroom. Prioritize conceptual clarity, direct manipulation, correct physics, and easy deployment.
+使用本 skill 生成真实课堂中可用的交互式物理仿真资源。优先保证概念清晰、物理正确、可直接操作、便于部署。默认面向人教版高中物理必修第三册和选择性必修第二册中的电磁学内容。
 
-## Default Output Choice
+## 典型触发请求
 
-Choose the output format based on teaching use:
+用户提出以下需求时，应优先使用本 skill：
 
-- **HTML/JavaScript single file**: default for classroom demonstration, PPT embedding, student self-study, or situations where Python is inconvenient. It should run by double-clicking the `.html` file in a browser.
-- **Streamlit Python app**: use when the user needs data export, more complex numeric computation, multi-tab analysis, or integration with Python plots.
-- **Both**: use when the user asks for a polished classroom demo plus a data-analysis version.
+- “生成一个电场线/等势面/回旋加速器 HTML 交互资源。”
+- “做一个能拖动电荷、调节电场强度、播放粒子运动的网页仿真。”
+- “把必修三/选择性必修二的某个电磁学知识点做成课堂演示工具。”
+- “给我一个单文件 HTML，能直接投影、能调参数、能让学生观察规律。”
 
-For the user's current project, prefer HTML/JavaScript for interactive classroom tools unless they explicitly request Streamlit.
+如果用户同时需要“讲解视频”和“交互网页”，本 skill 负责 HTML/JavaScript 交互资源，`manim-physics-animator` 负责 Manim 动画资源。
 
-## Workflow
+## 默认输出选择
 
-1. Define the teaching goal.
-   - State the physical law or concept to explore.
-   - Identify what students should observe, compare, or conclude.
-   - Keep the model at high school level unless the user requests more depth.
+根据教学用途选择输出形式：
 
-2. Build the physics model before the UI.
-   - Write formulas, variables, units, conversion rules, assumptions, and valid ranges.
-   - Use SI units internally even if UI uses cm, nC, uC, V, ohm, or mm.
-   - Handle impossible values such as zero distance, zero resistance, or out-of-range inputs.
+- **HTML/JavaScript 单文件**：默认选择。适合课堂演示、PPT 嵌入、学生自学，或不方便运行 Python 的场景。生成的 `.html` 文件应能直接双击在浏览器中打开。
+- **Streamlit Python 应用**：当用户需要数据导出、较复杂数值计算、多标签页分析，或需要结合 Python 图表时使用。
+- **两者都做**：当用户既需要课堂演示网页，又需要数据分析版本时使用。
 
-3. Design the interaction.
-   - Prefer direct manipulation when possible: draggable charges, movable sliders, switches, checkboxes, or graph cursors.
-   - Limit controls to the variables students need to explore.
-   - Put the main physical scene first; put settings and numeric details beside or below it.
-   - Include one to three classroom observation prompts.
+对当前高中物理可视化资源项目，除非用户明确要求 Streamlit，否则优先生成 HTML/JavaScript 交互资源。
 
-4. Implement the simulation.
-   - For HTML output, use vanilla HTML/CSS/JavaScript by default. Avoid external CDN dependencies unless truly needed.
-   - For Streamlit output, use `st.slider`, `st.number_input`, `st.checkbox`, `st.metric`, `st.tabs`, and Matplotlib/Plotly only when useful.
-   - Use clear Chinese UI labels and units.
-   - Keep the layout stable on a classroom projector and on a laptop screen.
+## 当前重点主题
 
-5. Validate before delivery.
-   - Check that the file opens without console-breaking syntax errors.
-   - Verify at least one known numerical example by hand or in code.
-   - Verify that changes in parameters update the visualization.
-   - For HTML, render or screenshot when possible; for Streamlit, run a syntax/import check if the environment is available.
+优先支持以下高中电磁学主题：
 
-## Classroom Design Rules
+- 必修第三册：库仑定律、电场强度、电场线、电势、电势差、等势面、带电粒子在电场中的运动、电路和电容器。
+- 选择性必修第二册：磁场、洛伦兹力、带电粒子在磁场中的运动、质谱仪、回旋加速器、电磁感应相关基础演示。
 
-- The first screen should be the usable simulation, not a long explanation.
-- The physical object or process should be visible: charges, field vectors, circuit diagram, trajectory, ruler, graph, or meter.
-- Numbers should support the visual scene, not replace it.
-- Avoid overloading students with too many sliders.
-- Use familiar classroom colors:
-  - positive charge: red
-  - negative charge: blue
-  - force/vector arrows: white or yellow
-  - distance/trajectory: green
-  - warning/model limits: orange
-- Include model assumptions when they matter, but keep them short.
+对教材中的静态图示，应生成可交互的延伸资源，不要简单照抄或随意改画教材图。所有方向、公式和模型假设必须先按教材层次确认。
 
-## Physics Guardrails
+## 工作流
 
-- Use correct unit conversion. Example: `1 uC = 1e-6 C`, `1 nC = 1e-9 C`, `1 cm = 1e-2 m`.
-- Coulomb force magnitude: `F = k |q1 q2| / r^2`; interaction is attractive for unlike charges and repulsive for like charges.
-- Electric field direction: outward from positive charge, inward toward negative charge.
-- Ohm's law: clearly distinguish voltage `U`, current `I`, and resistance `R`.
-- Capacitor simulations should state ideal parallel-plate assumptions when using `C = epsilon S / d`.
-- If a simplified model is used, label it as a simplified model.
+1. 明确教学目标。
+   - 说明要探究的物理规律或概念。
+   - 说明学生应观察、比较或得出的结论。
+   - 除非用户要求深入拓展，否则模型保持高中物理层次。
 
-## HTML Simulation Requirements
+2. 先建立物理模型，再设计界面。
+   - 写清公式、变量、单位、换算关系、模型假设和有效范围。
+   - 内部计算优先使用 SI 单位，即使界面显示 cm、nC、uC、V、ohm 或 mm。
+   - 处理零距离、零电阻、越界参数等不合理输入。
 
-When generating a browser-based simulation:
+3. 设计交互方式。
+   - 优先使用直接操作：拖拽电荷、移动探针、调节滑块、切换开关、勾选显示项或拖动图像光标。
+   - 控件数量要围绕学生需要探究的变量，避免过多。
+   - 主物理场景放在最显眼的位置，参数区和数值说明放在旁侧或下方。
+   - 设置 1 到 3 个课堂观察问题。
 
-- Create one complete `.html` file with embedded CSS and JavaScript.
-- Use `<canvas>` or SVG for the main physical scene when dynamic drawing is needed.
-- Do not rely on online libraries for core behavior.
-- Provide sliders, number inputs, checkboxes, or drag interaction as appropriate.
-- Show live computed values with units.
-- Include a reset button.
-- Include 1 to 3 classroom observation questions.
-- Make text readable on a 1366px projector screen.
+4. 实现仿真。
+   - HTML 输出默认使用原生 HTML/CSS/JavaScript，核心功能不依赖在线 CDN。
+   - Streamlit 输出使用 `st.slider`、`st.number_input`、`st.checkbox`、`st.metric`、`st.tabs` 和 Matplotlib/Plotly 等必要组件。
+   - 使用清晰的中文界面标签和单位。
+   - 保证 1366px 投影屏和普通笔记本屏幕上布局稳定、文字可读。
 
-## Streamlit Simulation Requirements
+5. 交付前校验。
+   - 检查文件能打开，没有破坏页面的语法错误或控制台错误。
+   - 至少用一个已知数值或物理方向进行人工/代码校验。
+   - 检查参数变化后可视化结果确实更新。
+   - HTML 尽量进行浏览器截图检查；Streamlit 至少进行语法或导入检查。
 
-When generating a Streamlit app:
+## 课堂设计规则
 
-- Create a complete `app.py`.
-- Use functions for physical calculations and plotting.
-- Use `st.set_page_config(layout="wide")`.
-- Set Chinese fonts for Matplotlib:
+- 第一屏就是可用仿真，不做长篇介绍页。
+- 画面中必须有可观察的物理对象或过程，如电荷、场矢量、电路图、运动轨迹、标尺、图像或仪表。
+- 数值用于支持物理图像，不应取代图像。
+- 避免用过多滑块干扰学生注意力。
+- 颜色使用课堂中容易理解的约定：
+  - 正电荷：红色
+  - 负电荷：蓝色
+  - 力或矢量箭头：白色或黄色
+  - 距离或轨迹：绿色
+  - 警告或模型限制：橙色
+- 当简化模型会影响理解时，应简短标注模型假设。
+
+## 物理正确性要求
+
+- 单位换算必须正确。例如：`1 uC = 1e-6 C`，`1 nC = 1e-9 C`，`1 cm = 1e-2 m`。
+- 库仑力大小：`F = k |q1 q2| / r^2`；同种电荷相斥，异种电荷相吸。
+- 正电荷电场方向向外，负电荷电场方向向内。
+- 欧姆定律中要清楚区分电压 `U`、电流 `I` 和电阻 `R`。
+- 电容器仿真使用 `C = epsilon S / d` 时，应标明理想平行板假设。
+- 使用简化模型时，必须标注“简化模型”或写清适用范围。
+
+## HTML 仿真要求
+
+生成浏览器仿真时：
+
+- 创建一个完整 `.html` 文件，内嵌 CSS 和 JavaScript。
+- 动态绘图优先使用 `<canvas>` 或 SVG。
+- 核心行为不依赖外部在线库。
+- 根据需要提供滑块、数字输入框、复选框、按钮或拖拽交互。
+- 显示实时计算结果和单位。
+- 包含重置按钮。
+- 包含 1 到 3 个课堂观察问题。
+- 保证课堂投影时文字清晰。
+
+## 默认文件组织
+
+- HTML 示例或新资源优先放在 `examples/` 目录。
+- 文件名使用小写英文和下划线，如 `electric_field_lines_html.html`。
+- 单文件资源应包含完整 CSS、HTML 和 JavaScript，避免额外依赖。
+- 生成后如果有截图或构建产物，应放入项目的 `build/` 目录，不放进 skill 目录。
+
+## 交互资源校验清单
+
+交付前至少检查：
+
+- 物理方向是否正确：电场线、力、速度、磁场、洛伦兹力方向不能反。
+- 关键公式是否匹配高中教材层次，必要时标注简化模型。
+- 滑块、按钮、拖拽、播放、重置等交互是否能正常工作。
+- 画面是否适合课堂投影：文字清楚、控件不过密、主图不被遮挡。
+- 浏览器是否能直接打开，控制台是否没有破坏页面运行的错误。
+
+## Streamlit 仿真要求
+
+生成 Streamlit 应用时：
+
+- 创建完整的 `app.py`。
+- 用函数组织物理计算和绘图。
+- 使用 `st.set_page_config(layout="wide")`。
+- 为 Matplotlib 设置中文字体：
 
 ```python
 from matplotlib import rcParams
@@ -98,11 +135,11 @@ rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "DejaVu Sans"]
 rcParams["axes.unicode_minus"] = False
 ```
 
-- Include export only when useful; otherwise keep the app simple.
+- 只有在确实有教学或分析价值时才加入导出功能，否则保持应用简洁。
 
-## Response Format
+## 回复格式
 
-When using this skill, respond with:
+使用本 skill 回答时，按以下结构说明：
 
 1. `实验目标`
 2. `物理模型与单位`
@@ -112,10 +149,14 @@ When using this skill, respond with:
 6. `课堂使用建议`
 7. `校验说明`
 
-If the user asks you to edit files directly, update the files and run a syntax or rendering check whenever possible.
+如果用户要求直接编辑文件，应直接更新文件，并尽可能运行语法检查、浏览器预览或截图检查。
 
-## Useful Examples
+## 可参考示例
 
-- `examples/coulombs_law_html.html`: single-file browser simulation for Coulomb's law with draggable charges, ruler, force arrows, and live force values.
-- `examples/coulombs_law_sim.py`: Streamlit version for Coulomb's law data exploration.
-- `examples/template_streamlit.py`: basic Streamlit template for physics sliders, metrics, plots, and optional data export.
+- `examples/coulombs_law_html.html`：库仑定律单文件网页仿真，包含可拖拽电荷、标尺、力箭头和实时力值。
+- `examples/electric_field_lines_html.html`：点电荷和两点电荷电场线网页资源，包含场景切换和可拖拽正试探电荷。
+- `examples/electric_potential_equipotential_html.html`：电势与等势面网页资源，包含电势颜色图、等势线、电场方向箭头和可拖拽电势探针。
+- `examples/charged_particle_uniform_field_html.html`：带电粒子在匀强电场中偏转的网页资源，包含平行板电场、轨迹、矢量、播放和参数控制。
+- `examples/cyclotron_html.html`：回旋加速器网页资源，包含 D 形盒、磁场符号、缝隙加速、螺旋轨迹以及 B、U、粒子类型调节。
+- `examples/coulombs_law_sim.py`：库仑定律 Streamlit 数据探究版本。
+- `examples/template_streamlit.py`：物理滑块、指标、图像和可选数据导出的 Streamlit 基础模板。

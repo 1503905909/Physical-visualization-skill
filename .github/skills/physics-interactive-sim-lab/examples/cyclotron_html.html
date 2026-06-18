@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>回旋加速器可视化资源</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --path: #ffd166;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 18px 0 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-panel,
+    .side-panel,
+    .control-panel,
+    .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stage-panel { padding: 12px; }
+
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 430px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+
+    #cyclotronCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .stage-readout {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .readout-item {
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+
+    .side-panel { padding: 14px; }
+    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
+
+    .metric {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #f8fafc;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value.neutral { color: var(--accent); }
+    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+    .control-panel { margin-top: 14px; padding: 14px; }
+    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
+    .field { margin-top: 10px; }
+    .field label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { background: #f1f5f9; }
+    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
+    button.active:hover, .primary-btn:hover { background: #0d665f; }
+
+    .toggles { display: grid; gap: 9px; }
+    .toggle { display: flex; align-items: center; gap: 9px; font-size: 15px; user-select: none; }
+    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+    .inquiry-panel { margin-top: 14px; padding: 14px; }
+    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+    @media (max-width: 960px) {
+      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
+      .topbar { align-items: start; flex-direction: column; }
+      .formula { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>回旋加速器可视化资源</h1>
+        <p class="subtitle">观察粒子在 D 形盒中受磁场偏转、在缝隙中受电场加速，理解半径增大与周期不随速率改变的近似条件。</p>
+      </div>
+      <div class="formula">r = mv / qB，T = 2πm / qB，ΔE<sub>k</sub> = qU</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="回旋加速器演示区">
+          <div class="stage-wrap">
+            <canvas id="cyclotronCanvas" width="960" height="540"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">粒子：<span id="stageParticle">质子</span></div>
+              <div class="readout-item">加速次数：<span id="stageBoosts">0</span></div>
+              <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>参数调节</h2>
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">磁场与电压</div>
+              <div class="field">
+                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">1.2</span></label>
+                <input id="bSlider" type="range" min="0.7" max="2.0" value="1.2" step="0.1" />
+              </div>
+              <div class="field">
+                <label for="uSlider"><span>缝隙电压 U</span><span id="uValue">1.5</span></label>
+                <input id="uSlider" type="range" min="0.6" max="2.4" value="1.5" step="0.1" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">粒子类型</div>
+              <div class="segmented">
+                <button type="button" class="particle-btn active" data-particle="proton">质子</button>
+                <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
+              </div>
+              <p class="hint">用相对 q/m 表示差异，便于课堂比较半径和周期。</p>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">显示与播放</div>
+              <div class="toggles">
+                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示速度和洛伦兹力</span></label>
+                <label class="toggle"><input type="checkbox" id="showBField" checked /><span>显示垂直屏面的磁场</span></label>
+              </div>
+              <div class="field">
+                <button type="button" class="primary-btn" id="playBtn">播放</button>
+                <button type="button" id="resetBtn">重置</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>粒子在哪一段受到电场力做功？在 D 形盒内部能量是否增加？</li>
+            <li>增大 B 后轨道为什么更紧？回旋周期 T 与速率有没有直接关系？</li>
+            <li>换成 α 粒子后，同样 B、U 下半径和周期为什么会改变？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="资源说明">
+        <h2>资源说明</h2>
+        <div class="metric">
+          <div class="metric-label">半径变化</div>
+          <div class="metric-value neutral" id="radiusValue">逐步增大</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">周期关系</div>
+          <div class="metric-value" id="periodValue">T ∝ m / qB</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">能量增量</div>
+          <div class="metric-value" id="energyValue">每次过缝隙增加 qU</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">模型假设</div>
+          <div class="metric-note">采用非相对论、匀强磁场、缝隙电场瞬时加速的简化模型，适合对应高中教材中的工作原理分析。</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("cyclotronCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const controls = {
+      bSlider: document.getElementById("bSlider"),
+      uSlider: document.getElementById("uSlider"),
+      showVectors: document.getElementById("showVectors"),
+      showBField: document.getElementById("showBField"),
+      playBtn: document.getElementById("playBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      particleButtons: Array.from(document.querySelectorAll(".particle-btn"))
+    };
+
+    const output = {
+      bValue: document.getElementById("bValue"),
+      uValue: document.getElementById("uValue"),
+      stageParticle: document.getElementById("stageParticle"),
+      stageBoosts: document.getElementById("stageBoosts"),
+      stageStatus: document.getElementById("stageStatus"),
+      radiusValue: document.getElementById("radiusValue"),
+      periodValue: document.getElementById("periodValue"),
+      energyValue: document.getElementById("energyValue")
+    };
+
+    const PARTICLES = {
+      proton: { name: "质子", q: 1, m: 1, color: "#ff3030", label: "+" },
+      alpha: { name: "α 粒子", q: 2, m: 4, color: "#ff7a2f", label: "2+" }
+    };
+
+    const state = {
+      B: 1.2,
+      U: 1.5,
+      particle: "proton",
+      playing: false,
+      progress: 0
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function stage() {
+      return { cx: 480, cy: 276, radius: 214, gap: 46 };
+    }
+
+    function particle() {
+      return PARTICLES[state.particle];
+    }
+
+    function modelValues() {
+      const p = particle();
+      const qOverM = p.q / p.m;
+      const expansion = Math.sqrt(state.U * qOverM) / state.B;
+      const turns = clamp(5.8 / Math.sqrt(state.U * qOverM) * Math.sqrt(state.B), 3.4, 7.0);
+      const maxRadius = clamp(122 + 76 * expansion, 118, 208);
+      const finalSpeed = Math.sqrt(2 * p.q * state.U * 12 / p.m);
+      const period = p.m / (p.q * state.B);
+      return { qOverM, turns, maxRadius, finalSpeed, period };
+    }
+
+    function thetaRange() {
+      const values = modelValues();
+      return { start: -Math.PI / 2, end: -Math.PI / 2 + values.turns * Math.PI * 2 };
+    }
+
+    function spiralPointByTheta(theta) {
+      const s = stage();
+      const values = modelValues();
+      const range = thetaRange();
+      const ratio = clamp((theta - range.start) / (range.end - range.start), 0, 1);
+      const r = 16 + (values.maxRadius - 16) * Math.pow(ratio, 0.76);
+      return {
+        x: s.cx + r * Math.cos(theta),
+        y: s.cy + r * Math.sin(theta),
+        r,
+        ratio,
+        theta
+      };
+    }
+
+    function currentTheta() {
+      const range = thetaRange();
+      return range.start + (range.end - range.start) * clamp(state.progress, 0, 1);
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, width = 3, headLength = 10) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCyclotronBody() {
+      const s = stage();
+      ctx.save();
+      ctx.fillStyle = "#080a0e";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (controls.showBField.checked) {
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.font = "bold 16px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let y = s.cy - 180; y <= s.cy + 180; y += 46) {
+          for (let x = s.cx - 240; x <= s.cx + 240; x += 52) {
+            if (Math.hypot(x - s.cx, y - s.cy) < s.radius - 10 && Math.abs(x - s.cx) > s.gap / 2 + 6) {
+              ctx.beginPath();
+              ctx.arc(x, y, 7, 0, Math.PI * 2);
+              ctx.strokeStyle = "rgba(255,255,255,0.22)";
+              ctx.lineWidth = 1.4;
+              ctx.stroke();
+              ctx.fillText("·", x, y - 1);
+            }
+          }
+        }
+      }
+
+      const leftGradient = ctx.createLinearGradient(s.cx - s.radius, s.cy, s.cx, s.cy);
+      leftGradient.addColorStop(0, "rgba(35,51,79,0.95)");
+      leftGradient.addColorStop(1, "rgba(17,24,39,0.96)");
+      const rightGradient = ctx.createLinearGradient(s.cx, s.cy, s.cx + s.radius, s.cy);
+      rightGradient.addColorStop(0, "rgba(17,24,39,0.96)");
+      rightGradient.addColorStop(1, "rgba(35,51,79,0.95)");
+
+      ctx.fillStyle = leftGradient;
+      ctx.beginPath();
+      ctx.moveTo(s.cx - s.gap / 2, s.cy - s.radius);
+      ctx.arc(s.cx - s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, true);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = rightGradient;
+      ctx.beginPath();
+      ctx.moveTo(s.cx + s.gap / 2, s.cy - s.radius);
+      ctx.arc(s.cx + s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, false);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.72)";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(s.cx - s.gap / 2, s.cy - s.radius);
+      ctx.arc(s.cx - s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, true);
+      ctx.lineTo(s.cx - s.gap / 2, s.cy - s.radius);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s.cx + s.gap / 2, s.cy - s.radius);
+      ctx.arc(s.cx + s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, false);
+      ctx.lineTo(s.cx + s.gap / 2, s.cy - s.radius);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255,209,102,0.13)";
+      ctx.fillRect(s.cx - s.gap / 2, s.cy - s.radius + 18, s.gap, s.radius * 2 - 36);
+      ctx.strokeStyle = "rgba(255,209,102,0.75)";
+      ctx.setLineDash([8, 8]);
+      ctx.strokeRect(s.cx - s.gap / 2, s.cy - s.radius + 18, s.gap, s.radius * 2 - 36);
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 20px Microsoft YaHei, Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("D₁", s.cx - 128, s.cy - 180);
+      ctx.fillText("D₂", s.cx + 128, s.cy - 180);
+      ctx.font = "bold 18px Microsoft YaHei, Arial";
+      ctx.fillText("匀强磁场 B 垂直屏面向外", s.cx, 58);
+      ctx.fillStyle = "#ffd166";
+      ctx.fillText("缝隙电场周期性反向", s.cx, s.cy + s.radius + 34);
+      ctx.restore();
+    }
+
+    function drawGapField() {
+      const s = stage();
+      const theta = currentTheta();
+      const cycle = Math.floor((theta - thetaRange().start) / Math.PI);
+      const toRight = cycle % 2 === 0;
+      const flash = Math.abs(Math.cos(theta)) < 0.22 ? 1 : 0.45;
+      ctx.save();
+      ctx.globalAlpha = flash;
+      for (let y = s.cy - 110; y <= s.cy + 110; y += 55) {
+        if (toRight) drawArrow(s.cx - 20, y, s.cx + 20, y, "#ffd166", 4, 12);
+        else drawArrow(s.cx + 20, y, s.cx - 20, y, "#ffd166", 4, 12);
+      }
+      ctx.restore();
+    }
+
+    function drawPath() {
+      const range = thetaRange();
+      const steps = 480;
+      ctx.save();
+      ctx.lineWidth = 3.4;
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i += 1) {
+        const theta = range.start + (range.end - range.start) * (i / steps);
+        const p = spiralPointByTheta(theta);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.24)";
+      ctx.lineWidth = 1.5;
+      for (let i = 1; i <= 10; i += 1) {
+        const theta = range.start + i * Math.PI;
+        if (theta > range.end) break;
+        const p = spiralPointByTheta(theta);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawParticleAndVectors() {
+      const pInfo = particle();
+      const theta = currentTheta();
+      const point = spiralPointByTheta(theta);
+      const tangentAngle = theta + Math.PI / 2;
+      const speed = 54 + point.r * 0.14;
+      const vx = Math.cos(tangentAngle);
+      const vy = Math.sin(tangentAngle);
+      const inwardX = -Math.cos(theta);
+      const inwardY = -Math.sin(theta);
+
+      ctx.save();
+      ctx.shadowColor = "rgba(255,209,102,0.45)";
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = pInfo.color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(pInfo.label, point.x, point.y);
+      ctx.restore();
+
+      if (controls.showVectors.checked) {
+        drawArrow(point.x, point.y, point.x + vx * speed, point.y + vy * speed, "rgba(255,255,255,0.9)", 4, 12);
+        drawArrow(point.x, point.y, point.x + inwardX * 60, point.y + inwardY * 60, "#7dd3fc", 4, 12);
+        ctx.save();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 16px Arial";
+        ctx.fillText("v", point.x + vx * (speed + 14), point.y + vy * (speed + 14));
+        ctx.fillStyle = "#7dd3fc";
+        ctx.fillText("F洛", point.x + inwardX * 78, point.y + inwardY * 78);
+        ctx.restore();
+      }
+    }
+
+    function updateOutputs() {
+      const p = particle();
+      const values = modelValues();
+      const theta = currentTheta();
+      const boosts = Math.max(0, Math.floor((theta - thetaRange().start) / Math.PI));
+      output.bValue.textContent = state.B.toFixed(1);
+      output.uValue.textContent = state.U.toFixed(1);
+      output.stageParticle.textContent = p.name;
+      output.stageBoosts.textContent = boosts.toString();
+      output.stageStatus.textContent = state.playing ? "播放" : "暂停";
+      output.radiusValue.textContent = `末端半径约为初始的 ${(values.maxRadius / 16).toFixed(1)} 倍`;
+      output.periodValue.textContent = `相对周期 ${(values.period).toFixed(2)}；B 越大周期越短`;
+      output.energyValue.textContent = `每次约增加 ${p.q}q × ${state.U.toFixed(1)}U`;
+    }
+
+    function render() {
+      updateOutputs();
+      drawCyclotronBody();
+      drawGapField();
+      drawPath();
+      drawParticleAndVectors();
+    }
+
+    function animate() {
+      if (state.playing) {
+        const speedFactor = 0.0028 + 0.0008 * state.B;
+        state.progress += speedFactor;
+        if (state.progress >= 1) {
+          state.progress = 1;
+          state.playing = false;
+          controls.playBtn.textContent = "播放";
+        }
+        render();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    controls.bSlider.addEventListener("input", () => {
+      state.B = Number(controls.bSlider.value);
+      render();
+    });
+
+    controls.uSlider.addEventListener("input", () => {
+      state.U = Number(controls.uSlider.value);
+      render();
+    });
+
+    controls.showVectors.addEventListener("change", render);
+    controls.showBField.addEventListener("change", render);
+
+    controls.particleButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.particle = button.dataset.particle;
+        controls.particleButtons.forEach(btn => btn.classList.toggle("active", btn === button));
+        render();
+      });
+    });
+
+    controls.playBtn.addEventListener("click", () => {
+      state.playing = !state.playing;
+      controls.playBtn.textContent = state.playing ? "暂停" : "播放";
+      if (state.progress >= 1) state.progress = 0;
+      render();
+    });
+
+    controls.resetBtn.addEventListener("click", () => {
+      state.progress = 0;
+      state.playing = false;
+      controls.playBtn.textContent = "播放";
+      render();
+    });
+
+    window.addEventListener("resize", render);
+    render();
+    animate();
+  </script>
+</body>
+</html>

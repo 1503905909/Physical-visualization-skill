@@ -1,110 +1,110 @@
-﻿# 高中物理电磁学可视化
+# 高中物理电磁学可视化 Skills
 
-一套专为高中物理电磁学教学设计的 AI Skill，包括 Manim 动画生成和 html交互式仿真实验。
+本仓库提供两个 Codex skills，用于生成高中物理电磁学可视化教学资源，重点面向人教版高中物理必修第三册和选择性必修第二册。
 
-## 项目信息
+## 这两个 skills 是什么
 
-| 项目 | 详情 |
-|------|------|
-| 主题范围 | 高中物理电磁学基础（第五-十四章） |
-| 应用场景 | 教学演示视频、课堂现场实验、学生自主探索 |
-| 预期输出 | 教学视频、交互工具、参考资源 |
+| Skill | 作用 | 主要产物 | 适合场景 |
+|---|---|---|---|
+| `physics-interactive-sim-lab` | 生成交互式物理仿真 | 单文件 HTML，必要时也可生成 Streamlit 应用 | 课堂投影、学生拖拽探究、参数调节演示 |
+| `manim-physics-animator` | 生成物理讲解动画 | Manim `.py` 脚本和 MP4 视频 | 课堂导入、过程讲解、公式关系演示、PPT 插入 |
 
-## 安装使用
+两者可以配合使用：HTML 负责“让学生操作和观察”，Manim 负责“让教师分步讲清过程”。
 
-本项目的 Skill 可在 **Codex** 中直接安装使用。
+## 别人怎么安装使用
 
-将以下链接粘贴到 Codex 的 Skill 导入框即可：
+不是把 GitHub 链接随便发给 Codex 后就一定会自动长期生效。更稳妥的方式是把具体 skill 路径安装到 Codex 的 skills 目录，安装后重启 Codex。
 
+如果 Codex 的界面支持从 GitHub 导入 skill，可以分别导入下面两个路径：
+
+```text
+https://github.com/1503905909/Physical-visualization-skill/tree/main/.github/skills/physics-interactive-sim-lab
+https://github.com/1503905909/Physical-visualization-skill/tree/main/.github/skills/manim-physics-animator
 ```
-https://github.com/1503905909/Physical-visualization-skill
+
+如果使用 Codex 的 skill 安装脚本，可以按这种形式安装：
+
+```bash
+install-skill-from-github.py --repo 1503905909/Physical-visualization-skill --path .github/skills/physics-interactive-sim-lab .github/skills/manim-physics-animator
 ```
 
-安装后在对话中用自然语言触发：
-- 说"帮我做库仑定律动画" → 自动触发 Manim 动画生成
-- 说"生成一个欧姆定律交互实验" → 自动触发 Streamlit 仿真实验
+安装后重启 Codex，然后在对话中用自然语言触发即可。
 
----
+## 典型用法
 
-## 两个核心 Skill
+生成 HTML 交互资源：
 
-### Skill 1：Manim 物理动画生成器
+```text
+使用 $physics-interactive-sim-lab，生成一个高中物理必修第三册“电场线”交互式 HTML 可视化资源。要求展示正点电荷、负点电荷、等量异种电荷和等量同种电荷，支持场景切换、方向箭头显示和课堂观察问题。
+```
 
-制作高质量物理教学演示视频。
+生成 Manim 讲解动画：
 
-**使用场景**：PPT 教学内嵌视频、教学资源库、学生预习视频
+```text
+使用 $manim-physics-animator，生成一个高中物理“回旋加速器”课堂讲解动画。要求分步展示 D 形盒、垂直纸面的磁场、缝隙电场加速、轨道半径增大和周期公式，并渲染预览视频。
+```
 
-**输出**：MP4 视频文件
+同时生成配套资源：
 
-**特点**：分步骤展示公式推导、彩色强调物理量、适合高中生理解
-
-### Skill 2：Python 交互式物理仿真实验
-
-课堂现场演示和参数探索工具。
-
-**使用场景**：课堂实时演示、学生参数调节验证规律、探索型学习
-
-**输出**：Streamlit 网页应用
-
-**特点**：实时参数调整、动态图表反馈、直观因果关系展示
-
----
+```text
+请分别使用 $physics-interactive-sim-lab 和 $manim-physics-animator，为“带电粒子在匀强电场中的运动”生成一个 HTML 交互资源和一个 Manim 讲解动画。HTML 用于学生调参观察，Manim 用于教师讲解运动分解。
+```
 
 ## 项目结构
 
-```
+```text
 Physical-visualization-skill/
 ├── .github/skills/
-│   ├── manim-physics-animator/       (Skill 1)
+│   ├── physics-interactive-sim-lab/
 │   │   ├── SKILL.md
+│   │   ├── agents/openai.yaml
 │   │   └── examples/
-│   └── physics-interactive-sim-lab/  (Skill 2)
+│   └── manim-physics-animator/
 │       ├── SKILL.md
+│       ├── agents/openai.yaml
 │       └── examples/
 ├── docs/
-│   ├── physics-topics.md
-│   └── setup-guide.md
-├── scripts/
+├── build/
 └── README.md
 ```
 
----
+## 已包含示例
+
+HTML 交互资源：
+
+- `coulombs_law_html.html`
+- `electric_field_lines_html.html`
+- `electric_potential_equipotential_html.html`
+- `charged_particle_uniform_field_html.html`
+- `cyclotron_html.html`
+
+Manim 动画资源：
+
+- `coulombs_law.py`
+- `electric_field_lines.py`
+- `electric_potential_equipotential.py`
+- `charged_particle_uniform_field.py`
+- `cyclotron.py`
 
 ## 运行环境
 
-Skill 生成的代码需要本地运行环境：
+生成 HTML 文件通常可直接用浏览器打开。
 
-| Skill | 需要安装 |
-|-------|---------|
-| Manim 动画 | `pip install manim` + LaTeX |
-| 交互仿真 | `pip install streamlit numpy matplotlib` |
+渲染 Manim 视频需要本地安装 Manim 和相关依赖：
 
-详细配置见 [docs/setup-guide.md](docs/setup-guide.md)。
+```bash
+pip install manim
+```
 
----
+如果涉及复杂公式或中文字体，需确认本机 LaTeX、中文字体和 Manim 环境可用。
 
-## 首批主题
+## 教学资源设计思路
 
-| 优先级 | 主题 | 公式 |
-|--------|------|------|
-| 核心 | 库仑定律 | F = k·q₁·q₂/r² |
-| 核心 | 电场强度 | E = F/q |
-| 核心 | 电势和电势差 | U = Ed |
-| 核心 | 欧姆定律 | U = IR |
-| 进阶 | 平行板电容器 | C = εS/d |
-| 进阶 | 串并联电路 | 分压/分流规律 |
+本仓库服务于“生成式人工智能辅助高中物理电磁学可视化教学资源设计”的流程：
 
----
-
-## 课堂教学建议（45 分钟）
-
-1. **导入阶段**（5 分钟）- 播放 Manim 动画引入概念
-2. **讲解阶段**（15 分钟）- 讲解理论和公式
-3. **演示阶段**（15 分钟）- 用交互工具现场改参数演示
-4. **练习阶段**（10 分钟）- 学生分组用工具探索
-
----
-
-## 许可证
-
-本项目用于教学目的。
+1. 教师用自然语言提出教学需求。
+2. Codex 根据 skill 工作流生成代码。
+3. 在本地运行、预览、截图或渲染视频。
+4. 教师检查物理科学性和课堂可读性。
+5. Codex 根据反馈修改资源。
+6. 形成可复用、可扩展的教学资源案例。

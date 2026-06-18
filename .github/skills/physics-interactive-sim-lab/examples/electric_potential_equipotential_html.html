@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>电势与等势面可视化资源</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --probe: #ffd166;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 18px 0 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+
+    .subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-panel,
+    .side-panel,
+    .control-panel,
+    .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stage-panel { padding: 12px; }
+
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 430px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+
+    #potentialCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .stage-readout {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .readout-item {
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+
+    .side-panel { padding: 14px; }
+    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
+
+    .metric {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #f8fafc;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value.positive { color: var(--positive); }
+    .metric-value.negative { color: var(--negative); }
+    .metric-value.neutral { color: var(--accent); }
+
+    .metric-note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .scene-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { background: #f1f5f9; }
+
+    .scene-btn.active,
+    .primary-btn {
+      border-color: #0f766e;
+      background: #0f766e;
+      color: #ffffff;
+    }
+
+    .scene-btn.active:hover,
+    .primary-btn:hover { background: #0d665f; }
+
+    .control-panel { margin-top: 14px; padding: 14px; }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .control-block {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .control-title {
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .field { margin-top: 10px; }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 7px;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .toggles {
+      display: grid;
+      gap: 9px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 15px;
+      user-select: none;
+    }
+
+    .toggle input {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent);
+    }
+
+    .inquiry-panel { margin-top: 14px; padding: 14px; }
+
+    .inquiry-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inquiry-list li {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+      color: #344054;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .hint {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 960px) {
+      .layout,
+      .controls-grid,
+      .inquiry-list,
+      .scene-buttons { grid-template-columns: 1fr; }
+      .topbar { align-items: start; flex-direction: column; }
+      .formula { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>电势与等势面可视化资源</h1>
+        <p class="subtitle">用颜色表示电势高低，用等势线表示等势面剖面，并比较它们与电场线的关系。</p>
+      </div>
+      <div class="formula">φ = E<sub>p</sub> / q，等势线 ⟂ 电场线</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="电势与等势面演示区">
+          <div class="stage-wrap">
+            <canvas id="potentialCanvas" width="960" height="540"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">场景：<span id="stageScene">正点电荷</span></div>
+              <div class="readout-item">探针电势：<span id="stageV">0.00</span></div>
+              <div class="readout-item">场强方向：<span id="stageE">--</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>场景与参数</h2>
+          <div class="scene-buttons" role="group" aria-label="电势场景">
+            <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
+            <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
+            <button type="button" class="scene-btn" data-scene="uniform">匀强电场</button>
+          </div>
+
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">等势线</div>
+              <div class="field">
+                <label for="levelSlider"><span>线条数量</span><span id="levelValue">9 组</span></label>
+                <input id="levelSlider" type="range" min="5" max="13" value="9" step="2" />
+              </div>
+              <div class="field">
+                <label for="scaleSlider"><span>电势色阶</span><span id="scaleValue">1.0</span></label>
+                <input id="scaleSlider" type="range" min="0.5" max="2.5" value="1" step="0.1" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">显示选项</div>
+              <div class="toggles">
+                <label class="toggle"><input type="checkbox" id="showHeat" checked /><span>显示电势颜色图</span></label>
+                <label class="toggle"><input type="checkbox" id="showEquipotential" checked /><span>显示等势线</span></label>
+                <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示电场方向</span></label>
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">课堂操作</div>
+              <p class="hint">拖动黄色探针，观察同一条等势线上的电势是否相同，以及电场方向是否与等势线垂直。</p>
+              <button type="button" class="primary-btn" id="resetBtn">重置探针</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>沿同一条等势线移动探针，电势读数是否明显变化？</li>
+            <li>等势线密的地方，电场方向箭头和颜色变化有什么特点？</li>
+            <li>匀强电场中，相邻等势线间距改变时，E 与 U/d 的关系如何理解？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="资源说明">
+        <h2>资源说明</h2>
+        <div class="metric">
+          <div class="metric-label">当前情境</div>
+          <div class="metric-value neutral" id="sceneName">正点电荷</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">探针位置电势</div>
+          <div class="metric-value" id="probeV">0.00 V</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">电场方向</div>
+          <div class="metric-value" id="probeE">沿电势降低最快方向</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">教学提示</div>
+          <div class="metric-note" id="teachingTip">等势线是等势面的剖面图。电场线与等势线垂直，并由电势高处指向电势低处。</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("potentialCanvas");
+    const ctx = canvas.getContext("2d");
+    const heatCanvas = document.createElement("canvas");
+    const heatCtx = heatCanvas.getContext("2d");
+    heatCanvas.width = 160;
+    heatCanvas.height = 90;
+
+    const controls = {
+      levelSlider: document.getElementById("levelSlider"),
+      scaleSlider: document.getElementById("scaleSlider"),
+      showHeat: document.getElementById("showHeat"),
+      showEquipotential: document.getElementById("showEquipotential"),
+      showField: document.getElementById("showField"),
+      resetBtn: document.getElementById("resetBtn"),
+      sceneButtons: Array.from(document.querySelectorAll(".scene-btn"))
+    };
+
+    const output = {
+      stageScene: document.getElementById("stageScene"),
+      stageV: document.getElementById("stageV"),
+      stageE: document.getElementById("stageE"),
+      levelValue: document.getElementById("levelValue"),
+      scaleValue: document.getElementById("scaleValue"),
+      sceneName: document.getElementById("sceneName"),
+      probeV: document.getElementById("probeV"),
+      probeE: document.getElementById("probeE"),
+      teachingTip: document.getElementById("teachingTip")
+    };
+
+    const state = {
+      scene: "singlePositive",
+      levels: 9,
+      scale: 1,
+      probe: { x: 1.7, y: 1.0 },
+      draggingProbe: false
+    };
+
+    const SCENES = {
+      singlePositive: {
+        name: "正点电荷",
+        tip: "正点电荷周围电势由靠近电荷处向外逐渐降低，等势线在剖面图中近似为同心圆。"
+      },
+      dipole: {
+        name: "等量异种点电荷",
+        tip: "等量异种电荷周围，正电荷附近电势较高，负电荷附近电势较低，中垂面附近电势接近零。"
+      },
+      uniform: {
+        name: "匀强电场",
+        tip: "匀强电场中的等势线互相平行且间距相等，电场方向由高电势指向低电势。"
+      }
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function worldBounds() {
+      return { xmin: -5.6, xmax: 5.6, ymin: -3.15, ymax: 3.15 };
+    }
+
+    function worldToCanvas(point) {
+      const b = worldBounds();
+      const sx = canvas.width / (b.xmax - b.xmin);
+      const sy = canvas.height / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.92;
+      return { x: canvas.width / 2 + point.x * s, y: canvas.height / 2 - point.y * s };
+    }
+
+    function canvasToWorld(point) {
+      const b = worldBounds();
+      const sx = canvas.width / (b.xmax - b.xmin);
+      const sy = canvas.height / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.92;
+      return {
+        x: clamp((point.x - canvas.width / 2) / s, b.xmin + 0.1, b.xmax - 0.1),
+        y: clamp((canvas.height / 2 - point.y) / s, b.ymin + 0.1, b.ymax - 0.1)
+      };
+    }
+
+    function sceneCharges() {
+      if (state.scene === "singlePositive") return [{ q: 1, x: 0, y: 0, label: "+Q" }];
+      if (state.scene === "dipole") return [{ q: 1, x: -1.4, y: 0, label: "+Q" }, { q: -1, x: 1.4, y: 0, label: "-Q" }];
+      return [];
+    }
+
+    function potentialAt(x, y) {
+      if (state.scene === "uniform") return -0.72 * x;
+      let v = 0;
+      for (const c of sceneCharges()) {
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const r = Math.sqrt(dx * dx + dy * dy + 0.08);
+        v += c.q / r;
+      }
+      return v;
+    }
+
+    function fieldAt(x, y) {
+      if (state.scene === "uniform") return { x: 0.72, y: 0, m: 0.72 };
+      let ex = 0;
+      let ey = 0;
+      for (const c of sceneCharges()) {
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const r2 = dx * dx + dy * dy + 0.08;
+        const r = Math.sqrt(r2);
+        ex += c.q * dx / (r2 * r);
+        ey += c.q * dy / (r2 * r);
+      }
+      return { x: ex, y: ey, m: Math.hypot(ex, ey) };
+    }
+
+    function colorForPotential(v) {
+      const value = Math.tanh(v * state.scale * 0.9);
+      if (value >= 0) {
+        const t = value;
+        return [18 + 218 * t, 46 + 24 * (1 - t), 92 + 15 * (1 - t), 220];
+      }
+      const t = -value;
+      return [26 + 30 * (1 - t), 72 + 34 * (1 - t), 190 + 45 * t, 220];
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#080a0e";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (controls.showHeat.checked) {
+        const img = heatCtx.createImageData(heatCanvas.width, heatCanvas.height);
+        for (let j = 0; j < heatCanvas.height; j += 1) {
+          for (let i = 0; i < heatCanvas.width; i += 1) {
+            const w = canvasToWorld({
+              x: (i / (heatCanvas.width - 1)) * canvas.width,
+              y: (j / (heatCanvas.height - 1)) * canvas.height
+            });
+            const c = colorForPotential(potentialAt(w.x, w.y));
+            const idx = (j * heatCanvas.width + i) * 4;
+            img.data[idx] = c[0];
+            img.data[idx + 1] = c[1];
+            img.data[idx + 2] = c[2];
+            img.data[idx + 3] = c[3];
+          }
+        }
+        heatCtx.putImageData(img, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(heatCanvas, 0, 0, canvas.width, canvas.height);
+      }
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.07)";
+      ctx.lineWidth = 1;
+      for (let x = -5; x <= 5; x += 1) {
+        const p1 = worldToCanvas({ x, y: -3 });
+        const p2 = worldToCanvas({ x, y: 3 });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      for (let y = -3; y <= 3; y += 1) {
+        const p1 = worldToCanvas({ x: -5.3, y });
+        const p2 = worldToCanvas({ x: 5.3, y });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, width = 2, headLength = 8) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawFieldVectors() {
+      if (!controls.showField.checked) return;
+      for (let x = -4.8; x <= 4.8; x += 1.2) {
+        for (let y = -2.4; y <= 2.4; y += 0.9) {
+          const e = fieldAt(x, y);
+          if (e.m < 0.002) continue;
+          const p = worldToCanvas({ x, y });
+          const len = 19;
+          drawArrow(p.x, p.y, p.x + (e.x / e.m) * len, p.y - (e.y / e.m) * len, "rgba(255,255,255,0.42)", 1.5, 6);
+        }
+      }
+    }
+
+    function getContourLevels() {
+      if (state.scene === "uniform") {
+        const count = state.levels;
+        const result = [];
+        for (let i = 0; i < count; i += 1) result.push(-2.4 + i * (4.8 / (count - 1)));
+        return result;
+      }
+      const base = state.levels >= 11 ? [0.35, 0.55, 0.8, 1.1, 1.45, 1.9] : [0.45, 0.72, 1.05, 1.48];
+      if (state.scene === "singlePositive") return base;
+      return base.flatMap(v => [-v, v]);
+    }
+
+    function interpolate(p1, p2, v1, v2, level) {
+      const t = Math.abs(v2 - v1) < 1e-6 ? 0.5 : (level - v1) / (v2 - v1);
+      return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
+    }
+
+    function drawEquipotentialLines() {
+      if (!controls.showEquipotential.checked) return;
+      const b = worldBounds();
+      const nx = 72;
+      const ny = 42;
+      const values = [];
+      for (let j = 0; j <= ny; j += 1) {
+        values[j] = [];
+        for (let i = 0; i <= nx; i += 1) {
+          const x = b.xmin + (i / nx) * (b.xmax - b.xmin);
+          const y = b.ymin + (j / ny) * (b.ymax - b.ymin);
+          values[j][i] = potentialAt(x, y);
+        }
+      }
+
+      const levels = getContourLevels();
+      ctx.save();
+      ctx.lineWidth = 1.6;
+      ctx.globalAlpha = 0.88;
+      for (const level of levels) {
+        ctx.strokeStyle = level >= 0 ? "rgba(255,235,235,0.95)" : "rgba(220,230,255,0.95)";
+        for (let j = 0; j < ny; j += 1) {
+          for (let i = 0; i < nx; i += 1) {
+            const x0 = b.xmin + (i / nx) * (b.xmax - b.xmin);
+            const x1 = b.xmin + ((i + 1) / nx) * (b.xmax - b.xmin);
+            const y0 = b.ymin + (j / ny) * (b.ymax - b.ymin);
+            const y1 = b.ymin + ((j + 1) / ny) * (b.ymax - b.ymin);
+            const p = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+            const v = [values[j][i], values[j][i + 1], values[j + 1][i + 1], values[j + 1][i]];
+            const pts = [];
+            for (let k = 0; k < 4; k += 1) {
+              const next = (k + 1) % 4;
+              if ((v[k] <= level && v[next] > level) || (v[k] > level && v[next] <= level)) {
+                pts.push(interpolate(p[k], p[next], v[k], v[next], level));
+              }
+            }
+            if (pts.length === 2) {
+              const a = worldToCanvas(pts[0]);
+              const c = worldToCanvas(pts[1]);
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(c.x, c.y);
+              ctx.stroke();
+            } else if (pts.length === 4) {
+              const a = worldToCanvas(pts[0]);
+              const c = worldToCanvas(pts[1]);
+              const d = worldToCanvas(pts[2]);
+              const e = worldToCanvas(pts[3]);
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(c.x, c.y);
+              ctx.moveTo(d.x, d.y);
+              ctx.lineTo(e.x, e.y);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawCharges() {
+      for (const charge of sceneCharges()) {
+        const p = worldToCanvas(charge);
+        const gradient = ctx.createRadialGradient(p.x - 10, p.y - 10, 4, p.x, p.y, 30);
+        gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+        gradient.addColorStop(0.22, charge.q > 0 ? "#ff3030" : "#5363ff");
+        gradient.addColorStop(1, charge.q > 0 ? "#ff3030" : "#5363ff");
+        ctx.save();
+        ctx.shadowColor = charge.q > 0 ? "rgba(255,62,62,0.45)" : "rgba(83,99,255,0.45)";
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 31, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(255,255,255,0.82)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 22px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(charge.q > 0 ? "+" : "-", p.x, p.y - 8);
+        ctx.font = "bold 17px Arial";
+        ctx.fillText(charge.label, p.x, p.y + 15);
+        ctx.restore();
+      }
+
+      if (state.scene === "uniform") {
+        const left = worldToCanvas({ x: -4.5, y: 2.6 });
+        const right = worldToCanvas({ x: 4.5, y: -2.6 });
+        ctx.save();
+        ctx.fillStyle = "rgba(255, 48, 48, 0.18)";
+        ctx.fillRect(left.x - 18, left.y, 36, right.y - left.y);
+        ctx.fillStyle = "rgba(83, 99, 255, 0.18)";
+        ctx.fillRect(right.x - 18, left.y, 36, right.y - left.y);
+        ctx.strokeStyle = "rgba(255,255,255,0.72)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(left.x - 18, left.y, 36, right.y - left.y);
+        ctx.strokeRect(right.x - 18, left.y, 36, right.y - left.y);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 18px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("+", left.x, left.y - 10);
+        ctx.fillText("-", right.x, left.y - 10);
+        ctx.restore();
+      }
+    }
+
+    function drawProbe() {
+      const p = worldToCanvas(state.probe);
+      const e = fieldAt(state.probe.x, state.probe.y);
+      ctx.save();
+      ctx.fillStyle = "#ffd166";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.shadowColor = "rgba(255,209,102,0.45)";
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+      ctx.fillStyle = "#172033";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("V", p.x, p.y);
+      ctx.restore();
+      if (e.m > 0.001) {
+        drawArrow(p.x, p.y, p.x + (e.x / e.m) * 64, p.y - (e.y / e.m) * 64, "#ffd166", 4.5, 14);
+      }
+    }
+
+    function updateOutputs() {
+      const scene = SCENES[state.scene];
+      const v = potentialAt(state.probe.x, state.probe.y);
+      const e = fieldAt(state.probe.x, state.probe.y);
+      const angle = Math.atan2(e.y, e.x) * 180 / Math.PI;
+      const direction = e.m > 0.001 ? `${angle.toFixed(0)}°` : "--";
+      output.stageScene.textContent = scene.name;
+      output.stageV.textContent = `${v.toFixed(2)} V`;
+      output.stageE.textContent = direction;
+      output.levelValue.textContent = `${state.levels} 组`;
+      output.scaleValue.textContent = state.scale.toFixed(1);
+      output.sceneName.textContent = scene.name;
+      output.probeV.textContent = `${v.toFixed(2)} V`;
+      output.probeV.className = `metric-value ${v >= 0 ? "positive" : "negative"}`;
+      output.probeE.textContent = "沿电势降低最快方向";
+      output.teachingTip.textContent = scene.tip;
+    }
+
+    function render() {
+      updateOutputs();
+      drawBackground();
+      drawEquipotentialLines();
+      drawFieldVectors();
+      drawCharges();
+      drawProbe();
+    }
+
+    function canvasPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * canvas.width / rect.width,
+        y: (event.clientY - rect.top) * canvas.height / rect.height
+      };
+    }
+
+    function hitProbe(point) {
+      const p = worldToCanvas(state.probe);
+      return Math.hypot(point.x - p.x, point.y - p.y) < 28;
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      const point = canvasPoint(event);
+      if (!hitProbe(point)) return;
+      state.draggingProbe = true;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!state.draggingProbe) return;
+      state.probe = canvasToWorld(canvasPoint(event));
+      render();
+    });
+
+    canvas.addEventListener("pointerup", () => { state.draggingProbe = false; });
+    canvas.addEventListener("pointercancel", () => { state.draggingProbe = false; });
+
+    controls.sceneButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.scene = button.dataset.scene;
+        controls.sceneButtons.forEach(btn => btn.classList.toggle("active", btn === button));
+        state.probe = state.scene === "uniform" ? { x: 1.4, y: 1.0 } : { x: 1.7, y: 1.0 };
+        render();
+      });
+    });
+
+    controls.levelSlider.addEventListener("input", () => {
+      state.levels = Number(controls.levelSlider.value);
+      render();
+    });
+
+    controls.scaleSlider.addEventListener("input", () => {
+      state.scale = Number(controls.scaleSlider.value);
+      render();
+    });
+
+    controls.showHeat.addEventListener("change", render);
+    controls.showEquipotential.addEventListener("change", render);
+    controls.showField.addEventListener("change", render);
+    controls.resetBtn.addEventListener("click", () => {
+      state.probe = state.scene === "uniform" ? { x: 1.4, y: 1.0 } : { x: 1.7, y: 1.0 };
+      render();
+    });
+
+    window.addEventListener("resize", render);
+    render();
+  </script>
+</body>
+</html>

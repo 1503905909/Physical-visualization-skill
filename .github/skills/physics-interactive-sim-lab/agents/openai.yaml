@@ -1,0 +1,7 @@
+interface:
+  display_name: "高中物理交互仿真"
+  short_description: "生成高中电磁学 HTML 交互可视化资源"
+  default_prompt: "使用 $physics-interactive-sim-lab 生成一个面向高中物理课堂的电磁学 HTML 交互可视化资源。"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>点电荷电场线可视化资源</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --warning: #b45309;
+      --field: #f8fafc;
+      --force: #ffd166;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 18px 0 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 25px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-panel,
+    .side-panel,
+    .control-panel,
+    .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stage-panel {
+      padding: 12px;
+    }
+
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 430px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+
+    #fieldCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .stage-readout {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .readout-item {
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+
+    .side-panel {
+      padding: 14px;
+    }
+
+    .side-panel h2,
+    .control-panel h2,
+    .inquiry-panel h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .metric {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #f8fafc;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value.positive {
+      color: var(--positive);
+    }
+
+    .metric-value.negative {
+      color: var(--negative);
+    }
+
+    .metric-value.neutral {
+      color: var(--accent);
+    }
+
+    .metric-note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .scene-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #f1f5f9;
+    }
+
+    .scene-btn.active,
+    .primary-btn {
+      border-color: #0f766e;
+      background: #0f766e;
+      color: #ffffff;
+    }
+
+    .scene-btn.active:hover,
+    .primary-btn:hover {
+      background: #0d665f;
+    }
+
+    .control-panel {
+      margin-top: 14px;
+      padding: 14px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .control-block {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .control-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .field {
+      margin-top: 10px;
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 7px;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .toggles {
+      display: grid;
+      gap: 9px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 15px;
+      user-select: none;
+    }
+
+    .toggle input {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent);
+    }
+
+    .reset-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .reset-row button {
+      flex: 1;
+    }
+
+    .inquiry-panel {
+      margin-top: 14px;
+      padding: 14px;
+    }
+
+    .inquiry-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inquiry-list li {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+      color: #344054;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .hint {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .stage-readout,
+      .controls-grid,
+      .inquiry-list,
+      .scene-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .formula {
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>点电荷电场线可视化资源</h1>
+        <p class="subtitle">切换典型电荷情境，观察电场线方向、疏密和正试探电荷受力方向。</p>
+      </div>
+      <div class="formula">E = F / q，方向按正试探电荷受力方向规定</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="电场线演示区">
+          <div class="stage-wrap">
+            <canvas id="fieldCanvas" width="960" height="540"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">场景：<span id="stageScene">正点电荷</span></div>
+              <div class="readout-item">电场线：<span id="stageDirection">向外发散</span></div>
+              <div class="readout-item">试探电荷：<span id="stageTest">显示</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>场景与参数</h2>
+          <div class="scene-buttons" role="group" aria-label="电场线场景">
+            <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
+            <button type="button" class="scene-btn" data-scene="singleNegative">负点电荷</button>
+            <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
+            <button type="button" class="scene-btn" data-scene="samePositive">等量同种</button>
+          </div>
+
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">电场线</div>
+              <div class="field">
+                <label for="densitySlider"><span>线条数量</span><span id="densityValue">14 条</span></label>
+                <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" />
+              </div>
+              <div class="field">
+                <label for="distanceSlider"><span>两电荷距离</span><span id="distanceValue">3.0</span></label>
+                <input id="distanceSlider" type="range" min="2.0" max="4.8" value="3.0" step="0.2" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">显示选项</div>
+              <div class="toggles">
+                <label class="toggle">
+                  <input type="checkbox" id="showVectors" checked />
+                  <span>显示背景场方向</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="showTestCharge" checked />
+                  <span>显示正试探电荷</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="animateArrows" checked />
+                  <span>箭头流动提示</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">课堂操作</div>
+              <p class="hint">在画布中拖动黄色试探电荷，观察该点电场方向。电场线表示模型，不是真实存在的线。</p>
+              <div class="reset-row">
+                <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>比较正点电荷和负点电荷：箭头方向分别指向哪里？</li>
+            <li>等量异种电荷中，电场线为什么从正电荷出发并指向负电荷？</li>
+            <li>等量同种电荷之间的电场线为什么向外弯曲且不相交？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="资源说明">
+        <h2>资源说明</h2>
+        <div class="metric">
+          <div class="metric-label">当前情境</div>
+          <div class="metric-value neutral" id="sceneName">正点电荷</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">电场线方向</div>
+          <div class="metric-value" id="fieldDirection">由电荷向外发散</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">试探电荷受力</div>
+          <div class="metric-value" id="forceDirection">与该点电场方向一致</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">教学提示</div>
+          <div class="metric-note" id="teachingTip">电场线方向表示该点电场强度方向，也就是正试探电荷在该点所受电场力方向。</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("fieldCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const controls = {
+      densitySlider: document.getElementById("densitySlider"),
+      distanceSlider: document.getElementById("distanceSlider"),
+      showVectors: document.getElementById("showVectors"),
+      showTestCharge: document.getElementById("showTestCharge"),
+      animateArrows: document.getElementById("animateArrows"),
+      resetBtn: document.getElementById("resetBtn"),
+      sceneButtons: Array.from(document.querySelectorAll(".scene-btn"))
+    };
+
+    const output = {
+      densityValue: document.getElementById("densityValue"),
+      distanceValue: document.getElementById("distanceValue"),
+      stageScene: document.getElementById("stageScene"),
+      stageDirection: document.getElementById("stageDirection"),
+      stageTest: document.getElementById("stageTest"),
+      sceneName: document.getElementById("sceneName"),
+      fieldDirection: document.getElementById("fieldDirection"),
+      forceDirection: document.getElementById("forceDirection"),
+      teachingTip: document.getElementById("teachingTip")
+    };
+
+    const SCENES = {
+      singlePositive: {
+        name: "正点电荷",
+        direction: "由电荷向外发散",
+        stageDirection: "向外发散",
+        force: "沿电场线切线向外",
+        tip: "正点电荷周围电场线向外发散，箭头方向表示正试探电荷所受电场力方向。"
+      },
+      singleNegative: {
+        name: "负点电荷",
+        direction: "由外部指向电荷",
+        stageDirection: "指向电荷",
+        force: "沿电场线切线指向电荷",
+        tip: "负点电荷周围电场线指向电荷，说明正试探电荷会受到指向负电荷的电场力。"
+      },
+      dipole: {
+        name: "等量异种点电荷",
+        direction: "从正电荷出发并终止于负电荷",
+        stageDirection: "+Q → -Q",
+        force: "沿电场线切线方向",
+        tip: "等量异种点电荷的电场线从正电荷出发，最终指向负电荷，线条越密处场强越大。"
+      },
+      samePositive: {
+        name: "等量同种点电荷",
+        direction: "分别从两个正电荷向外发散",
+        stageDirection: "向外弯曲",
+        force: "沿电场线切线方向",
+        tip: "等量同种正电荷的电场线从两个电荷向外发散，中间区域场线向两侧弯曲，电场线不能相交。"
+      }
+    };
+
+    const state = {
+      scene: "singlePositive",
+      density: 14,
+      distance: 3.0,
+      test: { x: 1.3, y: 1.1 },
+      draggingTest: false,
+      time: 0
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function worldBounds() {
+      return { xmin: -5.6, xmax: 5.6, ymin: -3.15, ymax: 3.15 };
+    }
+
+    function worldToCanvas(point) {
+      const b = worldBounds();
+      const sx = canvas.width / (b.xmax - b.xmin);
+      const sy = canvas.height / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.92;
+      const ox = canvas.width / 2;
+      const oy = canvas.height / 2;
+      return {
+        x: ox + point.x * s,
+        y: oy - point.y * s
+      };
+    }
+
+    function canvasToWorld(point) {
+      const b = worldBounds();
+      const sx = canvas.width / (b.xmax - b.xmin);
+      const sy = canvas.height / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.92;
+      return {
+        x: clamp((point.x - canvas.width / 2) / s, b.xmin + 0.2, b.xmax - 0.2),
+        y: clamp((canvas.height / 2 - point.y) / s, b.ymin + 0.25, b.ymax - 0.25)
+      };
+    }
+
+    function sceneCharges() {
+      const d = state.distance;
+      if (state.scene === "singlePositive") {
+        return [{ q: 1, x: 0, y: 0, label: "+Q" }];
+      }
+      if (state.scene === "singleNegative") {
+        return [{ q: -1, x: 0, y: 0, label: "-Q" }];
+      }
+      if (state.scene === "dipole") {
+        return [
+          { q: 1, x: -d / 2, y: 0, label: "+Q" },
+          { q: -1, x: d / 2, y: 0, label: "-Q" }
+        ];
+      }
+      return [
+        { q: 1, x: -d / 2, y: 0, label: "+Q" },
+        { q: 1, x: d / 2, y: 0, label: "+Q" }
+      ];
+    }
+
+    function fieldAt(x, y, charges) {
+      let ex = 0;
+      let ey = 0;
+      for (const c of charges) {
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const r2 = dx * dx + dy * dy + 0.025;
+        const r = Math.sqrt(r2);
+        const scale = c.q / (r2 * r);
+        ex += scale * dx;
+        ey += scale * dy;
+      }
+      return { x: ex, y: ey, m: Math.hypot(ex, ey) };
+    }
+
+    function chargeColor(q) {
+      if (q > 0) return "#ff3030";
+      if (q < 0) return "#5363ff";
+      return "#aab4c4";
+    }
+
+    function isNearCharge(x, y, charges, radius = 0.31) {
+      return charges.some(c => Math.hypot(x - c.x, y - c.y) < radius);
+    }
+
+    function inBounds(x, y) {
+      const b = worldBounds();
+      return x > b.xmin && x < b.xmax && y > b.ymin && y < b.ymax;
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, lineWidth, headLength = 13) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(
+        x2 - headLength * Math.cos(angle - Math.PI / 6),
+        y2 - headLength * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        x2 - headLength * Math.cos(angle + Math.PI / 6),
+        y2 - headLength * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawArrowHeadOnPath(path, color, offset = 0) {
+      if (path.length < 5) return;
+      const idx = clamp(Math.floor(path.length * (0.5 + offset)), 2, path.length - 3);
+      const p1 = worldToCanvas(path[idx - 2]);
+      const p2 = worldToCanvas(path[idx + 2]);
+      drawArrow(p1.x, p1.y, p2.x, p2.y, color, 2.2, 10);
+    }
+
+    function drawWorldPath(path, color, width = 2.2, alpha = 0.82) {
+      if (path.length < 2) return;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      const first = worldToCanvas(path[0]);
+      ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < path.length; i += 1) {
+        const p = worldToCanvas(path[i]);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function integrateLine(start, charges, forward = 1) {
+      const path = [{ x: start.x, y: start.y }];
+      let x = start.x;
+      let y = start.y;
+      const step = 0.045;
+      for (let i = 0; i < 1050; i += 1) {
+        const e = fieldAt(x, y, charges);
+        if (e.m < 0.0001) break;
+        x += forward * (e.x / e.m) * step;
+        y += forward * (e.y / e.m) * step;
+        path.push({ x, y });
+        if (!inBounds(x, y)) break;
+        if (i > 8 && isNearCharge(x, y, charges)) break;
+      }
+      return path;
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#080a0e";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.055)";
+      ctx.lineWidth = 1;
+      for (let x = -5; x <= 5; x += 1) {
+        const p1 = worldToCanvas({ x, y: -3 });
+        const p2 = worldToCanvas({ x, y: 3 });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      for (let y = -3; y <= 3; y += 1) {
+        const p1 = worldToCanvas({ x: -5.4, y });
+        const p2 = worldToCanvas({ x: 5.4, y });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawVectorGrid(charges) {
+      if (!controls.showVectors.checked) return;
+      ctx.save();
+      for (let x = -4.8; x <= 4.8; x += 1.2) {
+        for (let y = -2.4; y <= 2.4; y += 0.9) {
+          if (isNearCharge(x, y, charges, 0.55)) continue;
+          const e = fieldAt(x, y, charges);
+          if (e.m < 0.0001) continue;
+          const start = worldToCanvas({ x, y });
+          const length = 20;
+          const end = {
+            x: start.x + (e.x / e.m) * length,
+            y: start.y - (e.y / e.m) * length
+          };
+          drawArrow(start.x, start.y, end.x, end.y, "rgba(255,255,255,0.32)", 1.5, 6);
+        }
+      }
+      ctx.restore();
+    }
+
+    function singleFieldLines(charges) {
+      const charge = charges[0];
+      const count = state.density * 2;
+      const paths = [];
+      for (let i = 0; i < count; i += 1) {
+        const angle = (i / count) * Math.PI * 2;
+        const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+        if (charge.q > 0) {
+          paths.push([
+            { x: charge.x + dir.x * 0.42, y: charge.y + dir.y * 0.42 },
+            { x: charge.x + dir.x * 5.2, y: charge.y + dir.y * 3.0 }
+          ]);
+        } else {
+          paths.push([
+            { x: charge.x + dir.x * 5.2, y: charge.y + dir.y * 3.0 },
+            { x: charge.x + dir.x * 0.42, y: charge.y + dir.y * 0.42 }
+          ]);
+        }
+      }
+      return paths;
+    }
+
+    function pairFieldLines(charges) {
+      const paths = [];
+      const positiveCharges = charges.filter(c => c.q > 0);
+      const seedCount = state.density;
+      for (const c of positiveCharges) {
+        for (let i = 0; i < seedCount; i += 1) {
+          const angle = (i / seedCount) * Math.PI * 2;
+          const start = {
+            x: c.x + Math.cos(angle) * 0.38,
+            y: c.y + Math.sin(angle) * 0.38
+          };
+          const path = integrateLine(start, charges, 1);
+          paths.push(path);
+        }
+      }
+      return paths;
+    }
+
+    function cubicPoint(p0, p1, p2, p3, t) {
+      const u = 1 - t;
+      return {
+        x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+        y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
+      };
+    }
+
+    function cubicPath(p0, p1, p2, p3, samples = 72) {
+      const path = [];
+      for (let i = 0; i <= samples; i += 1) {
+        path.push(cubicPoint(p0, p1, p2, p3, i / samples));
+      }
+      return path;
+    }
+
+    function dipoleFieldLines(charges) {
+      const positive = charges.find(c => c.q > 0);
+      const negative = charges.find(c => c.q < 0);
+      if (!positive || !negative) return pairFieldLines(charges);
+
+      const radius = 0.42;
+      const distance = Math.abs(negative.x - positive.x);
+      const paths = [
+        [
+          { x: positive.x + radius, y: positive.y },
+          { x: negative.x - radius, y: negative.y }
+        ]
+      ];
+
+      const levels = state.density >= 16
+        ? [0.55, 0.88, 1.2, 1.52, 1.86]
+        : state.density >= 12
+          ? [0.58, 0.98, 1.38, 1.78]
+          : [0.68, 1.18, 1.68];
+      for (let side = -1; side <= 1; side += 2) {
+        for (let i = 0; i < levels.length; i += 1) {
+          const edge = Math.min(0.34, 0.1 + i * 0.065);
+          const horizontalOffset = Math.sqrt(radius * radius - edge * edge);
+          const start = {
+            x: positive.x + horizontalOffset,
+            y: positive.y + side * edge
+          };
+          const end = {
+            x: negative.x - horizontalOffset,
+            y: negative.y + side * edge
+          };
+          const c1 = {
+            x: positive.x + distance * (0.22 + i * 0.04),
+            y: positive.y + side * levels[i]
+          };
+          const c2 = {
+            x: negative.x - distance * (0.22 + i * 0.04),
+            y: negative.y + side * levels[i]
+          };
+          paths.push(cubicPath(start, c1, c2, end));
+        }
+      }
+      return paths;
+    }
+
+    function drawFieldLines(charges) {
+      const paths = charges.length === 1
+        ? singleFieldLines(charges)
+        : state.scene === "dipole"
+          ? dipoleFieldLines(charges)
+          : pairFieldLines(charges);
+      const phase = controls.animateArrows.checked ? (Math.sin(state.time * 0.04) * 0.08) : 0;
+      for (const path of paths) {
+        drawWorldPath(path, "#f8fafc", 2.2, 0.78);
+        drawArrowHeadOnPath(path, "#f8fafc", phase);
+      }
+    }
+
+    function drawCharge(c) {
+      const p = worldToCanvas(c);
+      const radius = 32;
+      const gradient = ctx.createRadialGradient(p.x - 12, p.y - 12, 5, p.x, p.y, radius);
+      gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+      gradient.addColorStop(0.23, chargeColor(c.q));
+      gradient.addColorStop(1, chargeColor(c.q));
+
+      ctx.save();
+      ctx.shadowColor = c.q > 0 ? "rgba(255, 62, 62, 0.48)" : "rgba(83, 99, 255, 0.48)";
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(255,255,255,0.82)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 24px Arial";
+      ctx.fillText(c.q > 0 ? "+" : "-", p.x, p.y - 9);
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(c.label, p.x, p.y + 16);
+      ctx.restore();
+    }
+
+    function drawTestCharge(charges) {
+      if (!controls.showTestCharge.checked) return;
+      const test = state.test;
+      if (isNearCharge(test.x, test.y, charges, 0.48)) {
+        test.y += 0.15;
+      }
+      const e = fieldAt(test.x, test.y, charges);
+      const p = worldToCanvas(test);
+      ctx.save();
+      ctx.fillStyle = "#ffd166";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.shadowColor = "rgba(255, 209, 102, 0.5)";
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+      ctx.fillStyle = "#172033";
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("+", p.x, p.y);
+      ctx.restore();
+
+      if (e.m > 0.0001) {
+        const end = {
+          x: p.x + (e.x / e.m) * 70,
+          y: p.y - (e.y / e.m) * 70
+        };
+        drawArrow(p.x, p.y, end.x, end.y, "#ffd166", 5, 16);
+        ctx.save();
+        ctx.fillStyle = "#ffd166";
+        ctx.font = "bold 18px Arial";
+        ctx.textAlign = "left";
+        ctx.fillText("F", end.x + 8, end.y + 4);
+        ctx.restore();
+      }
+    }
+
+    function drawModelLabel() {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "bold 18px Microsoft YaHei, Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("电场线方向 = 正试探电荷受力方向", canvas.width / 2, canvas.height - 22);
+      ctx.restore();
+    }
+
+    function updateOutputs() {
+      const scene = SCENES[state.scene];
+      output.densityValue.textContent = `${state.density} 条`;
+      output.distanceValue.textContent = state.scene.startsWith("single") ? "单电荷" : `${state.distance.toFixed(1)}`;
+      output.stageScene.textContent = scene.name;
+      output.stageDirection.textContent = scene.stageDirection;
+      output.stageTest.textContent = controls.showTestCharge.checked ? "显示" : "隐藏";
+      output.sceneName.textContent = scene.name;
+      output.fieldDirection.textContent = scene.direction;
+      output.forceDirection.textContent = scene.force;
+      output.teachingTip.textContent = scene.tip;
+      output.sceneName.className = state.scene === "singleNegative" ? "metric-value negative" : "metric-value neutral";
+      controls.distanceSlider.disabled = state.scene.startsWith("single");
+    }
+
+    function render() {
+      const charges = sceneCharges();
+      updateOutputs();
+      drawBackground();
+      drawVectorGrid(charges);
+      drawFieldLines(charges);
+      for (const c of charges) {
+        drawCharge(c);
+      }
+      drawTestCharge(charges);
+      drawModelLabel();
+    }
+
+    function animate() {
+      state.time += 1;
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    function canvasPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY
+      };
+    }
+
+    function hitTestCharge(point) {
+      const p = worldToCanvas(state.test);
+      return Math.hypot(point.x - p.x, point.y - p.y) < 28;
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (!controls.showTestCharge.checked) return;
+      const point = canvasPoint(event);
+      if (!hitTestCharge(point)) return;
+      state.draggingTest = true;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!state.draggingTest) return;
+      state.test = canvasToWorld(canvasPoint(event));
+      render();
+    });
+
+    canvas.addEventListener("pointerup", () => {
+      state.draggingTest = false;
+    });
+
+    canvas.addEventListener("pointercancel", () => {
+      state.draggingTest = false;
+    });
+
+    controls.sceneButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.scene = button.dataset.scene;
+        controls.sceneButtons.forEach(btn => btn.classList.toggle("active", btn === button));
+        state.test = state.scene === "singleNegative" ? { x: -1.2, y: 1.1 } : { x: 1.3, y: 1.1 };
+        render();
+      });
+    });
+
+    controls.densitySlider.addEventListener("input", () => {
+      state.density = Number(controls.densitySlider.value);
+      render();
+    });
+
+    controls.distanceSlider.addEventListener("input", () => {
+      state.distance = Number(controls.distanceSlider.value);
+      render();
+    });
+
+    controls.showVectors.addEventListener("change", render);
+    controls.showTestCharge.addEventListener("change", render);
+    controls.animateArrows.addEventListener("change", render);
+
+    controls.resetBtn.addEventListener("click", () => {
+      state.scene = "singlePositive";
+      state.density = 14;
+      state.distance = 3.0;
+      state.test = { x: 1.3, y: 1.1 };
+      controls.densitySlider.value = state.density;
+      controls.distanceSlider.value = state.distance;
+      controls.showVectors.checked = true;
+      controls.showTestCharge.checked = true;
+      controls.animateArrows.checked = true;
+      controls.sceneButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.scene === state.scene));
+      render();
+    });
+
+    window.addEventListener("resize", render);
+    animate();
+  </script>
+</body>
+</html>
