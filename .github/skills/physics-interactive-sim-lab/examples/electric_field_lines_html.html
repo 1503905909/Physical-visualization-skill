@@ -497,7 +497,7 @@
         direction: "从正电荷出发并终止于负电荷",
         stageDirection: "+Q → -Q",
         force: "沿电场线切线方向",
-        tip: "等量异种点电荷的电场线从正电荷出发，最终指向负电荷，线条越密处场强越大。"
+        tip: "等量异种点电荷的电场线从正电荷出发，最终指向负电荷。负电荷右侧的线段表示从画面外绕回并终止于负电荷的场线。"
       },
       samePositive: {
         name: "等量同种点电荷",
@@ -599,6 +599,14 @@
       return x > b.xmin && x < b.xmax && y > b.ymin && y < b.ymax;
     }
 
+    function inIntegrationBounds(x, y) {
+      return x > -13 && x < 13 && y > -8 && y < 8;
+    }
+
+    function angleDifference(a, b) {
+      return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+    }
+
     function drawArrow(x1, y1, x2, y2, color, lineWidth, headLength = 13) {
       const angle = Math.atan2(y2 - y1, x2 - x1);
       ctx.save();
@@ -627,7 +635,15 @@
 
     function drawArrowHeadOnPath(path, color, offset = 0) {
       if (path.length < 5) return;
-      const idx = clamp(Math.floor(path.length * (0.5 + offset)), 2, path.length - 3);
+      const visible = [];
+      for (let i = 2; i < path.length - 3; i += 1) {
+        if (inBounds(path[i].x, path[i].y)) {
+          visible.push(i);
+        }
+      }
+      if (visible.length < 3) return;
+      const ratio = clamp(0.5 + offset, 0.25, 0.75);
+      const idx = visible[Math.floor(visible.length * ratio)];
       const p1 = worldToCanvas(path[idx - 2]);
       const p2 = worldToCanvas(path[idx + 2]);
       drawArrow(p1.x, p1.y, p2.x, p2.y, color, 2.2, 10);
@@ -652,21 +668,66 @@
       ctx.restore();
     }
 
-    function integrateLine(start, charges, forward = 1) {
+    function normalizedField(x, y, charges) {
+      const e = fieldAt(x, y, charges);
+      if (e.m < 1e-5) return null;
+      return { x: e.x / e.m, y: e.y / e.m, m: e.m };
+    }
+
+    function rk4FieldStep(x, y, charges, direction, step) {
+      const k1 = normalizedField(x, y, charges);
+      if (!k1) return null;
+      const k2 = normalizedField(x + direction * k1.x * step / 2, y + direction * k1.y * step / 2, charges);
+      const k3 = normalizedField(x + direction * (k2 || k1).x * step / 2, y + direction * (k2 || k1).y * step / 2, charges);
+      const k4 = normalizedField(x + direction * (k3 || k1).x * step, y + direction * (k3 || k1).y * step, charges);
+      const vx = (k1.x + 2 * (k2 || k1).x + 2 * (k3 || k1).x + (k4 || k1).x) / 6;
+      const vy = (k1.y + 2 * (k2 || k1).y + 2 * (k3 || k1).y + (k4 || k1).y) / 6;
+      const m = Math.hypot(vx, vy);
+      if (m < 1e-5) return null;
+      return { x: x + direction * (vx / m) * step, y: y + direction * (vy / m) * step };
+    }
+
+    function reachedOppositeCharge(x, y, charges, source) {
+      return charges.some(c => c !== source && c.q * source.q < 0 && Math.hypot(x - c.x, y - c.y) < 0.34);
+    }
+
+    function integrateLine(start, charges, source, direction = 1) {
       const path = [{ x: start.x, y: start.y }];
       let x = start.x;
       let y = start.y;
-      const step = 0.045;
-      for (let i = 0; i < 1050; i += 1) {
-        const e = fieldAt(x, y, charges);
-        if (e.m < 0.0001) break;
-        x += forward * (e.x / e.m) * step;
-        y += forward * (e.y / e.m) * step;
+      const step = 0.035;
+      for (let i = 0; i < 2600; i += 1) {
+        const next = rk4FieldStep(x, y, charges, direction, step);
+        if (!next) break;
+        x = next.x;
+        y = next.y;
         path.push({ x, y });
-        if (!inBounds(x, y)) break;
-        if (i > 8 && isNearCharge(x, y, charges)) break;
+        if (i > 10 && reachedOppositeCharge(x, y, charges, source)) break;
+        if (!inIntegrationBounds(x, y)) break;
       }
       return path;
+    }
+
+    function seedAnglesForCharge(charge, charges, count) {
+      const blocked = charges
+        .filter(other => other !== charge && other.q * charge.q > 0)
+        .map(other => Math.atan2(other.y - charge.y, other.x - charge.x));
+      const candidates = [];
+      const samples = Math.max(96, count * 12);
+      for (let i = 0; i < samples; i += 1) {
+        const angle = (i / samples) * Math.PI * 2;
+        const pointsTowardSameCharge = blocked.some(blockedAngle => Math.abs(angleDifference(angle, blockedAngle)) < 0.42);
+        if (!pointsTowardSameCharge) {
+          candidates.push(angle);
+        }
+      }
+      if (candidates.length === 0) return [];
+      const angles = [];
+      for (let i = 0; i < count; i += 1) {
+        const index = Math.floor((i + 0.5) * candidates.length / count) % candidates.length;
+        angles.push(candidates[index]);
+      }
+      return angles;
     }
 
     function drawBackground() {
@@ -723,16 +784,15 @@
       for (let i = 0; i < count; i += 1) {
         const angle = (i / count) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+        const start = {
+          x: charge.x + dir.x * 0.42,
+          y: charge.y + dir.y * 0.42
+        };
         if (charge.q > 0) {
-          paths.push([
-            { x: charge.x + dir.x * 0.42, y: charge.y + dir.y * 0.42 },
-            { x: charge.x + dir.x * 5.2, y: charge.y + dir.y * 3.0 }
-          ]);
+          paths.push(integrateLine(start, charges, charge, 1));
         } else {
-          paths.push([
-            { x: charge.x + dir.x * 5.2, y: charge.y + dir.y * 3.0 },
-            { x: charge.x + dir.x * 0.42, y: charge.y + dir.y * 0.42 }
-          ]);
+          const path = integrateLine(start, charges, charge, -1);
+          paths.push(path.reverse());
         }
       }
       return paths;
@@ -741,77 +801,40 @@
     function pairFieldLines(charges) {
       const paths = [];
       const positiveCharges = charges.filter(c => c.q > 0);
-      const seedCount = state.density;
+      const seedCount = state.scene === "samePositive" ? state.density : Math.max(8, Math.round(state.density * 1.25));
       for (const c of positiveCharges) {
-        for (let i = 0; i < seedCount; i += 1) {
-          const angle = (i / seedCount) * Math.PI * 2;
+        const angles = seedAnglesForCharge(c, charges, seedCount);
+        for (const angle of angles) {
           const start = {
-            x: c.x + Math.cos(angle) * 0.38,
-            y: c.y + Math.sin(angle) * 0.38
+            x: c.x + Math.cos(angle) * 0.42,
+            y: c.y + Math.sin(angle) * 0.42
           };
-          const path = integrateLine(start, charges, 1);
-          paths.push(path);
+          const path = integrateLine(start, charges, c, 1);
+          if (path.length > 12) paths.push(path);
         }
+      }
+      if (state.scene === "dipole") {
+        paths.push(...dipoleOuterTerminalLines(charges));
       }
       return paths;
     }
 
-    function cubicPoint(p0, p1, p2, p3, t) {
-      const u = 1 - t;
-      return {
-        x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
-        y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
-      };
-    }
-
-    function cubicPath(p0, p1, p2, p3, samples = 72) {
-      const path = [];
-      for (let i = 0; i <= samples; i += 1) {
-        path.push(cubicPoint(p0, p1, p2, p3, i / samples));
-      }
-      return path;
-    }
-
-    function dipoleFieldLines(charges) {
-      const positive = charges.find(c => c.q > 0);
+    function dipoleOuterTerminalLines(charges) {
       const negative = charges.find(c => c.q < 0);
-      if (!positive || !negative) return pairFieldLines(charges);
-
-      const radius = 0.42;
-      const distance = Math.abs(negative.x - positive.x);
-      const paths = [
-        [
-          { x: positive.x + radius, y: positive.y },
-          { x: negative.x - radius, y: negative.y }
-        ]
-      ];
-
-      const levels = state.density >= 16
-        ? [0.55, 0.88, 1.2, 1.52, 1.86]
-        : state.density >= 12
-          ? [0.58, 0.98, 1.38, 1.78]
-          : [0.68, 1.18, 1.68];
-      for (let side = -1; side <= 1; side += 2) {
-        for (let i = 0; i < levels.length; i += 1) {
-          const edge = Math.min(0.34, 0.1 + i * 0.065);
-          const horizontalOffset = Math.sqrt(radius * radius - edge * edge);
-          const start = {
-            x: positive.x + horizontalOffset,
-            y: positive.y + side * edge
-          };
-          const end = {
-            x: negative.x - horizontalOffset,
-            y: negative.y + side * edge
-          };
-          const c1 = {
-            x: positive.x + distance * (0.22 + i * 0.04),
-            y: positive.y + side * levels[i]
-          };
-          const c2 = {
-            x: negative.x - distance * (0.22 + i * 0.04),
-            y: negative.y + side * levels[i]
-          };
-          paths.push(cubicPath(start, c1, c2, end));
+      if (!negative) return [];
+      const paths = [];
+      const count = Math.max(5, Math.round(state.density * 0.75));
+      const spread = Math.PI * 0.62;
+      for (let i = 0; i < count; i += 1) {
+        const t = count === 1 ? 0.5 : i / (count - 1);
+        const angle = -spread / 2 + t * spread;
+        const start = {
+          x: negative.x + Math.cos(angle) * 0.43,
+          y: negative.y + Math.sin(angle) * 0.43
+        };
+        const path = integrateLine(start, charges, negative, -1);
+        if (path.length > 16) {
+          paths.push(path.reverse());
         }
       }
       return paths;
@@ -820,9 +843,7 @@
     function drawFieldLines(charges) {
       const paths = charges.length === 1
         ? singleFieldLines(charges)
-        : state.scene === "dipole"
-          ? dipoleFieldLines(charges)
-          : pairFieldLines(charges);
+        : pairFieldLines(charges);
       const phase = controls.animateArrows.checked ? (Math.sin(state.time * 0.04) * 0.08) : 0;
       for (const path of paths) {
         drawWorldPath(path, "#f8fafc", 2.2, 0.78);

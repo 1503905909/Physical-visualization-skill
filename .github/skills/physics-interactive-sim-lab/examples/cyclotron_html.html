@@ -332,37 +332,46 @@
     function modelValues() {
       const p = particle();
       const qOverM = p.q / p.m;
-      const expansion = Math.sqrt(state.U * qOverM) / state.B;
-      const turns = clamp(5.8 / Math.sqrt(state.U * qOverM) * Math.sqrt(state.B), 3.4, 7.0);
-      const maxRadius = clamp(122 + 76 * expansion, 118, 208);
-      const finalSpeed = Math.sqrt(2 * p.q * state.U * 12 / p.m);
+      const passCount = 10;
+      const baseRadius = 24;
+      const radiusScale = 34;
+      const radii = [];
+      for (let i = 1; i <= passCount + 1; i += 1) {
+        radii.push(clamp(baseRadius + radiusScale * Math.sqrt(i * state.U / qOverM) / state.B, 34, 202));
+      }
+      const maxRadius = radii[radii.length - 1];
+      const finalSpeed = Math.sqrt(2 * p.q * state.U * passCount / p.m);
       const period = p.m / (p.q * state.B);
-      return { qOverM, turns, maxRadius, finalSpeed, period };
+      return { qOverM, passCount, radii, maxRadius, finalSpeed, period };
     }
 
-    function thetaRange() {
-      const values = modelValues();
-      return { start: -Math.PI / 2, end: -Math.PI / 2 + values.turns * Math.PI * 2 };
-    }
-
-    function spiralPointByTheta(theta) {
+    function orbitPointByPass(passFloat) {
       const s = stage();
       const values = modelValues();
-      const range = thetaRange();
-      const ratio = clamp((theta - range.start) / (range.end - range.start), 0, 1);
-      const r = 16 + (values.maxRadius - 16) * Math.pow(ratio, 0.76);
+      const pass = clamp(passFloat, 0, values.passCount);
+      const segment = Math.min(Math.floor(pass), values.passCount - 1);
+      const local = pass - segment;
+      const r = values.radii[segment];
+      const clockwiseInRightDee = segment % 2 === 0;
+      const theta = clockwiseInRightDee
+        ? -Math.PI / 2 + local * Math.PI
+        : Math.PI / 2 + local * Math.PI;
       return {
         x: s.cx + r * Math.cos(theta),
         y: s.cy + r * Math.sin(theta),
         r,
-        ratio,
+        segment,
+        local,
         theta
       };
     }
 
-    function currentTheta() {
-      const range = thetaRange();
-      return range.start + (range.end - range.start) * clamp(state.progress, 0, 1);
+    function currentPass() {
+      return modelValues().passCount * clamp(state.progress, 0, 1);
+    }
+
+    function currentPoint() {
+      return orbitPointByPass(currentPass());
     }
 
     function drawArrow(x1, y1, x2, y2, color, width = 3, headLength = 10) {
@@ -465,10 +474,10 @@
 
     function drawGapField() {
       const s = stage();
-      const theta = currentTheta();
-      const cycle = Math.floor((theta - thetaRange().start) / Math.PI);
+      const pass = currentPass();
+      const cycle = Math.floor(pass);
       const toRight = cycle % 2 === 0;
-      const flash = Math.abs(Math.cos(theta)) < 0.22 ? 1 : 0.45;
+      const flash = Math.abs(pass - Math.round(pass)) < 0.08 ? 1 : 0.45;
       ctx.save();
       ctx.globalAlpha = flash;
       for (let y = s.cy - 110; y <= s.cy + 110; y += 55) {
@@ -479,27 +488,32 @@
     }
 
     function drawPath() {
-      const range = thetaRange();
-      const steps = 480;
+      const values = modelValues();
+      const stepsPerHalf = 46;
       ctx.save();
       ctx.lineWidth = 3.4;
       ctx.strokeStyle = "#ffd166";
       ctx.lineCap = "round";
       ctx.beginPath();
-      for (let i = 0; i <= steps; i += 1) {
-        const theta = range.start + (range.end - range.start) * (i / steps);
-        const p = spiralPointByTheta(theta);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
+      let started = false;
+      for (let seg = 0; seg < values.passCount; seg += 1) {
+        for (let i = 0; i <= stepsPerHalf; i += 1) {
+          const local = i / stepsPerHalf;
+          const p = orbitPointByPass(seg + local);
+          if (!started) {
+            ctx.moveTo(p.x, p.y);
+            started = true;
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
+        }
       }
       ctx.stroke();
 
       ctx.strokeStyle = "rgba(255,255,255,0.24)";
       ctx.lineWidth = 1.5;
-      for (let i = 1; i <= 10; i += 1) {
-        const theta = range.start + i * Math.PI;
-        if (theta > range.end) break;
-        const p = spiralPointByTheta(theta);
+      for (let i = 1; i <= values.passCount; i += 1) {
+        const p = orbitPointByPass(i);
         ctx.beginPath();
         ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
         ctx.stroke();
@@ -509,14 +523,14 @@
 
     function drawParticleAndVectors() {
       const pInfo = particle();
-      const theta = currentTheta();
-      const point = spiralPointByTheta(theta);
-      const tangentAngle = theta + Math.PI / 2;
+      const point = currentPoint();
+      const inRightDee = point.segment % 2 === 0;
+      const tangentAngle = point.theta + Math.PI / 2;
       const speed = 54 + point.r * 0.14;
       const vx = Math.cos(tangentAngle);
       const vy = Math.sin(tangentAngle);
-      const inwardX = -Math.cos(theta);
-      const inwardY = -Math.sin(theta);
+      const inwardX = (stage().cx - point.x) / point.r;
+      const inwardY = (stage().cy - point.y) / point.r;
 
       ctx.save();
       ctx.shadowColor = "rgba(255,209,102,0.45)";
@@ -552,14 +566,13 @@
     function updateOutputs() {
       const p = particle();
       const values = modelValues();
-      const theta = currentTheta();
-      const boosts = Math.max(0, Math.floor((theta - thetaRange().start) / Math.PI));
+      const boosts = Math.max(0, Math.floor(currentPass()));
       output.bValue.textContent = state.B.toFixed(1);
       output.uValue.textContent = state.U.toFixed(1);
       output.stageParticle.textContent = p.name;
       output.stageBoosts.textContent = boosts.toString();
       output.stageStatus.textContent = state.playing ? "播放" : "暂停";
-      output.radiusValue.textContent = `末端半径约为初始的 ${(values.maxRadius / 16).toFixed(1)} 倍`;
+      output.radiusValue.textContent = `末端半径约为初始的 ${(values.maxRadius / values.radii[0]).toFixed(1)} 倍`;
       output.periodValue.textContent = `相对周期 ${(values.period).toFixed(2)}；B 越大周期越短`;
       output.energyValue.textContent = `每次约增加 ${p.q}q × ${state.U.toFixed(1)}U`;
     }

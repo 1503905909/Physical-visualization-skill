@@ -268,6 +268,87 @@ class ElectricFieldLinesScene(Scene):
         self.play(FadeOut(VGroup(header, panel, items)), run_time=0.8)
 
 
+
+def sphere_directions():
+    directions = []
+    for z, count, offset in [(-0.62, 4, 18), (0.0, 8, 0), (0.62, 4, 45)]:
+        radius = np.sqrt(max(0.0, 1 - z * z))
+        for i in range(count):
+            angle = TAU * i / count + np.deg2rad(offset)
+            directions.append(np.array([radius * np.cos(angle), radius * np.sin(angle), z]))
+    directions.append(np.array([0.0, 0.0, 1.0]))
+    directions.append(np.array([0.0, 0.0, -1.0]))
+    return directions
+
+
+def radial_lines_3d(inner=0.48, outer=2.28, sign=1):
+    lines = VGroup()
+    for direction in sphere_directions():
+        start = direction * inner if sign > 0 else direction * outer
+        end = direction * outer if sign > 0 else direction * inner
+        lines.add(Line3D(start=start, end=end, thickness=0.010, color=FIELD, resolution=4))
+    return lines
+
+
+class ElectricFieldLines2D3DScene(ThreeDScene):
+    """点电荷电场线：由教材二维图示过渡到三维空间分布。"""
+
+    def construct(self):
+        self.set_camera_orientation(phi=0 * DEGREES, theta=-90 * DEGREES, zoom=0.88)
+        header = title("点电荷电场线：由二维图示到三维图示", "教材平面图可看作空间电场分布的一个截面")
+        self.add_fixed_in_frame_mobjects(header)
+        self.play(FadeIn(header, shift=DOWN), run_time=0.7)
+
+        source = charge(1, "Q", 0.30).move_to(ORIGIN)
+        flat_lines = radial_lines(ORIGIN, sign=1, count=16, inner=0.43, outer=2.12)
+        step1 = cn("第一步：观察教材中的平面电场线", 25, INK, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(step1)
+
+        self.play(FadeIn(source, scale=0.85), run_time=0.35)
+        self.play(LaggedStart(*[Create(line) for line in flat_lines], lag_ratio=0.025), run_time=1.35)
+        self.play(FadeIn(step1, shift=UP), run_time=0.4)
+        self.wait(0.55)
+
+        plane = Square(side_length=4.95, stroke_color="#94a3b8", stroke_width=1.2)
+        plane.set_fill("#dbeafe", opacity=0.14)
+        step2 = cn("第二步：把平面图理解为空间分布的一个截面", 25, ACCENT, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(step2)
+        self.play(FadeOut(step1), FadeIn(plane), FadeIn(step2, shift=UP), run_time=0.55)
+
+        self.move_camera(phi=62 * DEGREES, theta=-43 * DEGREES, zoom=0.88, run_time=1.5)
+
+        sphere = Sphere(radius=0.27, resolution=(18, 9))
+        sphere.set_color(POSITIVE)
+        sphere.set_opacity(0.96)
+        sphere.set_shade_in_3d(True)
+
+        spatial_lines = radial_lines_3d(sign=1)
+
+        step3 = cn("第三步：正点电荷电场线向空间各方向发散", 24, INK, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(step3)
+        self.play(
+            FadeOut(source),
+            flat_lines.animate.set_opacity(0.18),
+            FadeIn(sphere, scale=0.9),
+            FadeIn(spatial_lines),
+            FadeOut(step2),
+            FadeIn(step3, shift=UP),
+            run_time=1.35,
+        )
+        self.move_camera(phi=68 * DEGREES, theta=-18 * DEGREES, zoom=0.86, run_time=1.0)
+        self.wait(0.8)
+        self.play(FadeOut(step3), run_time=0.3)
+
+        conclusion = VGroup(
+            cn("正点电荷：电场线向外发散", 24, FIELD, "BOLD"),
+            cn("平面电场线图只是空间模型的一个观察截面", 21, MUTED),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.15).to_corner(DR, buff=0.55)
+        self.add_fixed_in_frame_mobjects(conclusion)
+        self.play(FadeIn(conclusion, shift=LEFT), run_time=0.65)
+        self.wait(1.0)
+
+
 if __name__ == "__main__":
     # manim -pql electric_field_lines.py ElectricFieldLinesScene
+    # manim -pql electric_field_lines.py ElectricFieldLines2D3DScene
     pass

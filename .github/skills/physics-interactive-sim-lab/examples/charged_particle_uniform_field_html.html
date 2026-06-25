@@ -131,7 +131,7 @@
         <h1>带电粒子在匀强电场中的运动可视化资源</h1>
         <p class="subtitle">观察粒子进入平行板电场后的受力、速度分解和偏转轨迹。</p>
       </div>
-      <div class="formula">F = qE，a = qE / m，y = 1/2 at²</div>
+      <div class="formula">F = qE，a = qE / m，偏转量 y = 1/2 at²</div>
     </header>
 
     <section class="layout">
@@ -427,7 +427,9 @@
       output.forceDirection.textContent = forceText;
       output.forceDirection.className = state.charge > 0 ? "metric-value positive" : "metric-value negative";
       output.deflectionValue.textContent = `${Math.abs(def).toFixed(2)}（相对值）`;
-      output.motionNote.textContent = state.v0 > 1.8 ? "初速度较大，通过电场时间较短，因此偏转减小。" : "水平方向近似匀速，竖直方向在电场力作用下做匀加速运动。";
+      output.motionNote.textContent = state.v0 > 1.8
+        ? "初速度较大，通过电场时间较短，因此偏转减小；本图上极板为正、下极板为负，电场方向向下。"
+        : "本图上极板为正、下极板为负，电场方向向下；粒子水平方向近似匀速，竖直方向在电场力作用下做匀加速运动。";
     }
 
     function render() {

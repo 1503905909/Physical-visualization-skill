@@ -121,6 +121,53 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
     }
 
+    .stage-legend {
+      position: absolute;
+      left: 16px;
+      bottom: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 9px;
+      border-radius: 8px;
+      background: rgba(8, 10, 14, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 13px;
+      font-weight: 700;
+      backdrop-filter: blur(4px);
+    }
+
+    .legend-swatch {
+      width: 24px;
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      flex: 0 0 auto;
+    }
+
+    .legend-swatch.high {
+      background: #d62456;
+    }
+
+    .legend-swatch.low {
+      background: #1d4ed8;
+    }
+
+    .legend-line {
+      width: 24px;
+      height: 12px;
+      border-left: 3px solid rgba(255, 255, 255, 0.86);
+      flex: 0 0 auto;
+    }
+
     .side-panel { padding: 14px; }
     .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
 
@@ -275,7 +322,8 @@
       .layout,
       .controls-grid,
       .inquiry-list,
-      .scene-buttons { grid-template-columns: 1fr; }
+      .scene-buttons,
+      .stage-legend { grid-template-columns: 1fr; }
       .topbar { align-items: start; flex-direction: column; }
       .formula { white-space: normal; }
     }
@@ -286,7 +334,7 @@
     <header class="topbar">
       <div>
         <h1>电势与等势面可视化资源</h1>
-        <p class="subtitle">用颜色表示电势高低，用等势线表示等势面剖面，并比较它们与电场线的关系。</p>
+        <p class="subtitle">红色表示电势较高，蓝色表示电势较低；白色线是等势线，箭头表示电场方向。</p>
       </div>
       <div class="formula">φ = E<sub>p</sub> / q，等势线 ⟂ 电场线</div>
     </header>
@@ -298,8 +346,13 @@
             <canvas id="potentialCanvas" width="960" height="540"></canvas>
             <div class="stage-readout">
               <div class="readout-item">场景：<span id="stageScene">正点电荷</span></div>
-              <div class="readout-item">探针电势：<span id="stageV">0.00</span></div>
-              <div class="readout-item">场强方向：<span id="stageE">--</span></div>
+              <div class="readout-item">当前位置：<span id="stageV">中等电势</span></div>
+              <div class="readout-item">电场方向：<span id="stageE">--</span></div>
+            </div>
+            <div class="stage-legend" aria-hidden="true">
+              <div class="legend-item"><span class="legend-swatch high"></span><span>高电势</span></div>
+              <div class="legend-item"><span class="legend-swatch low"></span><span>低电势</span></div>
+              <div class="legend-item"><span class="legend-line"></span><span>等势线</span></div>
             </div>
           </div>
         </section>
@@ -359,12 +412,12 @@
           <div class="metric-value neutral" id="sceneName">正点电荷</div>
         </div>
         <div class="metric">
-          <div class="metric-label">探针位置电势</div>
-          <div class="metric-value" id="probeV">0.00 V</div>
+          <div class="metric-label">探针位置</div>
+          <div class="metric-value" id="probeV">中等电势区</div>
         </div>
         <div class="metric">
           <div class="metric-label">电场方向</div>
-          <div class="metric-value" id="probeE">沿电势降低最快方向</div>
+          <div class="metric-value" id="probeE">从高电势指向低电势</div>
         </div>
         <div class="metric">
           <div class="metric-label">教学提示</div>
@@ -423,7 +476,7 @@
       },
       uniform: {
         name: "匀强电场",
-        tip: "匀强电场中的等势线互相平行且间距相等，电场方向由高电势指向低电势。"
+        tip: "匀强电场中，红色一侧电势较高，蓝色一侧电势较低。白色竖线是等势线，电场方向向右，并与等势线垂直。"
       }
     };
 
@@ -701,6 +754,17 @@
         ctx.textAlign = "center";
         ctx.fillText("+", left.x, left.y - 10);
         ctx.fillText("-", right.x, left.y - 10);
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = "bold 16px Microsoft YaHei, Arial";
+        ctx.textAlign = "left";
+        ctx.fillText("正极板", left.x + 28, left.y + 28);
+        ctx.fillText("高电势", left.x + 28, left.y + 52);
+        ctx.textAlign = "right";
+        ctx.fillText("负极板", right.x - 28, left.y + 28);
+        ctx.fillText("低电势", right.x - 28, left.y + 52);
+        ctx.textAlign = "center";
+        drawArrow(left.x + 112, left.y + 28, right.x - 112, left.y + 28, "rgba(255,255,255,0.82)", 3, 11);
+        ctx.fillText("电场方向", (left.x + right.x) / 2, left.y + 18);
         ctx.restore();
       }
     }
@@ -734,18 +798,43 @@
       const scene = SCENES[state.scene];
       const v = potentialAt(state.probe.x, state.probe.y);
       const e = fieldAt(state.probe.x, state.probe.y);
-      const angle = Math.atan2(e.y, e.x) * 180 / Math.PI;
-      const direction = e.m > 0.001 ? `${angle.toFixed(0)}°` : "--";
+      const potentialText = describePotential(v);
+      const direction = describeFieldDirection(e);
       output.stageScene.textContent = scene.name;
-      output.stageV.textContent = `${v.toFixed(2)} V`;
+      output.stageV.textContent = potentialText;
       output.stageE.textContent = direction;
       output.levelValue.textContent = `${state.levels} 组`;
       output.scaleValue.textContent = state.scale.toFixed(1);
       output.sceneName.textContent = scene.name;
-      output.probeV.textContent = `${v.toFixed(2)} V`;
-      output.probeV.className = `metric-value ${v >= 0 ? "positive" : "negative"}`;
-      output.probeE.textContent = "沿电势降低最快方向";
+      output.probeV.textContent = state.scene === "uniform"
+        ? `${potentialText}（相对电势 ${v.toFixed(2)} V）`
+        : `${potentialText}（${v.toFixed(2)} V）`;
+      output.probeV.className = `metric-value ${v > 0.18 ? "positive" : v < -0.18 ? "negative" : "neutral"}`;
+      output.probeE.textContent = state.scene === "uniform" ? "向右，从正极板指向负极板" : direction;
       output.teachingTip.textContent = scene.tip;
+    }
+
+    function describePotential(v) {
+      if (v > 0.6) return "高电势区";
+      if (v > 0.18) return "较高电势区";
+      if (v < -0.6) return "低电势区";
+      if (v < -0.18) return "较低电势区";
+      return "接近零电势区";
+    }
+
+    function describeFieldDirection(e) {
+      if (e.m <= 0.001) return "该点场强很小";
+      if (state.scene === "uniform") return "向右，从正极板指向负极板";
+      const angle = Math.atan2(e.y, e.x);
+      const deg = angle * 180 / Math.PI;
+      if (deg >= -22.5 && deg < 22.5) return "向右";
+      if (deg >= 22.5 && deg < 67.5) return "右上方";
+      if (deg >= 67.5 && deg < 112.5) return "向上";
+      if (deg >= 112.5 && deg < 157.5) return "左上方";
+      if (deg >= 157.5 || deg < -157.5) return "向左";
+      if (deg >= -157.5 && deg < -112.5) return "左下方";
+      if (deg >= -112.5 && deg < -67.5) return "向下";
+      return "右下方";
     }
 
     function render() {

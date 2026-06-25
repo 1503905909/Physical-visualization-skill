@@ -188,6 +188,182 @@ class ElectricPotentialEquipotentialScene(Scene):
         self.play(FadeOut(VGroup(header, panel, items)), run_time=0.8)
 
 
+
+def fixed_title(scene, text, subtitle):
+    group = title(text, subtitle)
+    scene.add_fixed_in_frame_mobjects(group)
+    return group
+
+
+def sphere_dirs_for_potential():
+    directions = []
+    for z, count, offset in [(-0.70, 5, 18), (0.0, 8, 0), (0.70, 5, 45)]:
+        radius = np.sqrt(max(0.0, 1 - z * z))
+        for i in range(count):
+            angle = TAU * i / count + np.deg2rad(offset)
+            directions.append(np.array([radius * np.cos(angle), radius * np.sin(angle), z]))
+    return directions
+
+
+def field_lines_3d_for_point(inner=0.42, outer=2.15):
+    return VGroup(*[
+        Line3D(start=d * inner, end=d * outer, thickness=0.012, color=FIELD, resolution=4)
+        for d in sphere_dirs_for_potential()
+    ])
+
+
+def potential_height(x, y, charges):
+    value = 0.0
+    for q, cx, cy in charges:
+        r = np.sqrt((x - cx) ** 2 + (y - cy) ** 2 + 0.16)
+        value += q / r
+    return float(np.clip(0.92 * value, -1.85, 2.10))
+
+
+def potential_surface(axes, charges, color="#20c7c9"):
+    surface = Surface(
+        lambda u, v: axes.c2p(u, v, potential_height(u, v, charges)),
+        u_range=[-3.0, 3.0],
+        v_range=[-2.1, 2.1],
+        resolution=(24, 16),
+        fill_opacity=0.54,
+        stroke_color="#14868a",
+        stroke_width=0.28,
+    )
+    surface.set_fill(color, opacity=0.50)
+    return surface
+
+
+def contour_ring_on_surface(axes, center, radius, charges, color=EQUIP, width=3.2):
+    cx, cy = center
+    return ParametricFunction(
+        lambda t: axes.c2p(
+            cx + radius * np.cos(t),
+            cy + radius * np.sin(t),
+            potential_height(cx + radius * np.cos(t), cy + radius * np.sin(t), charges) + 0.035,
+        ),
+        t_range=[0, TAU],
+        color=color,
+        stroke_width=width,
+    )
+
+
+def base_grid(axes):
+    grid = VGroup()
+    for x in np.linspace(-3, 3, 7):
+        grid.add(Line3D(axes.c2p(x, -2.1, 0), axes.c2p(x, 2.1, 0), thickness=0.004, color="#94a3b8"))
+    for y in np.linspace(-2, 2, 5):
+        grid.add(Line3D(axes.c2p(-3.0, y, 0), axes.c2p(3.0, y, 0), thickness=0.004, color="#94a3b8"))
+    grid.set_opacity(0.45)
+    return grid
+
+
+class ElectricPotential3DSurfaceScene(ThreeDScene):
+    """电势与等势面：三维空间模型和电势高度图。"""
+
+    def construct(self):
+        self.equipotential_line_to_surface()
+        self.potential_surface_compare()
+
+    def equipotential_line_to_surface(self):
+        self.set_camera_orientation(phi=0 * DEGREES, theta=-90 * DEGREES, zoom=0.90)
+        header = fixed_title(self, "电势与等势面：由等势线到等势面", "平面等势线是空间等势面的一个截面")
+        self.play(FadeIn(header, shift=DOWN), run_time=0.6)
+
+        source = charge(1, "Q", 0.30).move_to(ORIGIN)
+        circles = equipotential_circles(ORIGIN, [0.75, 1.18, 1.62, 2.05])
+        field = radial_field(ORIGIN, count=12, inner=0.35, outer=2.28)
+        step1 = cn("二维图示：同一圆周上电势相等", 24, INK, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(step1)
+
+        self.play(FadeIn(source, scale=0.85), Create(circles), run_time=1.0)
+        self.play(LaggedStart(*[Create(a) for a in field], lag_ratio=0.04), FadeIn(step1, shift=UP), run_time=1.0)
+        self.wait(0.45)
+
+        self.play(FadeOut(step1), FadeOut(field), run_time=0.35)
+        self.move_camera(phi=64 * DEGREES, theta=-42 * DEGREES, zoom=0.86, run_time=1.3)
+
+        sphere = Sphere(radius=0.25, resolution=(16, 8)).set_color(POSITIVE).set_opacity(0.95)
+        shells = VGroup()
+        for r, opacity in [(0.75, 0.20), (1.18, 0.15), (1.62, 0.11), (2.05, 0.08)]:
+            shell = Sphere(radius=r, resolution=(24, 12))
+            shell.set_color(EQUIP)
+            shell.set_opacity(opacity)
+            shell.set_stroke(EQUIP, width=0.8, opacity=0.28)
+            shells.add(shell)
+        spatial_field = field_lines_3d_for_point()
+        step2 = cn("三维模型：等势线对应空间中的等势面", 24, EQUIP, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(step2)
+
+        self.play(FadeOut(source), FadeOut(circles), FadeIn(sphere), FadeIn(shells), FadeIn(spatial_field), FadeIn(step2, shift=UP), run_time=1.2)
+        self.move_camera(phi=70 * DEGREES, theta=-10 * DEGREES, zoom=0.84, run_time=1.0)
+        self.wait(0.8)
+        self.play(FadeOut(VGroup(header, sphere, shells, spatial_field, step2)), run_time=0.7)
+
+    def potential_surface_compare(self):
+        self.set_camera_orientation(phi=58 * DEGREES, theta=-50 * DEGREES, zoom=0.92)
+        header = fixed_title(self, "三维电势高度图", "用高度辅助理解电势大小，用曲线标出典型等势线")
+        self.play(FadeIn(header, shift=DOWN), run_time=0.6)
+
+        axes = ThreeDAxes(
+            x_range=[-3.2, 3.2, 1],
+            y_range=[-2.2, 2.2, 1],
+            z_range=[-2.0, 2.2, 1],
+            x_length=6.2,
+            y_length=4.2,
+            z_length=3.5,
+        ).shift(DOWN * 0.08)
+        grid = base_grid(axes)
+
+        like_charges = [(1, -1.25, 0.0), (1, 1.25, 0.0)]
+        like_surface = potential_surface(axes, like_charges)
+        like_contours = VGroup(
+            contour_ring_on_surface(axes, (-1.25, 0.0), 0.55, like_charges, EQUIP),
+            contour_ring_on_surface(axes, (1.25, 0.0), 0.55, like_charges, EQUIP),
+            contour_ring_on_surface(axes, (-1.25, 0.0), 0.95, like_charges, "#2563eb", 2.6),
+            contour_ring_on_surface(axes, (1.25, 0.0), 0.95, like_charges, "#2563eb", 2.6),
+        )
+        like_points = VGroup(
+            Sphere(radius=0.08, resolution=(10, 5)).set_color(POSITIVE).move_to(axes.c2p(-1.25, 0, 1.78)),
+            Sphere(radius=0.08, resolution=(10, 5)).set_color(POSITIVE).move_to(axes.c2p(1.25, 0, 1.78)),
+        )
+        label_like = cn("等量同种点电荷：两个高电势区域", 23, INK, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(label_like)
+        self.play(FadeIn(grid), FadeIn(label_like, shift=UP), run_time=0.6)
+        self.play(FadeIn(like_surface), FadeIn(like_contours), FadeIn(like_points), run_time=1.3)
+        self.move_camera(phi=60 * DEGREES, theta=-30 * DEGREES, zoom=0.98, run_time=1.0)
+        self.wait(0.7)
+
+        dipole_charges = [(1, -1.25, 0.0), (-1, 1.25, 0.0)]
+        dipole_surface = potential_surface(axes, dipole_charges)
+        dipole_zero = Line3D(axes.c2p(0, -2.0, 0.04), axes.c2p(0, 2.0, 0.04), thickness=0.018, color=EQUIP)
+        dipole_contours = VGroup(
+            contour_ring_on_surface(axes, (-1.25, 0.0), 0.55, dipole_charges, "#ef4444"),
+            contour_ring_on_surface(axes, (1.25, 0.0), 0.55, dipole_charges, "#2563eb"),
+            dipole_zero,
+        )
+        dipole_points = VGroup(
+            Sphere(radius=0.08, resolution=(10, 5)).set_color(POSITIVE).move_to(axes.c2p(-1.25, 0, 1.70)),
+            Sphere(radius=0.08, resolution=(10, 5)).set_color(NEGATIVE).move_to(axes.c2p(1.25, 0, -1.45)),
+        )
+        label_dipole = cn("等量异种点电荷：高电势与低电势相对分布", 23, INK, "BOLD").to_edge(DOWN, buff=0.55)
+        self.add_fixed_in_frame_mobjects(label_dipole)
+        self.play(
+            FadeOut(like_surface),
+            FadeOut(like_contours),
+            FadeOut(like_points),
+            FadeOut(label_like),
+            FadeIn(dipole_surface),
+            FadeIn(dipole_contours),
+            FadeIn(dipole_points),
+            FadeIn(label_dipole, shift=UP),
+            run_time=1.2,
+        )
+        self.move_camera(phi=60 * DEGREES, theta=-42 * DEGREES, zoom=0.98, run_time=1.0)
+        self.wait(1.4)
+
+
 if __name__ == "__main__":
     # manim -pql electric_potential_equipotential.py ElectricPotentialEquipotentialScene
+    # manim -pql electric_potential_equipotential.py ElectricPotential3DSurfaceScene
     pass
