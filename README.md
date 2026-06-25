@@ -1,4 +1,4 @@
-# 高中物理电磁学可视化 Skills
+﻿# 高中物理电磁学可视化 Skills
 
 本仓库提供两个 Codex skills，用于生成高中物理电磁学可视化教学资源，重点面向人教版高中物理必修第三册和选择性必修第二册。
 
@@ -11,9 +11,9 @@
 
 两者可以配合使用：HTML 负责“让学生操作和观察”，Manim 负责“让教师分步讲清过程”。
 
-## 别人怎么安装使用
+## 怎么安装使用
 
-不是把 GitHub 链接随便发给 Codex 后就一定会自动长期生效。更稳妥的方式是把具体 skill 路径安装到 Codex 的 skills 目录，安装后重启 Codex。
+把 GitHub 链接发给 Codex 后Codex解析安装。更稳妥的方式是把具体 skill 路径安装到 Codex 的 skills 目录，安装后重启 Codex。
 
 如果 Codex 的界面支持从 GitHub 导入 skill，可以分别导入下面两个路径：
 
@@ -55,16 +55,19 @@ install-skill-from-github.py --repo 1503905909/Physical-visualization-skill --pa
 ```text
 Physical-visualization-skill/
 ├── .github/skills/
-│   ├── physics-interactive-sim-lab/
-│   │   ├── SKILL.md
-│   │   ├── agents/openai.yaml
-│   │   └── examples/
-│   └── manim-physics-animator/
-│       ├── SKILL.md
-│       ├── agents/openai.yaml
-│       └── examples/
-├── docs/
-├── build/
+│   ├── physics-interactive-sim-lab/    # 交互式 HTML 仿真 Skill
+│   │   ├── SKILL.md                    # Skill 定义与工作流
+│   │   ├── agents/openai.yaml          # Agent 配置
+│   │   └── examples/                   # 示例资源
+│   └── manim-physics-animator/         # Manim 动画 Skill
+│       ├── SKILL.md                    # Skill 定义与工作流
+│       ├── agents/openai.yaml          # Agent 配置
+│       └── examples/                   # 示例脚本
+├── docs/                               # 论文附录与使用说明
+│   ├── appendix_charged_particle_example.md
+│   ├── physics-topics.md
+│   └── setup-guide.md
+├── build/                              # 构建产物（截图、视频帧等）
 └── README.md
 ```
 
@@ -98,6 +101,11 @@ pip install manim
 
 如果涉及复杂公式或中文字体，需确认本机 LaTeX、中文字体和 Manim 环境可用。
 
+## 示例详细说明（论文附录用）
+
+如需将示例资源写入论文附录，可参考以下文档（含截图建议和操作说明）：
+
+- [`docs/appendix_charged_particle_example.md`](docs/appendix_charged_particle_example.md) — 「带电粒子在匀强电场中的运动」HTML 仿真详细说明
 ## 教学资源设计思路
 
 本仓库服务于“生成式人工智能辅助高中物理电磁学可视化教学资源设计”的流程：

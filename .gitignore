@@ -22,3 +22,6 @@ Thumbs.db
 
 # 旧的 Trae 配置（已被 .github/skills/ 替代）
 .trae/
+
+# 临时文件
+tmp/
