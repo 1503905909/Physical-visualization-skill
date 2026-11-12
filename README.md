@@ -1,4 +1,4 @@
-﻿# 高中物理电磁学可视化 Skills
+# 高中物理电磁学可视化
 
 本仓库提供两个 Codex skills，用于生成高中物理电磁学可视化教学资源，重点面向人教版高中物理必修第三册和选择性必修第二册。
 
@@ -63,7 +63,7 @@ Physical-visualization-skill/
 │       ├── SKILL.md                    # Skill 定义与工作流
 │       ├── agents/openai.yaml          # Agent 配置
 │       └── examples/                   # 示例脚本
-├── docs/                               # 论文附录与使用说明
+├── docs/                               # 使用说明与资源文档
 │   ├── appendix_charged_particle_example.md
 │   ├── physics-topics.md
 │   └── setup-guide.md
@@ -101,11 +101,6 @@ pip install manim
 
 如果涉及复杂公式或中文字体，需确认本机 LaTeX、中文字体和 Manim 环境可用。
 
-## 示例详细说明（论文附录用）
-
-如需将示例资源写入论文附录，可参考以下文档（含截图建议和操作说明）：
-
-- [`docs/appendix_charged_particle_example.md`](docs/appendix_charged_particle_example.md) — 「带电粒子在匀强电场中的运动」HTML 仿真详细说明
 ## 教学资源设计思路
 
 本仓库服务于“生成式人工智能辅助高中物理电磁学可视化教学资源设计”的流程：
