@@ -229,25 +229,53 @@ class MagneticFluxScene(Scene):
 
         def normal_shape():
             th = theta.get_value()
-            length = 1.15 * abs(math.sin(th))
-            if length < 0.15:
-                return VGroup()
-            return VGroup(
-                Arrow(
-                    field_center,
-                    field_center + RIGHT * length,
-                    buff=0,
-                    color=NORMAL,
-                    stroke_width=4,
-                    max_tip_length_to_length_ratio=0.26,
+            ct = abs(math.cos(th))
+            st = abs(math.sin(th))
+            group = VGroup()
+            if ct > 0.08:
+                # 法线的"垂直纸面"分量：θ=0° 时与 B 同向，θ=90° 时完全消失
+                r = 0.15 + 0.06 * ct
+                marker = VGroup(
+                    Circle(radius=r, color=NORMAL, stroke_width=2.6).move_to(field_center),
+                    Line(
+                        field_center + np.array([-0.6 * r, -0.6 * r, 0]),
+                        field_center + np.array([0.6 * r, 0.6 * r, 0]),
+                        color=NORMAL,
+                        stroke_width=2.6,
+                    ),
+                    Line(
+                        field_center + np.array([0.6 * r, -0.6 * r, 0]),
+                        field_center + np.array([-0.6 * r, 0.6 * r, 0]),
+                        color=NORMAL,
+                        stroke_width=2.6,
+                    ),
                 )
-            )
+                marker.set_opacity(0.85 * ct)
+                group.add(marker)
+            if st > 0.05:
+                group.add(
+                    Arrow(
+                        field_center,
+                        field_center + RIGHT * (1.15 * st),
+                        buff=0,
+                        color=NORMAL,
+                        stroke_width=4,
+                        max_tip_length_to_length_ratio=0.26,
+                    )
+                )
+            return group
 
         normal = always_redraw(normal_shape)
         n_label = MathTex("n", font_size=34, color=NORMAL)
-        n_label.add_updater(
-            lambda m: m.move_to(field_center + RIGHT * (1.15 * abs(math.sin(theta.get_value())) + 0.26))
-        )
+
+        def n_label_pos():
+            th = theta.get_value()
+            st = abs(math.sin(th))
+            if st > 0.05:
+                return field_center + RIGHT * (1.15 * st + 0.26) + UP * 0.24
+            return field_center + RIGHT * 0.4 + UP * 0.34
+
+        n_label.add_updater(lambda m: m.move_to(n_label_pos()))
 
         self.play(FadeIn(field), FadeIn(axis_line), FadeIn(axis_text), run_time=0.9)
         self.add(coil, normal, n_label)
@@ -286,6 +314,62 @@ class MagneticFluxScene(Scene):
 
         moving_dot = always_redraw(dot_pos)
 
+        # 左下角小示意图：B 与 n 的夹角 θ（n 取在 B 所指的一侧）
+        inset_origin = np.array([-5.05, -2.95, 0.0])
+        inset_len = 0.8
+        inset_b = Arrow(
+            inset_origin,
+            inset_origin + RIGHT * inset_len,
+            buff=0,
+            color=LAMP,
+            stroke_width=4,
+            max_tip_length_to_length_ratio=0.24,
+        )
+        inset_b_text = cn("B", 22, LAMP, "BOLD").next_to(inset_b.get_end(), RIGHT, buff=0.08)
+        inset_n_text = cn("n", 22, NORMAL, "BOLD")
+        inset_theta_text = cn("θ", 22, INK, "BOLD")
+        inset_caption = cn("B 与 n 的夹角", 18, MUTED).move_to([-5.0, -3.66, 0])
+
+        def inset_shape():
+            th = theta.get_value()
+            off = 0.12 * max(0.0, 1.0 - th / 0.15)
+            start = inset_origin + UP * off
+            group = VGroup()
+            d = np.array([-math.sin(th), math.cos(th), 0.0])
+            group.add(Line(inset_origin - d * 0.3, inset_origin + d * 0.3, color=COIL, stroke_width=4))
+            group.add(
+                Arrow(
+                    start,
+                    start + np.array([math.cos(th), math.sin(th), 0.0]) * inset_len,
+                    buff=0,
+                    color=NORMAL,
+                    stroke_width=4,
+                    max_tip_length_to_length_ratio=0.24,
+                )
+            )
+            if th > 0.1:
+                group.add(
+                    Arc(radius=0.4, start_angle=0, angle=th, arc_center=inset_origin,
+                        color=MUTED, stroke_width=2)
+                )
+            return group
+
+        inset = always_redraw(inset_shape)
+        inset_n_text.add_updater(
+            lambda m: m.move_to(
+                inset_origin
+                + UP * (0.12 * max(0.0, 1.0 - theta.get_value() / 0.15))
+                + np.array([math.cos(theta.get_value()), math.sin(theta.get_value()), 0]) * (inset_len + 0.16)
+                + UP * 0.1
+            )
+        )
+        inset_theta_text.add_updater(
+            lambda m: m.move_to(
+                inset_origin
+                + 0.58 * np.array([math.cos(theta.get_value() / 2), math.sin(theta.get_value() / 2), 0])
+            )
+        )
+
         phi_num.add_updater(lambda m: m.set_value(PHI_MAX * math.cos(theta.get_value())))
         theta_num.add_updater(lambda m: m.set_value(theta.get_value() / DEG))
 
@@ -295,16 +379,15 @@ class MagneticFluxScene(Scene):
         self.play(FadeIn(theta_label), FadeIn(theta_num), FadeIn(theta_unit), run_time=0.4)
         self.play(FadeIn(axes), Create(curve), run_time=1.0)
         self.play(FadeIn(moving_dot), run_time=0.4)
+        self.add(inset, inset_b, inset_b_text, inset_n_text, inset_theta_text, inset_caption)
         self.wait(0.5)
 
         self.play(theta.animate.set_value(60 * DEG), run_time=3.0, rate_func=smooth)
         self.play(theta.animate.set_value(90 * DEG), run_time=2.2, rate_func=smooth)
 
-        end_text = VGroup(
-            cn("θ = 0°：Φ 最大", 22, INK),
-            cn("θ = 90°：Φ = 0（线圈平面与 B 平行）", 22, WARN, "BOLD"),
-        ).arrange(DOWN, buff=0.12).move_to([-3.7, -3.2, 0])
-        self.play(FadeIn(end_text, shift=UP), run_time=0.8)
+        end_text = cn("θ = 0°：Φ 最大；θ = 90°：Φ = 0（平面与 B 平行）", 18, MUTED)
+        end_text.move_to([3.5, -3.3, 0])
+        self.play(FadeIn(end_text, shift=UP), run_time=0.7)
         self.wait(1.0)
 
         phi_num.clear_updaters()
@@ -313,11 +396,15 @@ class MagneticFluxScene(Scene):
         normal.clear_updaters()
         n_label.clear_updaters()
         moving_dot.clear_updaters()
+        inset.clear_updaters()
+        inset_n_text.clear_updaters()
+        inset_theta_text.clear_updaters()
         self.play(
             FadeOut(VGroup(header, field, axis_line, axis_text, coil, normal, n_label,
                            formula, given, phi_label, phi_num, phi_unit, theta_label,
                            theta_num, theta_unit, axes, curve, curve_text, moving_dot,
-                           end_text)),
+                           inset, inset_b, inset_b_text, inset_n_text, inset_theta_text,
+                           inset_caption, end_text)),
             run_time=0.8,
         )
 
@@ -361,15 +448,20 @@ class MagneticFluxScene(Scene):
         changing.set_opacity(0)
         steady.set_opacity(0)
 
+        # 用 Φ 的前后帧差分判断"正在变化"，而不是位置判据
+        status = {"last": fraction(), "hold": 0.0}
+
         def status_updater(dt):
             f = fraction()
-            moving = 0.001 < f < 0.999
+            if abs(f - status["last"]) > 1e-5:
+                status["hold"] = 0.15
+            status["last"] = f
+            status["hold"] = max(0.0, status["hold"] - dt)
+            moving = status["hold"] > 0
             changing.set_opacity(1.0 if moving else 0.0)
             steady.set_opacity(0.0 if moving else 1.0)
-            changing.move_to([3.3, -3.15, 0])
-            steady.move_to([3.3, -3.15, 0])
 
-        status_updater(0)
+        status_updater(0.0)
         status_group = VGroup(changing, steady)
         status_group.add_updater(status_updater)
 
@@ -397,7 +489,7 @@ class MagneticFluxScene(Scene):
             patch_center = np.array([center[0], center[1] + 0.4, 0.0])
             patch = field_panel(2.2, 1.2, 4, 3, patch_center, into=True)
             coil = coil_ellipse(coil_rx, coil_ry, patch_center + RIGHT * coil_shift)
-            bulb = lamp(np.array([center[0], center[1] - 0.62, 0.0]), 0.13, lit)
+            bulb = lamp(patch_center + RIGHT * coil_shift + DOWN * (coil_ry + 0.03), 0.13, lit)
             name_text = cn(name, 22, INK, "BOLD").move_to([center[0], center[1] + 1.42, 0])
             result_text = cn("Φ 变化" if lit else "Φ 不变", 24, WARN if lit else MUTED, "BOLD")
             result_text.move_to([center[0], center[1] - 1.35, 0])
@@ -442,10 +534,11 @@ class MagneticFluxScene(Scene):
         self.play(FadeIn(header, shift=DOWN), run_time=0.6)
 
         items = VGroup(
-            cn("1  Φ = B·S·cosθ：B 越大、有效面积越大，Φ 越大。", 25, INK),
-            cn("2  B、S、θ 任一个改变，或线圈进出磁场，Φ 都会变化。", 25, INK),
-            cn("3  Φ 不变时，闭合回路中没有感应电流。", 25, MUTED),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.26).move_to([0.0, 0.7, 0])
+            cn("1  Φ = B·S·cosθ：B 越大、有效面积越大，Φ 越大。", 24, INK),
+            cn("2  前提：线圈在磁场中，且 B 不与线圈平面平行。满足前提时，", 24, INK),
+            cn("     B、S、θ 之一改变，或线圈进出磁场（有效面积变化），Φ 才变化。", 24, INK),
+            cn("3  Φ 不变时，闭合回路中没有感应电流。", 24, MUTED),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.24).move_to([0.1, 0.75, 0])
 
         key_box = RoundedRectangle(
             width=9.8,

@@ -85,16 +85,27 @@ def circuit(gap, height, center, y_batt, bx=None):
     )
 
 
-def field_arrows(center, gap, height, count, color=VECTOR, width=3.0, inset=0.12, span=0.78):
-    """板间匀强电场：方向一律由正极板指向负极板。"""
+def field_arrows(center, gap, height, count, color=VECTOR, width=3.0, inset=0.12, span=0.78,
+                 fixed_len=None):
+    """板间匀强电场：方向一律由正极板指向负极板。
+
+    fixed_len 不为 None 时箭头长度固定（居中），此时只有条数编码疏密，
+    避免箭头随板间距变长而被误读成“电场变强”。
+    """
     if count < 1:
         return VGroup()
     ys = np.linspace(-height * span / 2, height * span / 2, count) if count > 1 else [0.0]
-    return VGroup(*[
-        arrow([center[0] - gap / 2 + inset, center[1] + y, 0],
-              [center[0] + gap / 2 - inset, center[1] + y, 0], color, width)
-        for y in ys
-    ])
+    arrows = []
+    for y in ys:
+        if fixed_len is None:
+            x0 = center[0] - gap / 2 + inset
+            x1 = center[0] + gap / 2 - inset
+        else:
+            half = min(fixed_len, gap - 0.14) / 2
+            x0 = center[0] - half
+            x1 = center[0] + half
+        arrows.append(arrow([x0, center[1] + y, 0], [x1, center[1] + y, 0], color, width))
+    return VGroup(*arrows)
 
 
 def charges(center, gap, height, count, size=26, span=0.70):
@@ -118,7 +129,7 @@ def state_u_const(d_mm, u_volt=U_VOLT):
         "U": u_volt,
         "Q": c * u_volt,
         "E": u_volt / (d_mm * 1e-3),
-        "W": 0.5 * c * u_volt ** 2,
+        "E_C": 0.5 * c * u_volt ** 2,
     }
 
 
@@ -131,7 +142,7 @@ def state_q_const(d_mm, q_coulomb):
         "U": u,
         "Q": q_coulomb,
         "E": u / (d_mm * 1e-3),
-        "W": 0.5 * q_coulomb * q_coulomb / c,
+        "E_C": 0.5 * q_coulomb * q_coulomb / c,
     }
 
 
@@ -236,13 +247,14 @@ class CapacitorScene(Scene):
             return 1.45 + (s - 300.0) / 300.0 * 0.85
 
         def build():
+            # 本分镜只讨论“电容由什么决定”，不涉及电源，因此刻意不画板间场线，
+            # 避免在 U 或 Q 未指定的情况下暗示 E 的大小。
             g = gap_of(d_tr.get_value())
             h = height_of(s_tr.get_value())
             medium = Rectangle(width=g, height=h, stroke_width=0, fill_color="#38bdf8",
                                fill_opacity=0.04 + 0.20 * (er_tr.get_value() - 1.0) / 3.2)
             medium.move_to(center)
             body = plates(g, h, center, depth=0.16)
-            arrows = field_arrows(center, g, h, 5, inset=0.10, width=2.8)
             top, y_dim = center[1] + h / 2, center[1] + h / 2 + 0.34
             dim = VGroup(
                 DoubleArrow([center[0] - g / 2, y_dim, 0], [center[0] + g / 2, y_dim, 0],
@@ -252,16 +264,17 @@ class CapacitorScene(Scene):
                 Line([center[0] + g / 2, top, 0], [center[0] + g / 2, y_dim - 0.06, 0],
                      color=PATH_C, stroke_width=1.4),
             )
-            return VGroup(medium, body, arrows, dim)
+            return VGroup(medium, body, dim)
 
         scene_group = always_redraw(build)
 
         panel = RoundedRectangle(width=5.3, height=4.5, corner_radius=0.16,
                                  stroke_color=LINE, stroke_width=2,
                                  fill_color=PANEL, fill_opacity=1).move_to([3.75, 0.05, 0])
-        formula = MathTex(r"C=\varepsilon_0\varepsilon_r\frac{S}{d}", font_size=56, color=INK)
-        formula.move_to([3.75, 1.62, 0])
-        rule = Line([1.55, 0.98, 0], [5.95, 0.98, 0], color=LINE, stroke_width=1.5)
+        formula = MathTex(r"C=\varepsilon_0\varepsilon_r\frac{S}{d}", font_size=54, color=INK)
+        formula.move_to([3.75, 1.78, 0])
+        eps_note = MathTex(r"\varepsilon_0=\frac{1}{4\pi k}", font_size=32, color=MUTED)
+        eps_note.move_to([3.75, 1.0, 0])
 
         s_num = DecimalNumber(300, num_decimal_places=0, font_size=26, color=INK)
         er_num = DecimalNumber(1.0, num_decimal_places=1, font_size=26, color=INK)
@@ -276,13 +289,14 @@ class CapacitorScene(Scene):
                    ).arrange(RIGHT, buff=0.06, aligned_edge=DOWN),
             VGroup(cn("d = ", 24, MUTED, "BOLD"), d_num, cn(" mm", 24, MUTED)
                    ).arrange(RIGHT, buff=0.06, aligned_edge=DOWN),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.16).move_to([2.55, 0.22, 0])
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.16).move_to([2.55, 0.0, 0])
         rows.shift(RIGHT * (2.05 - rows.get_left()[0]))
 
         c_row = VGroup(cn("C = ", 30, INK, "BOLD"), c_num, cn(" pF", 30, MUTED)
                        ).arrange(RIGHT, buff=0.08, aligned_edge=DOWN)
-        c_row.move_to([3.75, -0.85, 0])
-        c_note = cn("只由 εr、S、d 决定", 20, MUTED).move_to([3.75, -1.45, 0])
+        c_row.move_to([3.75, -1.05, 0])
+        c_note = cn("只由 εr、S、d 决定；教材写作 C = εᵣS/(4πkd)", 17, MUTED)
+        c_note.move_to([3.75, -1.62, 0])
 
         s_num.add_updater(lambda m: m.set_value(s_tr.get_value()))
         er_num.add_updater(lambda m: m.set_value(er_tr.get_value()))
@@ -290,7 +304,7 @@ class CapacitorScene(Scene):
         c_num.add_updater(lambda m: m.set_value(
             capacity_farad(d_tr.get_value(), er_tr.get_value(), s_tr.get_value()) * 1e12))
 
-        self.play(FadeIn(VGroup(panel, formula, rule, c_note)), run_time=0.7)
+        self.play(FadeIn(VGroup(panel, formula, eps_note, c_note)), run_time=0.7)
         self.add(scene_group)
         self.play(FadeIn(rows), FadeIn(c_row), run_time=0.7)
 
@@ -312,7 +326,7 @@ class CapacitorScene(Scene):
         self.wait(0.8)
 
         self._stop(scene_group, s_num, er_num, d_num, c_num)
-        self.play(FadeOut(VGroup(header, panel, formula, rule, rows, c_row, c_note,
+        self.play(FadeOut(VGroup(header, panel, formula, eps_note, rows, c_row, c_note,
                                  scene_group, chips)), run_time=0.8)
 
     # ---------------------------------------------------------------- 分镜 3
@@ -371,7 +385,9 @@ class CapacitorScene(Scene):
             body = plates(g, cap_height, cap_center, depth=0.14)
             e = (state_u_const(d_tr.get_value())["E"] if kind == "u"
                  else state_q_const(d_tr.get_value(), Q_FROZEN)["E"])
-            arrows = field_arrows(cap_center, g, cap_height, arrow_count(e), inset=0.08, width=2.6)
+            # 箭头长度固定，只用条数表示疏密，避免板间距变大被误读为 E 变强。
+            arrows = field_arrows(cap_center, g, cap_height, arrow_count(e),
+                                  width=2.6, fixed_len=0.55)
             return VGroup(body, arrows)
 
         cap_group = always_redraw(build)
@@ -384,22 +400,22 @@ class CapacitorScene(Scene):
             w_num = DecimalNumber(4.0, num_decimal_places=1, font_size=26, color=FIELD)
             q_num.add_updater(lambda m: m.set_value(state_u_const(d_tr.get_value())["Q"] * 1e9))
             e_num.add_updater(lambda m: m.set_value(state_u_const(d_tr.get_value())["E"] / 1e3))
-            w_num.add_updater(lambda m: m.set_value(state_u_const(d_tr.get_value())["W"] * 1e6))
+            w_num.add_updater(lambda m: m.set_value(state_u_const(d_tr.get_value())["E_C"] * 1e6))
             dynamic_numbers = [q_num, e_num, w_num]
             rows.add(self._row("U = ", cn("300", 26, INK, "BOLD"), " V"))
             rows.add(self._row("Q = ", q_num, " nC"))
             rows.add(self._row("E = ", e_num, " kV/m"))
-            rows.add(self._row("W = ", w_num, " μJ"))
+            rows.add(self._row("E_C = ", w_num, " μJ"))
         else:
             u_num = DecimalNumber(300, num_decimal_places=0, font_size=26, color=NEGATIVE)
             w_num = DecimalNumber(4.0, num_decimal_places=1, font_size=26, color=FIELD)
             u_num.add_updater(lambda m: m.set_value(state_q_const(d_tr.get_value(), Q_FROZEN)["U"]))
-            w_num.add_updater(lambda m: m.set_value(state_q_const(d_tr.get_value(), Q_FROZEN)["W"] * 1e6))
+            w_num.add_updater(lambda m: m.set_value(state_q_const(d_tr.get_value(), Q_FROZEN)["E_C"] * 1e6))
             dynamic_numbers = [u_num, w_num]
             rows.add(self._row("U = ", u_num, " V"))
             rows.add(self._row("Q = ", cn("26.6", 26, POSITIVE, "BOLD"), " nC"))
             rows.add(self._row("E = ", cn("100", 26, VECTOR, "BOLD"), " kV/m"))
-            rows.add(self._row("W = ", w_num, " μJ"))
+            rows.add(self._row("E_C = ", w_num, " μJ"))
 
         rows.arrange(DOWN, aligned_edge=LEFT, buff=0.16)
         rows.move_to([cx, -1.55, 0])
@@ -413,7 +429,7 @@ class CapacitorScene(Scene):
 
     # ---------------------------------------------------------------- 分镜 4
     def energy(self):
-        header = title("电容器储存了多少能量？", "W = ½CU² = ½QU：电压加倍，能量变为 4 倍")
+        header = title("电容器储存了多少能量？", "E_C = ½CU² = ½QU（拓展）：电压加倍，能量变为 4 倍")
         self.play(FadeIn(header, shift=DOWN), run_time=0.6)
 
         u_tr = ValueTracker(100.0)
@@ -437,30 +453,34 @@ class CapacitorScene(Scene):
             arrow_count(state_u_const(3.0, u_tr.get_value())["E"]),
             inset=0.10, width=2.8))
 
-        formula = MathTex(r"W=\frac{1}{2}CU^2=\frac{1}{2}QU", font_size=52, color=INK)
-        formula.move_to([2.6, 2.05, 0])
+        formula = MathTex(r"E_C=\frac{1}{2}CU^2=\frac{1}{2}QU", font_size=52, color=INK)
+        formula.move_to([2.45, 2.05, 0])
+        ext_tag = cn("（拓展）", 20, MUTED).next_to(formula, RIGHT, buff=0.18)
 
         w_num = DecimalNumber(0.44, num_decimal_places=2, font_size=46, color=FIELD)
         w_num.add_updater(lambda m: m.set_value(energy_joule() * 1e6))
-        w_row = VGroup(cn("W = ", 30, INK, "BOLD"), w_num, cn(" μJ", 28, MUTED)
+        w_row = VGroup(cn("电场能 ", 28, INK, "BOLD"), w_num, cn(" μJ", 28, MUTED)
                        ).arrange(RIGHT, buff=0.08, aligned_edge=DOWN)
-        w_row.move_to([2.6, 1.0, 0])
+        w_row.move_to([2.45, 1.0, 0])
 
         base_y = -1.95
-        base = Line([1.8, base_y, 0], [3.6, base_y, 0], color=LINE, stroke_width=2.5)
+        base = Line([1.65, base_y, 0], [3.25, base_y, 0], color=LINE, stroke_width=2.5)
         bar = always_redraw(lambda: Rectangle(
             width=0.7,
             height=max(0.02, 2.3 * energy_joule() / 1.59e-5),
             stroke_color=FIELD, stroke_width=2, fill_color=FIELD, fill_opacity=0.18,
-        ).move_to([2.7, base_y + max(0.02, 2.3 * energy_joule() / 1.59e-5) / 2, 0]))
-        bar_caption = cn("电场能 W", 18, MUTED).next_to(base, DOWN, buff=0.16)
+        ).move_to([2.45, base_y + max(0.02, 2.3 * energy_joule() / 1.59e-5) / 2, 0]))
+        bar_caption = cn("电场能 E_C", 18, MUTED).next_to(base, DOWN, buff=0.16)
 
-        note = cn("U 增大到 3 倍，W 变为 9 倍；U 再增大到 2 倍，W 又变为 4 倍", 20, MUTED)
-        note.move_to([2.6, -2.75, 0])
+        note = cn("U 增大到 3 倍，E_C 变为 9 倍；U 再增大到 2 倍，E_C 又变为 4 倍", 20, MUTED)
+        note.move_to([2.45, -2.75, 0])
+        field_note = cn("板间箭头条数为示意，不代表实际疏密比例", 16, MUTED)
+        field_note.move_to([-4.3, -3.35, 0])
 
-        self.play(FadeIn(VGroup(body, wires, batt, u_label)), run_time=0.9)
+        self.play(FadeIn(VGroup(body, wires, batt, u_label, field_note)), run_time=0.9)
         self.add(fields)
-        self.play(FadeIn(formula), FadeIn(w_row), Create(base), FadeIn(bar_caption), run_time=0.8)
+        self.play(FadeIn(formula), FadeIn(ext_tag), FadeIn(w_row), Create(base),
+                  FadeIn(bar_caption), run_time=0.8)
         self.add(bar)
 
         self.play(u_tr.animate.set_value(300.0), run_time=2.0)
@@ -471,7 +491,8 @@ class CapacitorScene(Scene):
 
         self._stop(bar, fields, u_num, w_num)
         self.play(FadeOut(VGroup(header, body, wires, batt, u_label, fields, formula,
-                                 w_row, base, bar, bar_caption, note)), run_time=0.8)
+                                 ext_tag, w_row, base, bar, bar_caption, note, field_note)),
+                  run_time=0.8)
 
     # ---------------------------------------------------------------- 分镜 5
     def summary(self):
@@ -480,15 +501,18 @@ class CapacitorScene(Scene):
         items = VGroup(
             cn("1  充电后两极板带等量异种电荷，板间出现匀强电场。", 24, INK),
             cn("2  电容只由结构、介质决定，与电压、电荷量无关。", 24, INK),
-            cn("3  接通电源（U 不变）：改变 d 时，E 与 Q 都随之改变。", 24, FIELD, "BOLD"),
+            cn("3  接通电源（U 不变）：d 增大 → Q 减小、E 减小。", 24, FIELD, "BOLD"),
             cn("4  断开电源（Q 不变）：E 与 d 无关，U 与 d 成正比。", 24, ACCENT, "BOLD"),
-            cn("5  储存的电场能与电压的平方成正比。", 24, INK),
+            cn("5  （拓展）电场能 E_C = ½CU²，与电压的平方成正比。", 24, INK),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.26).move_to([-0.55, 0.55, 0])
 
         formula_row = VGroup(
             MathTex(r"C=\varepsilon_0\varepsilon_r\frac{S}{d}", font_size=38, color=INK),
             MathTex(r"E=\frac{U}{d}", font_size=38, color=INK),
-            MathTex(r"W=\frac{1}{2}CU^2=\frac{1}{2}QU", font_size=38, color=INK),
+            VGroup(
+                MathTex(r"E_C=\frac{1}{2}CU^2", font_size=38, color=INK),
+                cn("（拓展）", 18, MUTED),
+            ).arrange(RIGHT, buff=0.16),
         ).arrange(RIGHT, buff=0.8).move_to([0.0, -1.95, 0])
 
         panel = RoundedRectangle(width=12.6, height=5.2, corner_radius=0.2,

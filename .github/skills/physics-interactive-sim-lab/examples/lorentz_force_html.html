@@ -233,12 +233,12 @@
         <h2>实时读数</h2>
         <div class="metric">
           <div class="metric-label">轨道半径 r</div>
-          <div class="metric-value neutral" id="radiusValue">6.3 cm</div>
+          <div class="metric-value neutral" id="radiusValue">10.42 cm</div>
           <div class="metric-note" id="radiusNote">r = mv/(qB)</div>
         </div>
         <div class="metric">
           <div class="metric-label">回旋周期 T</div>
-          <div class="metric-value" id="periodValue">656 ns</div>
+          <div class="metric-value" id="periodValue">655.0 ns</div>
           <div class="metric-note" id="periodNote">T = 2πm/(qB)</div>
         </div>
         <div class="metric">
@@ -253,7 +253,7 @@
         </div>
         <div class="metric">
           <div class="metric-label">模型假设</div>
-          <div class="metric-note">匀强磁场充满整个区域，忽略重力与相对论效应，v 与 B 垂直（θ = 90°）。内部按 SI 单位计算，界面显示 m/s、mT、cm、ns/μs。</div>
+          <div class="metric-note">匀强磁场充满整个区域，忽略重力与相对论效应，v 与 B 垂直（θ = 90°）。内部按 SI 单位计算，界面显示 m/s、mT、cm、ns/μs。质量范围 0.5~6.0×10⁻²⁷ kg，对应质子与常见离子（不含电子 9.11×10⁻³¹ kg）。画面上力箭头长度按 √F 缩放，只表示方向与相对大小，F 的数值以本面板读数为准。</div>
         </div>
       </aside>
     </section>
@@ -618,7 +618,15 @@
         const laps = Math.floor(state.phase / (Math.PI * 2));
         chip("t = " + fmtTime(tPhys) + "，已绕 " + laps + " 圈", 22, canvas.height - 24, "#cbd5e1", "left");
 
-        chip("匀强磁场 · 忽略重力 · 非相对论 · θ = 90°", canvas.width / 2, canvas.height - 24, "#f59f00", "center");
+        chip("匀强磁场 · 忽略重力 · 非相对论", canvas.width / 2, canvas.height - 24, "#f59f00", "center");
+
+        ctx.save();
+        ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+        ctx.font = "15px \"Microsoft YaHei\", Arial";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText("力箭头长度示意（非等比），F 数值见右侧读数", canvas.width - 22, canvas.height - 24);
+        ctx.restore();
 
         drawScaleBar(g.pxPerM);
       }
@@ -675,14 +683,15 @@
       }
 
       // ---------- 播放控制 ----------
+      // state.phase 记录“自入射点起转过的圆心角大小”，恒为非负；
+      // 绕行方向统一由 geometry() 中的 dir = sign(omega) 决定，只能乘一次。
       let lastTs = 0;
       function loop(ts) {
         if (lastTs === 0) lastTs = ts;
         const dt = Math.min(0.05, (ts - lastTs) / 1000);
         lastTs = ts;
         if (state.playing) {
-          const dir = derived().omega >= 0 ? 1 : -1;
-          state.phase += dir * (Math.PI * 2 / PERIOD_VISUAL) * dt;
+          state.phase += (Math.PI * 2 / PERIOD_VISUAL) * dt;
           render();
         }
         requestAnimationFrame(loop);
@@ -710,6 +719,7 @@
       controls.chargeButtons.forEach(function (button) {
         button.addEventListener("click", function () {
           state.sign = Number(button.dataset.sign);
+          state.phase = 0;   // 入射点固定在速度沿 +x 处，换电性后从入射点重新开始
           controls.chargeButtons.forEach(function (btn) {
             btn.classList.toggle("active", btn === button);
           });
@@ -720,6 +730,7 @@
       controls.fieldButtons.forEach(function (button) {
         button.addEventListener("click", function () {
           state.intoPage = button.dataset.into === "1";
+          state.phase = 0;   // 磁场反向同样回到入射点，避免相位与 theta0 不匹配造成跳位
           controls.fieldButtons.forEach(function (btn) {
             btn.classList.toggle("active", btn === button);
           });

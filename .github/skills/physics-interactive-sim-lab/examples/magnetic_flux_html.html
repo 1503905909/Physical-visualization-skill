@@ -447,7 +447,7 @@
               <div class="toggles" style="margin-top: 12px;">
                 <label class="toggle">
                   <input type="checkbox" id="bOutToggle" />
-                  <span>磁场取向外（·），默认向里（×）</span>
+                  <span>磁场取向外（⊙），默认向里（×）</span>
                 </label>
                 <label class="toggle">
                   <input type="checkbox" id="showAxis" checked />
@@ -474,7 +474,7 @@
             <li>把 θ 从 0° 慢慢转到 90°，Φ 怎样变化？灯泡在什么阶段最亮？</li>
             <li>线圈静止在场中，只改变 B 或 S，灯泡会不会亮？由此归纳产生感应电流的条件。</li>
           </ul>
-          <p class="assumption">简化假设：匀强磁场，磁场区域内各点 B 相同；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；忽略自感与线圈电阻，只定性判断感应电流的有无和强弱。本课不讨论感应电流的方向（楞次定律）。</p>
+          <p class="assumption">简化假设：匀强磁场，磁场区域内各点 B 相同；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；线圈电阻恒定，不讨论电流的定量大小，只判断感应电流的有无和相对强弱。本课不讨论感应电流的方向（楞次定律）。</p>
         </section>
       </div>
 
@@ -645,12 +645,23 @@
       }
 
       function coilPlacement() {
-        var R = Math.sqrt(state.S / Math.PI);
-        var left = state.xc - R;
-        var right = state.xc + R;
+        // 判据必须用"画出来的椭圆水平半轴" a = R|cosθ|，而不是 R
+        var g = coilGeom();
+        var left = state.xc - g.a;
+        var right = state.xc + g.a;
         if (right <= -FIELD_X || left >= FIELD_X) return "outside";
         if (left >= -FIELD_X && right <= FIELD_X) return "inside";
         return "partial";
+      }
+
+      function rateRef() {
+        // 各场景实际最大 |ΔΦ/Δt| 的量级，用于灯泡亮度归一化
+        var g = coilGeom();
+        var vMax = AMP * (Math.PI * 2 / TRANS_PERIOD);
+        var wMax = 45 * DEG * (Math.PI * 2 / ROT_PERIOD);
+        if (state.scene === "rotate") return Math.max(1e-9, state.B * state.S * wMax);
+        if (state.scene === "translate") return Math.max(1e-9, state.B * 2 * g.a * vMax);
+        return Math.max(1e-9, state.B * state.S);
       }
 
       function fluxNow() {
@@ -728,7 +739,7 @@
         } else if (absRate > th) {
           state.hasCurrent = true;
         }
-        state.level = state.hasCurrent ? clamp(absRate / (0.25 * scale), 0.22, 1) : 0;
+        state.level = state.hasCurrent ? clamp(absRate / (0.9 * rateRef()), 0.15, 1) : 0;
 
         if (state.trendRate > th * 0.7) {
           state.trend = 1;
@@ -828,9 +839,14 @@
             ctx.lineWidth = 2.4;
             ctx.lineCap = "round";
             if (state.bOut) {
+              // ⊙：圆 + 中心实心点，表示 B 垂直纸面向外
               ctx.beginPath();
-              ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2);
+              ctx.arc(p.x, p.y, 5.6, 0, Math.PI * 2);
               ctx.stroke();
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+              ctx.fillStyle = C.mark;
+              ctx.fill();
             } else {
               var arm = 7;
               ctx.beginPath();
@@ -899,7 +915,7 @@
         ctx.save();
         ctx.beginPath();
         ctx.ellipse(c.x, c.y, aPx, bPx, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(8, 10, 14, 0.55)";
+        ctx.fillStyle = "rgba(8, 10, 14, 0.18)";
         ctx.fill();
         ctx.shadowColor = "rgba(52, 211, 153, 0.35)";
         ctx.shadowBlur = 12;
@@ -914,30 +930,33 @@
         var c = px(state.xc, 0);
         var ct = Math.abs(Math.cos(state.theta));
         var st = Math.abs(Math.sin(state.theta));
-
-        ctx.save();
-        ctx.globalAlpha = 0.32 + 0.68 * ct;
-        ctx.strokeStyle = C.normal;
-        ctx.lineWidth = 2.4;
         var r = 9 + 7 * ct;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
-        ctx.stroke();
-        var k = r * 0.6;
-        if (state.bOut) {
-          ctx.fillStyle = C.normal;
+
+        // 法线的"垂直纸面"分量：θ=90° 时 ct=0，必须完全消失
+        if (ct >= 0.06) {
+          ctx.save();
+          ctx.globalAlpha = 0.68 * ct;
+          ctx.strokeStyle = C.normal;
+          ctx.lineWidth = 2.4;
           ctx.beginPath();
-          ctx.arc(c.x, c.y, 3.6, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(c.x - k, c.y - k);
-          ctx.lineTo(c.x + k, c.y + k);
-          ctx.moveTo(c.x + k, c.y - k);
-          ctx.lineTo(c.x - k, c.y + k);
+          ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
           ctx.stroke();
+          var k = r * 0.6;
+          if (state.bOut) {
+            ctx.fillStyle = C.normal;
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(c.x - k, c.y - k);
+            ctx.lineTo(c.x + k, c.y + k);
+            ctx.moveTo(c.x + k, c.y - k);
+            ctx.lineTo(c.x - k, c.y + k);
+            ctx.stroke();
+          }
+          ctx.restore();
         }
-        ctx.restore();
 
         var alpha = Math.min(1, st * 2.4);
         if (st > 0.03) {
@@ -947,7 +966,7 @@
           ctx.globalAlpha = alpha;
           drawArrow(c.x + r + 6, c.y, x2, c.y, C.normal, 3.5, 15);
           ctx.restore();
-          label("n", x2 + 10, c.y - 12, {
+          label("n", clamp(x2 + 10, 24, CW - 44), c.y - 12, {
             size: 24,
             color: C.normal,
             bold: true,
@@ -955,7 +974,7 @@
             baseline: "middle"
           });
         } else {
-          label("n", c.x + r + 10, c.y - r - 4, {
+          label("n", clamp(c.x + r + 10, 24, CW - 44), c.y - r - 4, {
             size: 24,
             color: C.normal,
             bold: true,
@@ -1009,9 +1028,9 @@
         panel(x, y, w, h);
 
         label("Φ = B·S·cosθ", x + 20, y + 40, { size: 27, color: C.ink, bold: true });
-        label("θ 为法线 n 与 B 的夹角", x + 20, y + 76, { size: 20, color: C.muted });
-        label("× ：B 垂直纸面向里；·：向外", x + 20, y + 108, { size: 20, color: C.muted });
-        label("白圈 / 白箭头：线圈法线 n", x + 20, y + 138, { size: 20, color: C.muted });
+        label("θ：法线 n 与 B 的夹角", x + 20, y + 76, { size: 20, color: C.muted });
+        label("× 向里、⊙ 向外（B 垂直纸面）", x + 20, y + 108, { size: 20, color: C.muted });
+        label("⊗/⊙ 与白箭头：n 的垂直/纸面内分量", x + 20, y + 138, { size: 20, color: C.muted });
       }
 
       function drawJudgment() {
@@ -1051,7 +1070,7 @@
         var y = CH - 32 - h;
         panel(x, y, w, h);
 
-        label("θ 的定义（示意）", x + 16, y + 30, { size: 19, color: C.muted });
+        label("θ 的定义（n 取 B 一侧）", x + 16, y + 30, { size: 19, color: C.muted });
 
         var th = state.theta;
         var deg = Math.round(th / DEG);
@@ -1109,7 +1128,7 @@
       }
 
       function drawAssumption() {
-        label("简化模型：匀强磁场；忽略自感与线圈电阻；只判断是否有感应电流，不讨论方向", CX0, 882, {
+        label("简化模型：匀强磁场；线圈电阻恒定，不讨论电流的定量大小，只判断有无与相对强弱", CX0, 882, {
           size: 20,
           color: C.dim,
           align: "center"
@@ -1212,7 +1231,7 @@
         ui.phiValue.className = "metric-value " + (state.hasCurrent ? "active" : "neutral");
         ui.phiTrend.textContent = "变化趋势：" + trend;
 
-        var areaCm2 = (state.phi / state.B) * 1e4;
+        var areaCm2 = state.B > 1e-6 ? (state.phi / state.B) * 1e4 : 0;
         ui.areaValue.textContent = areaCm2.toFixed(0) + " cm²";
         var where = coilPlacement();
         var ct = Math.abs(Math.cos(state.theta));
@@ -1272,10 +1291,26 @@
         ui.playBtn.textContent = state.playing ? "暂停动画" : "播放动画";
       }
 
+      function syncPhaseFromState() {
+        // 恢复播放时把动画相位对到当前状态，避免位置/θ 跳变引发假电流
+        if (state.scene === "translate") {
+          var s = clamp(state.xc / AMP, -1, 1);
+          state.phase = (Math.asin(s) * TRANS_PERIOD) / (Math.PI * 2);
+        } else if (state.scene === "rotate") {
+          var c = clamp(1 - (state.theta / DEG) / 45, -1, 1);
+          state.phase = (Math.acos(c) * ROT_PERIOD) / (Math.PI * 2);
+        }
+      }
+
       function setScene(name) {
         state.scene = name;
         state.phase = 0;
         state.xc = 0;
+        if (name === "rotate") {
+          // 先归零 θ，再记录 Φ，否则会闪一帧"Φ 从 B·S·cosθ 跳到 B·S"的假电流
+          state.theta = 0;
+          ui.thetaSlider.value = "0";
+        }
         state.playing = name !== "static";
         ui.sceneButtons.forEach(function (btn) {
           btn.classList.toggle("active", btn.dataset.scene === name);
@@ -1368,6 +1403,10 @@
       ui.playBtn.addEventListener("click", function () {
         if (state.scene === "static") return;
         state.playing = !state.playing;
+        if (state.playing) {
+          syncPhaseFromState();
+          resetDynamics();
+        }
         syncPlayButton();
       });
 

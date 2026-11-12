@@ -52,6 +52,12 @@
       line-height: 1.5;
     }
 
+    .symbol-note {
+      margin-top: 3px;
+      font-size: 12.5px;
+      color: #7b8794;
+    }
+
     .formula {
       padding: 9px 14px;
       border: 1px solid var(--line);
@@ -413,6 +419,7 @@
       <div>
         <h1>交变电流与变压器</h1>
         <p class="subtitle">矩形线圈在匀强磁场中绕垂直于磁场的轴匀速转动，产生正弦交变电流；理想变压器按匝数比改变电压。</p>
+        <p class="subtitle symbol-note">符号与角度：θ 为线圈法线 n 与磁感线 B 的夹角，从中性面（θ = 0°）起算；N<sub>r</sub> 为转速，N 为线圈匝数，n₁、n₂ 为变压器原、副线圈匝数。</p>
       </div>
       <div class="formula">e = E<sub>m</sub> sin&nbsp;ωt，&nbsp;E<sub>m</sub> = NBSω，&nbsp;E = E<sub>m</sub>/√2</div>
     </header>
@@ -477,7 +484,7 @@
             <div class="control-block">
               <div class="control-title">交流发电机</div>
               <div class="field">
-                <label for="rpmSlider"><span>转速 n</span><span id="rpmValue">60 r/min</span></label>
+                <label for="rpmSlider"><span>转速 N<sub>r</sub></span><span id="rpmValue">60 r/min</span></label>
                 <input id="rpmSlider" type="range" min="30" max="240" step="10" value="60" />
               </div>
               <div class="field">
@@ -518,7 +525,7 @@
               <div class="control-title">显示与操作</div>
               <div class="toggles">
                 <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示磁感线与中性面</span></label>
-                <label class="toggle"><input type="checkbox" id="showFlux" checked /><span>显示 Φ–t 曲线（虚线）</span></label>
+                <label class="toggle"><input type="checkbox" id="showFlux" checked /><span>显示 Φ/Φ<sub>m</sub> 曲线（虚线）</span></label>
               </div>
               <div class="btn-row">
                 <button type="button" id="pauseBtn">暂停</button>
@@ -714,13 +721,6 @@
         ctx.textBaseline = "middle";
         ctx.fillText(str, x, y);
         ctx.restore();
-      }
-
-      function fmtRatio(value) {
-        var s = value.toFixed(2);
-        s = s.replace(/\.00$/, "");
-        s = s.replace(/(\.\d)0$/, "$1");
-        return s;
       }
 
       function clamp(value, min, max) {
@@ -922,7 +922,7 @@
       }
 
       function drawCoilLabels(ctx) {
-        label(ctx, "矩形线圈 N = " + params.turns + " 匝", VIEW.cx, 428, 13.5, "#cbd5e1", "center");
+        label(ctx, "矩形线圈（画法示意）N = " + params.turns + " 匝", VIEW.cx, 428, 13.5, "#cbd5e1", "center");
         label(ctx, "转轴竖直，与 B 垂直", VIEW.cx, 452, 12.5, COLORS.muted, "center");
       }
 
@@ -949,7 +949,7 @@
         ctx.strokeRect(PLOT.x0 - 26, PLOT.y0 - 34, PLOT.x1 - PLOT.x0 + 46, PLOT.y1 - PLOT.y0 + 66);
         ctx.restore();
 
-        label(ctx, "e–t 图像（两个周期）", (PLOT.x0 + PLOT.x1) / 2, PLOT.y0 - 16, 14, "#e2e8f0", "center");
+        label(ctx, "e–t 图像（虚线为 Φ/Φm，仅示意相位）", (PLOT.x0 + PLOT.x1) / 2, PLOT.y0 - 16, 13.5, "#e2e8f0", "center");
 
         // 网格
         var k;
@@ -982,7 +982,7 @@
         }
         // 中性面位置用橙点标在零线上（图例见上方）
 
-        // Φ–t 曲线（归一化到与 e 相同的纵向比例）
+        // Φ/Φm–t 曲线：无量纲，按峰值等高绘制，只用于对照相位
         if (state.showFlux) {
           ctx.save();
           ctx.strokeStyle = COLORS.flux;
@@ -992,9 +992,9 @@
           var i;
           for (i = 0; i <= 320; i += 1) {
             var tt = span * i / 320;
-            var phi = Em * Math.cos(d.omega * tt);
+            var phiRatio = Math.cos(d.omega * tt);
             var px = xOf(tt);
-            var py = yOf(phi);
+            var py = yOf(Em * phiRatio);
             if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
           }
           ctx.stroke();
@@ -1063,17 +1063,17 @@
         if (state.showFlux) {
           ctx.save();
           ctx.setLineDash([5, 5]);
-          segment(ctx, PLOT.x0 + 86, PLOT.y0 - 40, PLOT.x0 + 108, PLOT.y0 - 40, COLORS.flux, 1.8);
+          segment(ctx, PLOT.x0 + 74, PLOT.y0 - 40, PLOT.x0 + 96, PLOT.y0 - 40, COLORS.flux, 1.8);
           ctx.restore();
-          label(ctx, "Φ（虚线，同一标尺）", PLOT.x0 + 112, PLOT.y0 - 40, 11.5, "#93c5fd", "left");
+          label(ctx, "Φ/Φm（归一化）", PLOT.x0 + 100, PLOT.y0 - 40, 11.5, "#93c5fd", "left");
         }
         ctx.save();
         ctx.fillStyle = "#fb923c";
         ctx.beginPath();
-        ctx.arc(PLOT.x1 - 78, PLOT.y0 - 40, 3.6, 0, TAU);
+        ctx.arc(PLOT.x1 - 92, PLOT.y0 - 40, 3.6, 0, TAU);
         ctx.fill();
         ctx.restore();
-        label(ctx, "中性面 e = 0", PLOT.x1 - 70, PLOT.y0 - 40, 11.5, "#fdba74", "left");
+        label(ctx, "中性面 e = 0", PLOT.x1, PLOT.y0 - 40, 11.5, "#fdba74", "right");
       }
 
       /* ---------- 变压器 ---------- */
@@ -1104,7 +1104,7 @@
         ctx.strokeRect(coreOuter.x + gap, coreOuter.y + gap, coreOuter.w - 2 * gap, coreOuter.h - 2 * gap);
         ctx.restore();
 
-        label(ctx, "铁芯（理想，无漏磁）", coreOuter.x + coreOuter.w / 2, coreOuter.y + coreOuter.h + 26, 13, "rgba(203,213,225,0.85)", "center");
+        label(ctx, "铁芯（理想，无漏磁）；绕组圈数仅示意，不按比例", coreOuter.x + coreOuter.w / 2, coreOuter.y + coreOuter.h + 26, 12.5, "rgba(203,213,225,0.85)", "center");
 
         // 线圈匝数决定画出多少圈，只是示意
         var primaryTurns = Math.max(4, Math.min(12, Math.round(params.n1 / 42)));
@@ -1227,7 +1227,7 @@
         var isStepDown = params.n2 < params.n1;
         var kindText = isStepUp ? "升压变压器" : (isStepDown ? "降压变压器" : "隔离变压器（n₁ = n₂）");
         label(ctx, kindText, 340, 172, 15, isStepUp ? "#fb923c" : (isStepDown ? "#7dd3fc" : "#e2e8f0"), "center");
-        label(ctx, "n₁ : n₂ = 1 : " + fmtRatio(params.n2 / params.n1), 340, 196, 12.5, "#cbd5e1", "center");
+        label(ctx, "n₁ : n₂ = " + params.n1 + " : " + params.n2, 340, 196, 12.5, "#cbd5e1", "center");
       }
 
       /* ---------- 数据读出 ---------- */
@@ -1243,13 +1243,28 @@
 
       function describePhase(deg) {
         var d = ((deg % 360) + 360) % 360;
-        if (d < 3.5 || d > 356.5) { return { short: "最大（中性面）", long: "线圈位于中性面，磁通量最大，感应电动势为零" }; }
-        if (Math.abs(d - 180) < 3.5) { return { short: "反向最大（中性面）", long: "线圈再次位于中性面，磁通量反向最大，感应电动势为零" }; }
-        if (Math.abs(d - 90) < 3.5 || Math.abs(d - 270) < 3.5) { return { short: "为零（线圈平面 ∥ B）", long: "线圈平面与磁感线平行，磁通量为零，感应电动势最大" }; }
-        if (d < 90) { return { short: "正在减小", long: "线圈离开中性面，磁通量减小，感应电动势增大" }; }
-        if (d < 180) { return { short: "正在减小至零", long: "线圈接近平行位置，磁通量减小到零，感应电动势接近峰值" }; }
-        if (d < 270) { return { short: "正在反向增大", long: "线圈越过平行位置，磁通量反向增大，感应电动势减小" }; }
-        return { short: "正在反向增大", long: "线圈回到中性面前，磁通量反向增大，感应电动势接近零" };
+        if (d < 3.5 || d > 356.5) {
+          return { short: "正向最大（中性面）", long: "线圈位于中性面：磁通量正向最大，感应电动势为零" };
+        }
+        if (Math.abs(d - 180) < 3.5) {
+          return { short: "反向最大（中性面）", long: "线圈再次经过中性面：磁通量反向最大，感应电动势为零" };
+        }
+        if (Math.abs(d - 90) < 3.5) {
+          return { short: "为零（平面 ∥ B）", long: "线圈平面与磁感线平行：磁通量为零，感应电动势达到正向最大值" };
+        }
+        if (Math.abs(d - 270) < 3.5) {
+          return { short: "为零（平面 ∥ B）", long: "线圈平面再次与磁感线平行：磁通量为零，感应电动势达到反向最大值" };
+        }
+        if (d < 90) {
+          return { short: "正向减小", long: "线圈离开中性面：磁通量正向减小，感应电动势增大（e > 0）" };
+        }
+        if (d < 180) {
+          return { short: "反向增大", long: "线圈由平行位置转向中性面：磁通量反向增大，感应电动势减小（e > 0）" };
+        }
+        if (d < 270) {
+          return { short: "反向减小", long: "线圈越过中性面：磁通量反向减小，感应电动势反向增大（e < 0）" };
+        }
+        return { short: "正向增大", long: "线圈由平行位置转向中性面：磁通量正向增大，感应电动势反向减小（e < 0）" };
       }
 
       function updateReadouts(d, tf) {
@@ -1285,7 +1300,7 @@
         setText(out.tfI2, tf.I2.toFixed(2) + " A");
         setText(out.tfI1, tf.I1.toFixed(2) + " A");
         setText(out.tfPower, tf.P.toFixed(1) + " W");
-        var ratioText = "1 : " + fmtRatio(tf.ratio);
+        var ratioText = params.n1 + " : " + params.n2;
         if (params.n2 > params.n1) { ratioText += "（升压）"; }
         else if (params.n2 < params.n1) { ratioText += "（降压）"; }
         else { ratioText += "（隔离）"; }

@@ -150,15 +150,15 @@ class FaradayLenzScene(Scene):
         self.summary()
 
     # ------------------------------------------------------------------
-    # 分镜一：磁铁插入、拔出线圈
+    # 分镜一：磁铁靠近、远离线圈
     # ------------------------------------------------------------------
     def magnet_and_coil(self):
-        header = title("磁铁插入线圈：磁通量变化产生感应电动势",
+        header = title("磁铁靠近线圈：磁通量变化产生感应电动势",
                        "磁铁不动时没有感应电流，只有磁通量发生变化才有")
         self.play(FadeIn(header, shift=DOWN), run_time=0.7)
 
         coil = solenoid().shift(RIGHT * COIL_X)
-        coil_label = cn("线圈 n = 100 匝", 20, COPPER, "BOLD").next_to(coil, DOWN, buff=0.32)
+        coil_label = cn("线圈 n = 100 匝（画法示意）", 19, COPPER, "BOLD").next_to(coil, DOWN, buff=0.32)
 
         galv = galvanometer(0.5).move_to(GALV_CENTER)
         g_label = cn("电流计 G", 20, MUTED).next_to(galv, RIGHT, buff=0.22)
@@ -178,7 +178,7 @@ class FaradayLenzScene(Scene):
 
         bar_frame = flux_bar(np.array([-4.95, 1.75, 0.0]), width=2.4, height=0.22)
         bar_fill = always_redraw(lambda: flux_fill(bar_frame, flux_of(mag_x.get_value()), ACCENT))
-        bar_label = cn("磁通量 Φ", 19, MUTED).next_to(bar_frame, UP, buff=0.12).align_to(bar_frame, LEFT)
+        bar_label = cn("磁通量 Φ（示意 0–1）", 19, MUTED).next_to(bar_frame, UP, buff=0.12).align_to(bar_frame, LEFT)
 
         caption = cn("磁铁靠近线圈，穿过线圈的磁通量增大", 24, INK, "BOLD").to_edge(DOWN, buff=0.55)
 
@@ -189,7 +189,7 @@ class FaradayLenzScene(Scene):
         self.play(FadeIn(mag), run_time=0.5)
         self.play(FadeIn(caption, shift=UP), run_time=0.5)
 
-        # 插入：磁通量增大，电流计偏转
+        # 靠近：磁通量增大，电流计偏转
         self.play(
             mag_x.animate.set_value(-1.15),
             current.animate.set_value(1.0),
@@ -199,14 +199,14 @@ class FaradayLenzScene(Scene):
         self.play(Transform(caption, cn("磁铁停止运动：磁通量不变，感应电流消失", 24, MUTED, "BOLD").to_edge(DOWN, buff=0.55)),
                   current.animate.set_value(0.0), run_time=0.9)
 
-        # 拔出：磁通量减小，偏转方向相反
+        # 远离：同样用 2.0 s，平均电动势大小相同，偏转方向相反
         self.play(
             mag_x.animate.set_value(-4.0),
             current.animate.set_value(-1.0),
-            run_time=1.6,
+            run_time=2.0,
             rate_func=smooth,
         )
-        self.play(Transform(caption, cn("磁铁拔出：磁通量减小，感应电流反向", 24, INK, "BOLD").to_edge(DOWN, buff=0.55)),
+        self.play(Transform(caption, cn("磁铁远离：磁通量减小，感应电流反向", 24, INK, "BOLD").to_edge(DOWN, buff=0.55)),
                   current.animate.set_value(0.0), run_time=0.8)
         self.wait(0.6)
 
@@ -222,15 +222,15 @@ class FaradayLenzScene(Scene):
     # 分镜二：ε = n·ΔΦ/Δt 的定量关系
     # ------------------------------------------------------------------
     def quantitative_law(self):
-        header = title("定量关系：ε = n·ΔΦ/Δt", "同样的磁通量变化，用时越短，感应电动势越大")
+        header = title("定量关系：ε = n·ΔΦ/Δt", "同样的磁通量变化，用时越短，平均感应电动势越大（线圈按示意绘制）")
         self.play(FadeIn(header, shift=DOWN), run_time=0.6)
 
         law = MathTex(r"\varepsilon = n\,\frac{\Delta \Phi}{\Delta t}", font_size=52, color=FIELD)
         law.move_to(np.array([0.0, -2.85, 0.0]))
         self.play(Write(law), run_time=1.0)
 
-        left_card = card(5.9, 3.5, "慢速插入：Δt = 2.0 s").shift(LEFT * 3.2 + UP * 0.35)
-        right_card = card(5.9, 3.5, "快速插入：Δt = 0.5 s").shift(RIGHT * 3.2 + UP * 0.35)
+        left_card = card(5.9, 3.5, "慢速靠近：Δt = 2.0 s").shift(LEFT * 3.2 + UP * 0.35)
+        right_card = card(5.9, 3.5, "快速靠近：Δt = 0.5 s").shift(RIGHT * 3.2 + UP * 0.35)
         self.play(FadeIn(left_card), FadeIn(right_card), run_time=0.6)
 
         def build_panel(center, turns=5, radius=0.58, length=1.9):
@@ -245,8 +245,8 @@ class FaradayLenzScene(Scene):
 
         lg_center = left_card[0].get_center() + np.array([1.85, 1.05, 0.0])
         rg_center = right_card[0].get_center() + np.array([1.85, 1.05, 0.0])
-        left_galv = galvanometer(0.3).move_to(lg_center)
-        right_galv = galvanometer(0.3).move_to(rg_center)
+        left_galv = galvanometer(0.36).move_to(lg_center)
+        right_galv = galvanometer(0.36).move_to(rg_center)
 
         left_x = ValueTracker(-1.25)
         right_x = ValueTracker(-1.25)
@@ -257,18 +257,18 @@ class FaradayLenzScene(Scene):
         left_mag.add_updater(lambda m: m.move_to(left_center + np.array([left_x.get_value(), 0.0, 0.0])))
         right_mag = magnet(1.0, 0.44)
         right_mag.add_updater(lambda m: m.move_to(right_center + np.array([right_x.get_value(), 0.0, 0.0])))
-        left_ndl = needle(lg_center, 0.3, left_cur, scale=0.95)
-        right_ndl = needle(rg_center, 0.3, right_cur, scale=0.95)
+        left_ndl = needle(lg_center, 0.36, left_cur, scale=1.0)
+        right_ndl = needle(rg_center, 0.36, right_cur, scale=1.0)
 
         left_txt = VGroup(
-            cn("ΔΦ = 0.02 Wb，Δt = 2.0 s", 17, INK),
-            cn("ε = 1.0 V", 22, FIELD, "BOLD"),
+            cn("n = 100，ΔΦ = 0.02 Wb", 16, INK),
+            cn("Δt = 2.0 s → 平均 ε = 100×0.02/2.0 = 1.0 V", 16, FIELD, "BOLD"),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.14)
         left_txt.move_to(left_card[0].get_center() + np.array([0.0, -1.05, 0.0]))
 
         right_txt = VGroup(
-            cn("ΔΦ = 0.02 Wb，Δt = 0.5 s", 17, INK),
-            cn("ε = 4.0 V", 22, INDUCED, "BOLD"),
+            cn("n = 100，ΔΦ = 0.02 Wb", 16, INK),
+            cn("Δt = 0.5 s → 平均 ε = 100×0.02/0.5 = 4.0 V", 16, INDUCED, "BOLD"),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.14)
         right_txt.move_to(right_card[0].get_center() + np.array([0.0, -1.05, 0.0]))
 
@@ -277,18 +277,39 @@ class FaradayLenzScene(Scene):
         self.play(FadeIn(left_mag), FadeIn(right_mag), run_time=0.4)
         self.play(FadeIn(left_ndl), FadeIn(right_ndl), run_time=0.3)
 
-        # 两个磁铁同时出发，速度不同
+        # 两个磁铁同时出发、速度不同；各自到位后停下，指针随即回零
+        # 第一段 0.5 s：左磁铁走过 1/4，右磁铁前进到位，右指针满偏
         self.play(
-            left_x.animate(run_time=2.0).set_value(0.55),
+            left_x.animate(run_time=0.5).set_value(-0.80),
+            left_cur.animate(run_time=0.5).set_value(0.0625),
             right_x.animate(run_time=0.5).set_value(0.55),
-            left_cur.animate(run_time=2.0).set_value(0.35),
             right_cur.animate(run_time=0.5).set_value(1.0),
             rate_func=linear,
         )
+        # 第二段 0.5 s：右磁铁已静止 → 右指针回零；左磁铁继续缓慢前进
+        self.play(
+            left_x.animate(run_time=0.5).set_value(-0.35),
+            left_cur.animate(run_time=0.5).set_value(0.125),
+            right_cur.animate(run_time=0.5).set_value(0.0),
+            rate_func=linear,
+        )
+        # 第三、四段：左磁铁继续走到位，左指针继续按比例增大
+        self.play(
+            left_x.animate(run_time=0.5).set_value(0.10),
+            left_cur.animate(run_time=0.5).set_value(0.1875),
+            rate_func=linear,
+        )
+        self.play(
+            left_x.animate(run_time=0.5).set_value(0.55),
+            left_cur.animate(run_time=0.5).set_value(0.25),
+            rate_func=linear,
+        )
+        # 左磁铁也停下 → 指针回零
+        self.play(left_cur.animate(run_time=0.5).set_value(0.0), rate_func=linear)
         self.play(FadeIn(left_txt, shift=UP), FadeIn(right_txt, shift=UP), run_time=0.7)
         self.wait(0.4)
 
-        compare = cn("同样的 ΔΦ，Δt 越小，ε 越大：4.0 V 是 1.0 V 的 4 倍", 22, INDUCED, "BOLD")
+        compare = cn("同样的 ΔΦ，Δt 越小，平均电动势越大：4.0 V 是 1.0 V 的 4 倍", 22, INDUCED, "BOLD")
         compare.to_edge(DOWN, buff=0.28)
         self.play(FadeIn(compare, shift=UP), run_time=0.6)
         self.wait(1.0)
@@ -336,10 +357,23 @@ class FaradayLenzScene(Scene):
         )
         self.play(FadeIn(induced_label, shift=UP), FadeIn(phi_up), Create(phi_arrow), run_time=0.6)
         self.play(FadeIn(caption, shift=UP), run_time=0.6)
-        self.wait(1.2)
+        self.wait(1.0)
 
-        self.play(FadeOut(VGroup(header, coil, mag, b0_arrow, b0_label,
-                                 heads, induced_b, induced_label, phi_up, phi_arrow, caption)), run_time=0.7)
+        # 磁铁停下 → 磁通量不再变化 → 感应电流、感应磁场随之消失
+        stop_caption = cn("磁铁停止运动：磁通量不再变化，感应电流随之消失", 22, MUTED, "BOLD")
+        stop_caption.to_edge(DOWN, buff=0.6)
+        self.play(
+            Transform(caption, stop_caption),
+            FadeOut(heads),
+            FadeOut(induced_b),
+            FadeOut(induced_label),
+            FadeOut(phi_up),
+            FadeOut(phi_arrow),
+            run_time=0.7,
+        )
+        self.wait(0.9)
+
+        self.play(FadeOut(VGroup(header, coil, mag, b0_arrow, b0_label, caption)), run_time=0.7)
         self.remove(mag)
 
     # ------------------------------------------------------------------
@@ -379,10 +413,23 @@ class FaradayLenzScene(Scene):
         )
         self.play(FadeIn(induced_label, shift=UP), FadeIn(phi_down), Create(phi_arrow), run_time=0.6)
         self.play(FadeIn(caption, shift=UP), run_time=0.6)
-        self.wait(1.2)
+        self.wait(1.0)
 
-        self.play(FadeOut(VGroup(header, coil, mag, b0_arrow, b0_label,
-                                 heads, induced_b, induced_label, phi_down, phi_arrow, caption)), run_time=0.7)
+        # 磁铁停下 → 磁通量不再变化 → 感应电流、感应磁场随之消失
+        stop_caption = cn("磁铁停止运动：磁通量不再变化，感应电流随之消失", 22, MUTED, "BOLD")
+        stop_caption.to_edge(DOWN, buff=0.6)
+        self.play(
+            Transform(caption, stop_caption),
+            FadeOut(heads),
+            FadeOut(induced_b),
+            FadeOut(induced_label),
+            FadeOut(phi_down),
+            FadeOut(phi_arrow),
+            run_time=0.7,
+        )
+        self.wait(0.9)
+
+        self.play(FadeOut(VGroup(header, coil, mag, b0_arrow, b0_label, caption)), run_time=0.7)
         self.remove(mag)
 
     # ------------------------------------------------------------------

@@ -199,6 +199,7 @@ class MassSpectrometerScene(Scene):
             cn("+", 32, POSITIVE, "BOLD").move_to([-4.55, -1.14, 0]),
         )
         chamber_label = cn("速度选择器（E ⊥ B₁）", 20, INK, "BOLD").move_to([-2.70, 1.86, 0])
+        b1_note = cn("⊙ 表示 B₁ 垂直纸面向外", 18, MUTED).move_to([1.45, 1.86, 0])
 
         p_slow = CubicBezier(
             [-5.55, 0.20, 0], [-4.75, 0.20, 0], [-3.85, 0.62, 0], [-3.35, 1.28, 0]
@@ -220,7 +221,7 @@ class MassSpectrometerScene(Scene):
         formula_note2 = cn("合力为零，沿直线通过", 21, MUTED).next_to(formula_note, DOWN, buff=0.10)
 
         self.play(FadeIn(VGroup(top, bottom, chamber_label)), run_time=0.7)
-        self.play(LaggedStart(*[Create(a) for a in e_arrows], lag_ratio=0.10), FadeIn(marks), run_time=0.7)
+        self.play(LaggedStart(*[Create(a) for a in e_arrows], lag_ratio=0.10), FadeIn(marks), FadeIn(b1_note), run_time=0.7)
         self.play(FadeIn(plate_labels), run_time=0.5)
 
         # 受力分析：两个力等大反向
@@ -256,7 +257,7 @@ class MassSpectrometerScene(Scene):
 
         self.play(
             FadeOut(VGroup(
-                header, top, bottom, e_arrows, marks, plate_labels, chamber_label,
+                header, top, bottom, e_arrows, marks, plate_labels, chamber_label, b1_note,
                 dot_slow, dot_ok, dot_fast,
                 formula, formula_note, formula_note2, slow_label, fast_label, ok_label,
             )),
@@ -379,10 +380,10 @@ class MassSpectrometerScene(Scene):
             cn("由落点反推质量", 21, MUTED),
         ).arrange(DOWN, buff=0.20).move_to([4.35, 0.60, 0])
         apps = VGroup(
-            cn("应用：同位素分析", 21, INK),
-            cn("有机物分子量测定", 21, INK),
-            cn("¹⁴C 考古测年", 21, INK),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.16).next_to(mass_formula, DOWN, buff=0.55)
+            cn("应用：同位素分析、有机分子量测定", 21, INK),
+            cn("¹⁴C 测年常用加速器质谱 AMS 测比值，", 18, MUTED),
+            cn("与本节单通道半圆用法不同", 18, MUTED),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.14).next_to(mass_formula, DOWN, buff=0.55)
 
         self.play(FadeIn(VGroup(chamber, plate, beam)), run_time=0.7)
         dot_a.move_to(arc_a.get_start())
@@ -415,7 +416,7 @@ class MassSpectrometerScene(Scene):
         items = VGroup(
             cn("1  速度选择器：电场力与洛伦兹力等大反向，只放行 v = E/B₁。", 26, INK),
             cn("2  偏转磁场：洛伦兹力提供向心力，离子做半圆运动。", 26, INK),
-            cn("3  半径 r = mv/(qB₂)，落点 x = 2r，质量越大落点越远。", 26, FIELD, "BOLD"),
+            cn("3  半径 r = mv/(qB₂)，落点 x = 2r；同速同电荷时质量越大落点越远。", 26, FIELD, "BOLD"),
             cn("4  由 x 反推质量 m = qB₁B₂x/(2E)，这是质谱仪测质量的依据。", 26, INK),
             cn("简化假设：忽略重力、非相对论、忽略边缘场。", 22, WARN),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.30).move_to([0, 0.05, 0])

@@ -162,6 +162,13 @@
       font-weight: 700;
     }
 
+    .legend-item.plain {
+      border-style: dashed;
+      background: #ffffff;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
     .dot {
       width: 9px;
       height: 9px;
@@ -574,9 +581,9 @@
     <header class="topbar">
       <div>
         <h1>平行板电容器：改变板间距会发生什么？</h1>
-        <p class="subtitle">同一个 d 的变化，在「接通电源」和「断开电源」两种情形下，U、Q、E、W 的结论完全不同。</p>
+        <p class="subtitle">同一个 d 的变化，在「接通电源」和「断开电源」两种情形下，U、Q、E、E_C 的结论完全不同。</p>
       </div>
-      <div class="formula">C = ε₀εᵣS / d　·　Q = CU　·　E = U / d　·　W = ½CU²</div>
+      <div class="formula">C = ε₀εᵣS / d　·　Q = CU　·　E = U / d　·　E_C = ½CU²（拓展）</div>
     </header>
 
     <section class="layout">
@@ -595,8 +602,9 @@
             <span class="legend-item"><b class="dot dot-blue"></b>负电荷</span>
             <span class="legend-item"><b class="arrow-glyph">→</b>白箭头：板间场强 E，方向由正极板指向负极板</span>
             <span class="legend-item"><b class="dot dot-green"></b>绿色：板间距 d</span>
+            <span class="legend-item plain">电荷符号数、场线条数、极板高度均为示意（非线性）</span>
             <span class="legend-item assumption">模型假设：理想平行板，边缘效应忽略</span>
-            <span class="legend-item assumption" id="breakdownChip" hidden>E 已超过 1 MV/m：实际装置需考虑空气击穿（约 3×10⁶ V/m）</span>
+            <span class="legend-item assumption" id="breakdownChip" hidden>E 已超过 1 MV/m，接近空气击穿场强（约 3×10⁶ V/m），属拓展内容</span>
           </div>
         </section>
 
@@ -619,11 +627,12 @@
               <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
             </div>
             <div class="tile" id="tileW">
-              <div class="tile-top"><span class="tile-label">电场能 W</span><span class="tile-badge na">—</span></div>
+              <div class="tile-top"><span class="tile-label">电场能 E_C</span><span class="tile-badge na">—</span></div>
               <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
             </div>
           </div>
           <p class="unit-note" id="unitNote">—</p>
+          <p class="unit-note" id="extraNote">E_C 为电场能（拓展内容，避免与功的符号 W 混淆）。教材中平行板电容写作 C = εᵣS/(4πkd)，其中 ε₀ = 1/(4πk)，与这里的 C = ε₀εᵣS/d 完全等价。</p>
         </section>
 
         <section class="conclusion-panel" aria-label="结论">
@@ -649,7 +658,7 @@
           <ul class="inquiry-list">
             <li>保持「接通电源」，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
             <li>先接通电源充好电，再切到「断开电源」，只改变 d：E 的读数和场线疏密为什么几乎不变？此时 U 与 d 成什么关系？</li>
-            <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、W 也变小？</li>
+            <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、E_C 也变小？</li>
           </ul>
         </section>
       </div>
@@ -694,7 +703,7 @@
         <div class="reset-row">
           <button type="button" class="primary-btn" id="resetBtn">重置</button>
         </div>
-        <p class="footnote">模型：理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场；极板高度按 S 比例示意。</p>
+        <p class="footnote">模型：理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场。极板高度随 S、电荷符号个数随 Q 单调变化，但都只是示意（非线性），不按真实比例绘制。</p>
       </aside>
     </section>
   </main>
@@ -766,19 +775,19 @@
         name: "接通电源（U 不变）",
         hint: "接通电源：极板两端电压由电源决定，始终等于 U。调节 d 时电源会自动补充或取回电荷，所以 Q 会变，U 不变。",
         tag: "U 不变",
-        body: "d 减小 → C 增大、Q 增大、E 增大、W 增大；d 增大则 C、Q、E、W 全部减小。整个过程中 U 保持不变。",
-        formula: "C = ε₀εᵣS/d　　Q = CU　　E = U/d　　W = ½CU²",
+        body: "d 减小 → C 增大、Q 增大、E 增大、E_C 增大；d 增大则 C、Q、E、E_C 全部减小。整个过程中 U 保持不变。",
+        formula: "C = ε₀εᵣS/d　　Q = CU　　E = U/d　　E_C = ½CU²（拓展）",
         key: "关键：E = U/d。电压被电源固定后，板间场强只由板间距 d 决定 —— d 越小，电场越强。",
-        extra: "同一情形下增大 S 或 εᵣ：C 增大，Q 增大，W 增大；而 E = U/d 保持不变。"
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，Q 增大，E_C 增大；而 E = U/d 保持不变。"
       },
       qconst: {
         name: "断开电源（Q 不变）",
         hint: "已断开电源：极板上的电荷无处流走，Q 保持不变，电压由 U = Q/C 决定。此时电压滑块失效。",
         tag: "Q 不变",
-        body: "d 减小 → C 增大、U 减小、W 减小；d 增大则 C 减小、U 增大、W 增大。整个过程中 E 保持不变。",
-        formula: "C = ε₀εᵣS/d　　U = Q/C = Qd/(ε₀εᵣS)　　E = U/d = Q/(ε₀εᵣS)　　W = ½Q²/C",
+        body: "d 减小 → C 增大、U 减小、E_C 减小；d 增大则 C 减小、U 增大、E_C 增大。整个过程中 E 保持不变。",
+        formula: "C = ε₀εᵣS/d　　U = Q/C = Qd/(ε₀εᵣS)　　E = U/d = Q/(ε₀εᵣS)　　E_C = ½Q²/C（拓展）",
         key: "关键：E = Q/(ε₀εᵣS)，式中没有 d。断开电源后「锁住」的电荷量使板间场强不随 d 改变。",
-        extra: "同一情形下增大 S 或 εᵣ：C 增大，U 减小，E 减小，W 减小。"
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，U 减小，E 减小，E_C 减小。"
       }
     };
 
@@ -905,11 +914,11 @@
     function fieldLineCount(E) {
       if (!(E > 1)) return 0;
       const g = stageGeom();
-      const span = g.plateH * 0.72;
-      let n = Math.round(2 + 3.6 * Math.log10(E / 1e4));
-      n = clamp(n, 2, 16);
-      n = Math.min(n, Math.max(2, Math.floor(span / 16)));
-      return n;
+      // 条数乘以极板投影长度：密度（条数/板高）= f(E)/200，只由 E 决定，与 S 无关。
+      // f(E) 是单调压缩，只保证「E 越大条数越多」，并非严格正比；取 200 使 S=300 时仍为 6 条。
+      const f = 2 + 3.6 * Math.log10(E / 1e4);
+      const n = Math.round(f * g.plateH / 200);
+      return clamp(n, 2, 16);
     }
 
     function chargeCount(Q) {
@@ -1192,7 +1201,7 @@
       chip("负极板　−" + q[0] + " " + q[1], g.rightInner + 34, g.bottom + 38, "#a5b8ff", "left");
 
       chip("S = " + state.S + " cm²　εᵣ = " + state.er.toFixed(1), g.leftInner - 34, g.cy - 18, "#cbd5e1", "right");
-      chip("板高按 S 示意", g.leftInner - 34, g.cy + 18, "#94a3b8", "right");
+      chip("板高随 S 单调变化（示意）", g.leftInner - 34, g.cy + 18, "#94a3b8", "right");
 
       const yDim = g.bottom + 104;
       ctx.save();
@@ -1253,7 +1262,7 @@
       setTile("E", e[0], e[1], deltaBadge(m.E, ref.E));
       setTile("W", w[0], w[1], deltaBadge(m.W, ref.W));
 
-      el.stageLines.textContent = fieldLineCount(m.E) + " 条（疏密 ∝ E）";
+      el.stageLines.textContent = fieldLineCount(m.E) + " 条（E 越大条数越多，示意）";
       el.stageState.textContent = state.mode === "uconst" ? "由电源补充或取回" : "被锁在极板上";
 
       el.unitNote.textContent = "C = " + c[0] + " " + c[1] + " = " + sci(m.C / 1e-6) + " μF　|　Q = " + q[0] + " " + q[1] + " = " + sci(m.Q / 1e-6) + " μC　|　1 cm² = 10⁻⁴ m²，1 mm = 10⁻³ m，1 μF = 10⁻⁶ F，1 μC = 10⁻⁶ C";
@@ -1272,7 +1281,7 @@
       el.conclusionKey.textContent = text.key;
       el.conclusionExtra.textContent = text.extra;
       el.conclusionCard.className = state.mode === "uconst" ? "conclusion-card" : "conclusion-card warn";
-      el.deltaHint.textContent = "读数徽标 ↑↓ 表示相对「d = " + state.refD.toFixed(1) + " mm 时」的变化（S、εᵣ、电源状态不变）；橙色「不变」是本次要强调的结论。";
+      el.deltaHint.textContent = "读数徽标 ↑↓ 只反映 d 的单独影响：以「基准 d = " + state.refD.toFixed(1) + " mm」为参照，改动 S、εᵣ、电源或电压后基准会重置为当前 d，徽标回到「—」，因此不会与屏幕上的读数相矛盾。";
     }
 
     function syncLabels() {
@@ -1324,6 +1333,8 @@
 
     el.s.addEventListener("input", function () {
       state.S = Number(el.s.value);
+      state.refD = state.d;
+      updateModeText();
       syncLabels();
       render();
     });
@@ -1336,12 +1347,16 @@
 
     el.er.addEventListener("input", function () {
       state.er = Number(el.er.value);
+      state.refD = state.d;
+      updateModeText();
       syncLabels();
       render();
     });
 
     el.u.addEventListener("input", function () {
       state.U = Number(el.u.value);
+      state.refD = state.d;
+      updateModeText();
       syncLabels();
       render();
     });

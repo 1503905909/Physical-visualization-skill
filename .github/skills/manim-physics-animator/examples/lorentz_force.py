@@ -161,7 +161,7 @@ class LorentzForceScene(Scene):
         self.wait(1.2)
 
         big_force = arrow(np.array([-2.1, 0.02, 0]), np.array([-2.1, 1.55, 0]), FORCE, 5)
-        big_label = cn("F安 = BIL", 32, FORCE, "BOLD").next_to(big_force, LEFT, buff=0.20)
+        big_label = cn("F安 = BIL（B 垂直于 I）", 30, FORCE, "BOLD").next_to(big_force, LEFT, buff=0.20)
         summ = VGroup(
             cn("F安 = NqvB = BIL", 36, ACCENT, "BOLD"),
             cn("N 个电荷受力方向相同，合力就是安培力", 21, MUTED),
@@ -169,13 +169,16 @@ class LorentzForceScene(Scene):
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.18)
         summ.move_to(np.array([4.5, -0.85, 0]))
 
+        carrier = cn("为便于画图，图中把定向移动电荷等效画成正电荷（金属导线中实际是自由电子）", 19, MUTED)
+        carrier.move_to(np.array([-1.9, -2.45, 0]))
+
         self.play(GrowArrow(big_force), FadeIn(big_label), run_time=0.8)
-        self.play(FadeIn(summ, shift=LEFT), run_time=0.9)
+        self.play(FadeIn(summ, shift=LEFT), FadeIn(carrier), run_time=0.9)
         self.wait(1.5)
 
         self.remove(*mini_arrows)
         self.play(
-            FadeOut(VGroup(header, marks, wire, current, current_label, charges, each, summ, big_force, big_label)),
+            FadeOut(VGroup(header, marks, wire, current, current_label, charges, each, summ, big_force, big_label, carrier)),
             run_time=0.8,
         )
         self.remove(s)
@@ -205,8 +208,9 @@ class LorentzForceScene(Scene):
             cn("① 让磁感线垂直穿入掌心", 22, MUTED),
             cn("② 四指指向正电荷运动方向", 22, MUTED),
             cn("③ 拇指所指就是洛伦兹力方向", 22, MUTED),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.16)
-        rule.move_to(np.array([4.5, 1.40, 0]))
+            cn("④ 负电荷：四指指向运动的反方向", 22, NEG),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.14)
+        rule.move_to(np.array([4.55, 1.45, 0]))
         self.play(FadeIn(rule, shift=LEFT), run_time=0.9)
         self.wait(1.0)
 
@@ -244,7 +248,8 @@ class LorentzForceScene(Scene):
         b0 = 100.0                      # 参考磁感应强度 / mT
         b_track = ValueTracker(1.0)     # B / B0
         ang = ValueTracker(0.0)
-        ang.add_updater(lambda m, dt: m.increment_value(dt * 1.35))
+        # 角速度与 B 成正比：r 变小、ω 变大，画面线速度 v = ωr 保持不变（洛伦兹力不改变速率）
+        ang.add_updater(lambda m, dt: m.increment_value(dt * 1.35 * b_track.get_value()))
         self.add(b_track, ang)
 
         def radius():
@@ -275,48 +280,63 @@ class LorentzForceScene(Scene):
         dot = charge(1).move_to(pos())
         dot.add_updater(lambda m: m.move_to(pos()))
         v_arrow = always_redraw(lambda: arrow(pos(), pos() + v_dir() * 0.80, VEL, 4))
-        f_arrow = always_redraw(lambda: arrow(pos(), pos() + f_dir() * 0.60, FORCE, 4))
+        # F ∝ B：长度乘以 b_track，但不超过半径的 0.85（力只能指向圆心，不能穿过圆心）
+        f_arrow = always_redraw(
+            lambda: arrow(pos(), pos() + f_dir() * min(0.60 * b_track.get_value(), 0.85 * radius()), FORCE, 4)
+        )
 
         self.add(orbit, radius_line)
         self.play(FadeIn(center_dot), FadeIn(center_label), run_time=0.5)
         self.add(dot, v_arrow, f_arrow)
         self.wait(1.0)
 
-        formula = MathTex(r"qvB=\frac{mv^{2}}{r}", font_size=46, color=INK).move_to(np.array([4.55, 2.10, 0]))
+        formula = MathTex(r"qvB=\frac{mv^{2}}{r}", font_size=46, color=INK).move_to(np.array([4.55, 2.30, 0]))
         self.play(Write(formula), run_time=0.9)
 
         b_row = VGroup(
             cn("B =", 26, MUTED),
             DecimalNumber(100, num_decimal_places=0, color=FIELD).scale(0.62),
             cn("mT", 24, MUTED),
-        ).arrange(RIGHT, buff=0.16).move_to(np.array([4.55, 1.10, 0]))
+        ).arrange(RIGHT, buff=0.16).move_to(np.array([4.55, 1.50, 0]))
         r_row = VGroup(
             cn("r =", 26, MUTED),
             DecimalNumber(10.4, num_decimal_places=1, color=ACCENT).scale(0.62),
             cn("cm", 24, MUTED),
-        ).arrange(RIGHT, buff=0.16).move_to(np.array([4.55, 0.50, 0]))
+        ).arrange(RIGHT, buff=0.16).move_to(np.array([4.55, 0.95, 0]))
         b_num = b_row[1]
         r_num = r_row[1]
         b_num.add_updater(lambda m: m.set_value(b0 * b_track.get_value()))
         r_num.add_updater(lambda m: m.set_value(10.44 / b_track.get_value()))
         self.play(FadeIn(b_row), FadeIn(r_row), run_time=0.7)
 
-        hint = cn("增大 B，半径 r 同步变小", 24, FIELD, "BOLD").move_to(np.array([4.55, -0.55, 0]))
-        self.play(FadeIn(hint, shift=LEFT), run_time=0.6)
+        # 让学生可以自己复算 10.4 cm
+        proton_note = VGroup(
+            cn("本例粒子：质子（可据此复算 r）", 18, MUTED),
+            cn("m = 1.67×10⁻²⁷ kg", 18, MUTED),
+            cn("q = 1.6×10⁻¹⁹ C", 18, MUTED),
+            cn("v = 1.0×10⁶ m/s，B = 100 mT", 18, MUTED),
+            cn("r = mv/(qB) ≈ 0.104 m = 10.4 cm", 18, MUTED),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.10)
+        proton_note.move_to(np.array([3.05, -0.38, 0]))
+        self.play(FadeIn(proton_note, shift=LEFT), run_time=0.7)
+
+        hint = cn("增大 B，半径 r 同步变小（ω 同步变大，线速度不变）", 22, FIELD, "BOLD")
+        hint.move_to(np.array([-2.1, -2.95, 0]))
+        self.play(FadeIn(hint, shift=UP), run_time=0.6)
 
         self.play(b_track.animate.set_value(2.05), run_time=3.4, rate_func=smooth)
         self.wait(0.6)
         self.play(b_track.animate.set_value(0.72), run_time=3.0, rate_func=smooth)
         self.wait(0.4)
 
-        result = MathTex(r"r=\frac{mv}{qB}", font_size=50, color=ACCENT).move_to(np.array([4.55, -1.55, 0]))
+        result = MathTex(r"r=\frac{mv}{qB}", font_size=50, color=ACCENT).move_to(np.array([4.55, -1.78, 0]))
         self.play(FadeOut(formula, shift=UP * 0.2), FadeIn(result, shift=UP * 0.2), run_time=1.0)
         self.wait(0.9)
 
         self.remove(orbit, radius_line, v_arrow, f_arrow)
         dot.clear_updaters()
         self.play(
-            FadeOut(VGroup(header, marks, center_dot, center_label, dot, b_row, r_row, hint, result)),
+            FadeOut(VGroup(header, marks, center_dot, center_label, dot, b_row, r_row, proton_note, hint, result)),
             run_time=0.8,
         )
         self.remove(b_track, ang)
@@ -327,7 +347,8 @@ class LorentzForceScene(Scene):
         self.play(FadeIn(header, shift=DOWN), run_time=0.6)
 
         center = np.array([-2.8, -0.35, 0])
-        radii = [0.78, 1.28, 1.78]
+        # 同一粒子 r ∝ v：v、2v、3v 对应半径 1 : 2 : 3
+        radii = [0.74, 1.48, 2.22]
         colors = [VEL, FIELD, ACCENT]
         speed_labels = ["v", "2v", "3v"]
 
@@ -339,7 +360,7 @@ class LorentzForceScene(Scene):
         dots = VGroup()
         for r, c, lab in zip(radii, colors, speed_labels):
             circles.add(Circle(radius=r, color=c, stroke_width=3, stroke_opacity=0.55).move_to(center))
-            labels.add(cn(lab, 24, c, "BOLD").move_to(center + np.array([r + 0.36, 0.0, 0])))
+            labels.add(cn(lab, 24, c, "BOLD").move_to(center + np.array([r * 0.72 + 0.10, r * 0.72 + 0.06, 0])))
             d = VGroup(Circle(radius=0.13, fill_color=c, fill_opacity=1, stroke_color="#ffffff", stroke_width=2))
 
             def upd(m, dt, rr=r):
@@ -350,7 +371,7 @@ class LorentzForceScene(Scene):
             dots.add(d)
 
         start_line = DashedLine(
-            center + np.array([0, -1.95, 0]),
+            center + np.array([0, -2.42, 0]),
             center + np.array([0, 0.10, 0]),
             dash_length=0.08,
             color=LINE,
@@ -390,7 +411,7 @@ class LorentzForceScene(Scene):
             cn("1  运动电荷受洛伦兹力 F = qvB sinθ，方向由左手定则判断。", 25, INK),
             cn("2  洛伦兹力始终垂直于速度，不做功：只改变方向，不改变速率。", 25, INK),
             cn("3  v 垂直于 B 时做匀速圆周运动：r = mv/(qB)，T = 2πm/(qB)。", 25, ACCENT, "BOLD"),
-            cn("4  宏观的安培力 F = BIL，是大量电荷所受洛伦兹力的合力。", 25, INK),
+            cn("4  宏观的安培力 F = BIL（B 垂直于 I），是大量电荷所受洛伦兹力的合力。", 25, INK),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.36)
         items.move_to(np.array([0, 0.30, 0]))
 
