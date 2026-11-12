@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>洛伦兹力与带电粒子在匀强磁场中的圆周运动</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --velocity: #22c55e;
+      --force: #d99b0b;
+      --warn: #d97706;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app { width: min(1320px, calc(100vw - 32px)); margin: 0 auto; padding: 18px 0 24px; }
+    .topbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 306px; gap: 14px; align-items: start; }
+    .stage-panel, .side-panel, .control-panel, .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .stage-panel { padding: 12px; }
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 440px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+    #lorentzCanvas { width: 100%; height: 100%; display: block; }
+    .stage-readout {
+      position: absolute;
+      left: 16px;
+      top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+    .readout-item {
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 9px 2px 0; color: var(--muted); font-size: 13px; }
+    .legend span { display: inline-flex; align-items: center; }
+    .swatch { width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; display: inline-block; }
+    .side-panel { padding: 14px; }
+    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
+    .metric { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: #f8fafc; }
+    .metric-label { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+    .metric-value { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.25; overflow-wrap: anywhere; }
+    .metric-value.positive { color: var(--positive); }
+    .metric-value.negative { color: var(--negative); }
+    .metric-value.neutral { color: var(--accent); }
+    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .control-panel { margin-top: 14px; padding: 14px; }
+    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
+    .field { margin-top: 10px; }
+    .field label, .field-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
+    .field-label { justify-content: flex-start; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    button {
+      min-height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #f1f5f9; }
+    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
+    button.active:hover, .primary-btn:hover { background: #0d665f; }
+    .toggles { display: grid; gap: 9px; }
+    .toggle { display: flex; align-items: center; gap: 9px; font-size: 15px; user-select: none; }
+    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .inquiry-panel { margin-top: 14px; padding: 14px; }
+    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    @media (max-width: 1100px) {
+      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
+      .topbar { align-items: start; flex-direction: column; }
+      .formula { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>洛伦兹力与带电粒子在匀强磁场中的圆周运动</h1>
+        <p class="subtitle">调节 B、v、q、m，观察受力方向、绕行方向以及半径 r、周期 T 的变化。</p>
+      </div>
+      <div class="formula">F = qvB·sinθ　r = mv / (qB)　T = 2πm / (qB)</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="磁场运动演示区">
+          <div class="stage-wrap">
+            <canvas id="lorentzCanvas" width="960" height="540"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">粒子：<span id="stageParticle">正电荷</span></div>
+              <div class="readout-item">绕行：<span id="stageDirection">逆时针</span></div>
+              <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
+            </div>
+          </div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#ff3b30"></i>正电荷</span>
+            <span><i class="swatch" style="background:#3558ff"></i>负电荷</span>
+            <span><i class="swatch" style="background:#22c55e"></i>速度 v 与轨迹</span>
+            <span><i class="swatch" style="background:#ffd166"></i>洛伦兹力 F</span>
+            <span><i class="swatch" style="background:#9aa7b8"></i>磁场符号 × / ·</span>
+          </div>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>参数调节</h2>
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">磁场与速度</div>
+              <div class="field">
+                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">100 mT</span></label>
+                <input id="bSlider" type="range" min="20" max="300" value="100" step="5" />
+              </div>
+              <div class="field">
+                <div class="field-label"><span>磁场方向（视角：垂直纸面）</span></div>
+                <div class="segmented">
+                  <button type="button" class="field-btn active" data-into="1">× 向里</button>
+                  <button type="button" class="field-btn" data-into="0">· 向外</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="vSlider"><span>速率 v</span><span id="vValue">1.00×10⁶ m/s</span></label>
+                <input id="vSlider" type="range" min="0.5" max="4" value="1" step="0.1" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">电荷与质量</div>
+              <div class="field">
+                <div class="field-label"><span>电荷电性</span></div>
+                <div class="segmented">
+                  <button type="button" class="charge-btn active" data-sign="1">正电荷 +</button>
+                  <button type="button" class="charge-btn" data-sign="-1">负电荷 −</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="qSlider"><span>电荷量 |q|</span><span id="qValue">1 e</span></label>
+                <input id="qSlider" type="range" min="1" max="3" value="1" step="1" />
+              </div>
+              <div class="field">
+                <label for="mSlider"><span>质量 m</span><span id="mValue">1.67×10⁻²⁷ kg</span></label>
+                <input id="mSlider" type="range" min="0.5" max="6" value="1.67" step="0.01" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">显示与播放</div>
+              <div class="toggles">
+                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示速度与洛伦兹力</span></label>
+                <label class="toggle"><input type="checkbox" id="showCircle" checked /><span>显示圆心与半径</span></label>
+              </div>
+              <div class="field">
+                <button type="button" class="primary-btn" id="playBtn">播放</button>
+                <button type="button" id="resetBtn">重置</button>
+              </div>
+              <p class="hint">播放速度按“一周期约 3 s”示意，真实周期见右侧读数。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>只改变速率 v（保持其他不变），半径 r 怎样变化？周期 T 变不变？由此说明 T 与 v 是否有关。</li>
+            <li>把 B 反向（× → ·）或把电荷换成负电荷，洛伦兹力方向和轨迹绕行方向怎样改变？两者为什么总是相反？</li>
+            <li>若把 B 和 |q| 同时变为原来的 2 倍，先猜一猜 r 与 T 各变多少，再动手验证。</li>
+          </ul>
+          <p class="hint">画面比例会随半径自动换挡，比较半径大小时请对照画面左上角标尺与右侧 r 读数；粒子始终做匀速圆周运动，洛伦兹力不做功。</p>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="实时读数与说明">
+        <h2>实时读数</h2>
+        <div class="metric">
+          <div class="metric-label">轨道半径 r</div>
+          <div class="metric-value neutral" id="radiusValue">6.3 cm</div>
+          <div class="metric-note" id="radiusNote">r = mv/(qB)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">回旋周期 T</div>
+          <div class="metric-value" id="periodValue">656 ns</div>
+          <div class="metric-note" id="periodNote">T = 2πm/(qB)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">洛伦兹力 F</div>
+          <div class="metric-value" id="forceValue">1.60×10⁻¹⁴ N</div>
+          <div class="metric-note" id="forceNote">F = qvB·sinθ，θ = 90°，v ⟂ B</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">绕行方向</div>
+          <div class="metric-value" id="bendValue">逆时针</div>
+          <div class="metric-note" id="bendNote">正电荷 + B 向里 → 逆时针</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">模型假设</div>
+          <div class="metric-note">匀强磁场充满整个区域，忽略重力与相对论效应，v 与 B 垂直（θ = 90°）。内部按 SI 单位计算，界面显示 m/s、mT、cm、ns/μs。</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const canvas = document.getElementById("lorentzCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const E_CHARGE = 1.602e-19;      // 元电荷 / C
+      const M_UNIT = 1e-27;            // 质量单位 / kg
+      const F_REF = 1.6e-14;           // 力箭头长度的参考值 / N
+      const PERIOD_VISUAL = 3.2;       // 一个周期在画面上约占 3.2 s
+      const CENTER = { x: 468, y: 296 };
+      const PX_LADDER = [204800, 102400, 51200, 25600, 12800, 6400, 3200, 1600, 800, 400, 200, 100, 50, 25];
+
+      const controls = {
+        bSlider: document.getElementById("bSlider"),
+        vSlider: document.getElementById("vSlider"),
+        qSlider: document.getElementById("qSlider"),
+        mSlider: document.getElementById("mSlider"),
+        showVectors: document.getElementById("showVectors"),
+        showCircle: document.getElementById("showCircle"),
+        playBtn: document.getElementById("playBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        chargeButtons: Array.from(document.querySelectorAll(".charge-btn")),
+        fieldButtons: Array.from(document.querySelectorAll(".field-btn"))
+      };
+
+      const output = {
+        bValue: document.getElementById("bValue"),
+        vValue: document.getElementById("vValue"),
+        qValue: document.getElementById("qValue"),
+        mValue: document.getElementById("mValue"),
+        stageParticle: document.getElementById("stageParticle"),
+        stageDirection: document.getElementById("stageDirection"),
+        stageStatus: document.getElementById("stageStatus"),
+        radiusValue: document.getElementById("radiusValue"),
+        radiusNote: document.getElementById("radiusNote"),
+        periodValue: document.getElementById("periodValue"),
+        periodNote: document.getElementById("periodNote"),
+        forceValue: document.getElementById("forceValue"),
+        forceNote: document.getElementById("forceNote"),
+        bendValue: document.getElementById("bendValue"),
+        bendNote: document.getElementById("bendNote")
+      };
+
+      const state = {
+        bmT: 100,        // 磁感应强度 / mT
+        vM: 1.0,         // 速率 / (10^6 m/s)
+        qe: 1,           // 电荷量大小 / e
+        sign: 1,         // 电荷电性
+        mU: 1.67,        // 质量 / (10^-27 kg)
+        intoPage: true,  // 磁场是否垂直纸面向里
+        playing: false,
+        phase: 0         // 自入射点起已转过的圆心角 / rad
+      };
+
+      function clamp(value, lo, hi) {
+        return Math.min(hi, Math.max(lo, value));
+      }
+
+      // 物理模型：SI 单位，v ⟂ B，忽略重力，非相对论
+      function derived() {
+        const B = state.bmT * 1e-3;
+        const v = state.vM * 1e6;
+        const qAbs = state.qe * E_CHARGE;
+        const q = state.sign * qAbs;
+        const m = state.mU * M_UNIT;
+        const bz = state.intoPage ? -B : B;   // z 轴指向纸外（观察者）
+        const r = m * v / (qAbs * B);
+        const T = 2 * Math.PI * m / (qAbs * B);
+        const F = qAbs * v * B;               // sinθ = 1
+        const omega = -q * bz / m;            // 有符号角速度，正值为逆时针
+        return { B: B, v: v, q: q, qAbs: qAbs, m: m, bz: bz, r: r, T: T, F: F, omega: omega };
+      }
+
+      // F = q v × B，其中 v = (vx, vy, 0)，B = (0, 0, bz)
+      function lorentz(q, vx, vy, bz) {
+        return { x: q * vy * bz, y: -q * vx * bz };
+      }
+
+      function geometry() {
+        const d = derived();
+        let pxPerM = PX_LADDER[PX_LADDER.length - 1];
+        for (let i = 0; i < PX_LADDER.length; i += 1) {
+          if (2 * d.r * PX_LADDER[i] <= 376) { pxPerM = PX_LADDER[i]; break; }
+        }
+
+        const dir = d.omega >= 0 ? 1 : -1;                  // +1 逆时针，-1 顺时针
+        const theta0 = dir > 0 ? -Math.PI / 2 : Math.PI / 2; // 入射点：速度沿 +x
+        const theta = theta0 + dir * state.phase;
+
+        const radiusPx = d.r * pxPerM;
+        const point = {
+          x: CENTER.x + radiusPx * Math.cos(theta),
+          y: CENTER.y - radiusPx * Math.sin(theta)
+        };
+
+        const ux = Math.cos(theta);
+        const uy = Math.sin(theta);
+        const tx = -uy * dir;   // 速度方向（世界坐标，y 向上）
+        const ty = ux * dir;
+        const force = lorentz(d.q, tx * d.v, ty * d.v, d.bz);
+        const fMag = Math.hypot(force.x, force.y);
+        const fx = fMag > 0 ? force.x / fMag : 0;
+        const fy = fMag > 0 ? force.y / fMag : 0;
+
+        return {
+          d: d, pxPerM: pxPerM, dir: dir, theta0: theta0, theta: theta,
+          radiusPx: radiusPx, point: point, tx: tx, ty: ty, fx: fx, fy: fy
+        };
+      }
+
+      // ---------- 数值格式 ----------
+      function fmtLength(r) {
+        if (r >= 1) return (r).toFixed(2) + " m";
+        if (r >= 0.01) return (r * 100).toFixed(2) + " cm";
+        return (r * 1000).toFixed(2) + " mm";
+      }
+
+      function fmtTime(t) {
+        if (t <= 0) return "0";
+        if (t >= 1e-3) return (t * 1e3).toFixed(2) + " ms";
+        if (t >= 1e-6) return (t * 1e6).toFixed(2) + " μs";
+        if (t >= 1e-9) return (t * 1e9).toFixed(1) + " ns";
+        return (t * 1e12).toFixed(1) + " ps";
+      }
+
+      function sciHTML(value, digits) {
+        const n = digits || 2;
+        if (!isFinite(value) || value === 0) return "0";
+        let exp = Math.floor(Math.log10(Math.abs(value)));
+        let mant = value / Math.pow(10, exp);
+        if (Math.abs(Number(mant.toFixed(n))) >= 10) { mant /= 10; exp += 1; }
+        return mant.toFixed(n) + "×10<sup>" + exp + "</sup>";
+      }
+
+      // ---------- 绘图工具 ----------
+      function roundRectPath(x, y, w, h, r) {
+        const rr = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + rr, y);
+        ctx.arcTo(x + w, y, x + w, y + h, rr);
+        ctx.arcTo(x + w, y + h, x, y + h, rr);
+        ctx.arcTo(x, y + h, x, y, rr);
+        ctx.arcTo(x, y, x + w, y, rr);
+        ctx.closePath();
+      }
+
+      function chip(text, x, y, color, align, font) {
+        const f = font || "bold 18px \"Microsoft YaHei\", Arial";
+        ctx.save();
+        ctx.font = f;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const w = ctx.measureText(text).width;
+        const padX = 9;
+        const h = 27;
+        let left = x - w / 2;
+        if (align === "left") left = x;
+        else if (align === "right") left = x - w;
+        ctx.fillStyle = "rgba(8, 10, 14, 0.66)";
+        roundRectPath(left - padX, y - h / 2, w + padX * 2, h, 7);
+        ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fillText(text, left, y + 1);
+        ctx.restore();
+      }
+
+      function drawArrow(x1, y1, x2, y2, color, width, headLength) {
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 7), y2 - headLength * Math.sin(angle - Math.PI / 7));
+        ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 7), y2 - headLength * Math.sin(angle + Math.PI / 7));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ---------- 画面元素 ----------
+      function drawFieldSymbols() {
+        ctx.save();
+        ctx.strokeStyle = "rgba(203, 213, 225, 0.30)";
+        ctx.fillStyle = "rgba(203, 213, 225, 0.30)";
+        ctx.lineWidth = 2;
+        for (let y = 44; y <= canvas.height - 34; y += 54) {
+          for (let x = 42; x <= canvas.width - 34; x += 60) {
+            if (state.intoPage) {
+              const s = 5;
+              ctx.beginPath();
+              ctx.moveTo(x - s, y - s);
+              ctx.lineTo(x + s, y + s);
+              ctx.moveTo(x + s, y - s);
+              ctx.lineTo(x - s, y + s);
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        ctx.restore();
+      }
+
+      function drawOrbit(g) {
+        const R = g.radiusPx;
+        if (R < 2) return;
+        ctx.save();
+        ctx.strokeStyle = "rgba(34, 197, 94, 0.34)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 9]);
+        ctx.beginPath();
+        ctx.arc(CENTER.x, CENTER.y, R, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const span = Math.min(state.phase, Math.PI * 2);
+        if (span > 0.004) {
+          const steps = Math.max(2, Math.ceil(span / 0.035));
+          ctx.strokeStyle = "#22c55e";
+          ctx.lineWidth = 5;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          for (let i = 0; i <= steps; i += 1) {
+            const ang = g.theta0 + g.dir * span * (i / steps);
+            const px = CENTER.x + R * Math.cos(ang);
+            const py = CENTER.y - R * Math.sin(ang);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawCenterAndRadius(g) {
+        if (!controls.showCircle.checked) return;
+        const p = g.point;
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 7]);
+        ctx.beginPath();
+        ctx.moveTo(CENTER.x, CENTER.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(CENTER.x, CENTER.y, 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(CENTER.x - 13, CENTER.y);
+        ctx.lineTo(CENTER.x + 13, CENTER.y);
+        ctx.moveTo(CENTER.x, CENTER.y - 13);
+        ctx.lineTo(CENTER.x, CENTER.y + 13);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 19px \"Microsoft YaHei\", Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText("O", CENTER.x + 17, CENTER.y - 17);
+
+        const mx = (CENTER.x + p.x) / 2;
+        const my = (CENTER.y + p.y) / 2;
+        const ox = -g.tx * 26;
+        const oy = g.ty * 26;
+        chip("r = " + fmtLength(g.d.r), mx + ox, my + oy, "#ffffff", "center", "bold 17px \"Microsoft YaHei\", Arial");
+      }
+
+      function drawVectors(g) {
+        if (!controls.showVectors.checked) return;
+        const p = g.point;
+        const d = g.d;
+
+        const vLen = 82;
+        drawArrow(p.x, p.y, p.x + g.tx * vLen, p.y - g.ty * vLen, "#22c55e", 4.5, 15);
+        chip("v", p.x + g.tx * (vLen + 20), p.y - g.ty * (vLen + 20), "#4ade80", "center", "bold 19px \"Microsoft YaHei\", Arial");
+
+        const fLen = clamp(76 * Math.sqrt(d.F / F_REF), 48, 132);
+        drawArrow(p.x, p.y, p.x + g.fx * fLen, p.y - g.fy * fLen, "#ffd166", 4.5, 15);
+        chip("F", p.x + g.fx * (fLen * 0.62) + g.tx * 22, p.y - g.fy * (fLen * 0.62) - g.ty * 22, "#ffd166", "center", "bold 19px \"Microsoft YaHei\", Arial");
+      }
+
+      function drawParticle(g) {
+        const p = g.point;
+        const color = state.sign > 0 ? "#ff3b30" : "#3558ff";
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(state.sign > 0 ? "+" : "–", p.x, p.y + 1);
+        ctx.restore();
+      }
+
+      function drawScaleBar(pxPerM) {
+        const candidates = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5];
+        let best = candidates[0];
+        for (let i = 0; i < candidates.length; i += 1) {
+          if (candidates[i] * pxPerM <= 150) best = candidates[i];
+        }
+        const lenPx = best * pxPerM;
+        const x0 = 28;
+        const y0 = 78;
+        ctx.save();
+        ctx.strokeStyle = "rgba(203, 213, 225, 0.9)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0 + lenPx, y0);
+        ctx.moveTo(x0, y0 - 7);
+        ctx.lineTo(x0, y0 + 7);
+        ctx.moveTo(x0 + lenPx, y0 - 7);
+        ctx.lineTo(x0 + lenPx, y0 + 7);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(203, 213, 225, 0.95)";
+        ctx.font = "bold 17px \"Microsoft YaHei\", Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const label = best >= 1 ? best + " m" : (best * 100 >= 1 ? Math.round(best * 100) + " cm" : Math.round(best * 1000) + " mm");
+        ctx.fillText(label, x0, y0 + 22);
+        ctx.restore();
+      }
+
+      function drawHud(g) {
+        const d = g.d;
+        const intoText = state.intoPage ? "方向为 × 垂直纸面向里" : "方向为 · 垂直纸面向外";
+        chip("B = " + state.bmT + " mT，" + intoText, canvas.width - 20, 34, "#e2e8f0", "right");
+
+        const tPhys = state.phase / Math.abs(d.omega);
+        const laps = Math.floor(state.phase / (Math.PI * 2));
+        chip("t = " + fmtTime(tPhys) + "，已绕 " + laps + " 圈", 22, canvas.height - 24, "#cbd5e1", "left");
+
+        chip("匀强磁场 · 忽略重力 · 非相对论 · θ = 90°", canvas.width / 2, canvas.height - 24, "#f59f00", "center");
+
+        drawScaleBar(g.pxPerM);
+      }
+
+      // ---------- 读数 ----------
+      function updateOutputs(g) {
+        const d = g.d;
+        output.bValue.innerHTML = state.bmT + " mT";
+        output.vValue.innerHTML = state.vM.toFixed(2) + "×10<sup>6</sup> m/s";
+        output.qValue.innerHTML = state.qe + " e（" + (state.qe * 1.602).toFixed(2) + "×10<sup>-19</sup> C）";
+        output.mValue.innerHTML = state.mU.toFixed(2) + "×10<sup>-27</sup> kg";
+
+        output.stageParticle.textContent = state.sign > 0 ? "正电荷" : "负电荷";
+        output.stageDirection.textContent = g.dir > 0 ? "逆时针" : "顺时针";
+        output.stageStatus.textContent = state.playing ? "播放" : "暂停";
+
+        output.radiusValue.textContent = fmtLength(d.r);
+        output.radiusValue.className = "metric-value neutral";
+        output.radiusNote.innerHTML = "r = mv/(qB) = " + sciHTML(d.r, 2) + " m";
+
+        output.periodValue.textContent = fmtTime(d.T);
+        output.periodNote.innerHTML = "T = 2πm/(qB) = " + sciHTML(d.T, 2) + " s，与 v 无关";
+
+        output.forceValue.innerHTML = sciHTML(d.F, 2) + " N";
+        output.forceNote.innerHTML = "F = qvB·sinθ，θ = 90°，v ⟂ B，方向始终指向圆心";
+
+        output.bendValue.textContent = g.dir > 0 ? "逆时针" : "顺时针";
+        if (state.sign > 0) {
+          output.bendNote.textContent = state.intoPage
+            ? "正电荷 + B 向里：v 向右时 F 向上，轨迹逆时针。"
+            : "正电荷 + B 向外：v 向右时 F 向下，轨迹顺时针。";
+        } else {
+          output.bendNote.textContent = state.intoPage
+            ? "负电荷 + B 向里：v 向右时 F 向下，轨迹顺时针。"
+            : "负电荷 + B 向外：v 向右时 F 向上，轨迹逆时针。";
+        }
+      }
+
+      function render() {
+        const g = geometry();
+        const d = g.d;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#080a0e";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawFieldSymbols();
+        drawOrbit(g);
+        drawCenterAndRadius(g);
+        drawVectors(g);
+        drawParticle(g);
+        drawHud(g);
+        updateOutputs(g);
+      }
+
+      // ---------- 播放控制 ----------
+      let lastTs = 0;
+      function loop(ts) {
+        if (lastTs === 0) lastTs = ts;
+        const dt = Math.min(0.05, (ts - lastTs) / 1000);
+        lastTs = ts;
+        if (state.playing) {
+          const dir = derived().omega >= 0 ? 1 : -1;
+          state.phase += dir * (Math.PI * 2 / PERIOD_VISUAL) * dt;
+          render();
+        }
+        requestAnimationFrame(loop);
+      }
+
+      controls.bSlider.addEventListener("input", function () {
+        state.bmT = Number(controls.bSlider.value);
+        render();
+      });
+      controls.vSlider.addEventListener("input", function () {
+        state.vM = Number(controls.vSlider.value);
+        render();
+      });
+      controls.qSlider.addEventListener("input", function () {
+        state.qe = Number(controls.qSlider.value);
+        render();
+      });
+      controls.mSlider.addEventListener("input", function () {
+        state.mU = Number(controls.mSlider.value);
+        render();
+      });
+      controls.showVectors.addEventListener("change", render);
+      controls.showCircle.addEventListener("change", render);
+
+      controls.chargeButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          state.sign = Number(button.dataset.sign);
+          controls.chargeButtons.forEach(function (btn) {
+            btn.classList.toggle("active", btn === button);
+          });
+          render();
+        });
+      });
+
+      controls.fieldButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          state.intoPage = button.dataset.into === "1";
+          controls.fieldButtons.forEach(function (btn) {
+            btn.classList.toggle("active", btn === button);
+          });
+          render();
+        });
+      });
+
+      controls.playBtn.addEventListener("click", function () {
+        state.playing = !state.playing;
+        controls.playBtn.textContent = state.playing ? "暂停" : "播放";
+        controls.playBtn.classList.toggle("active", state.playing);
+        render();
+      });
+
+      controls.resetBtn.addEventListener("click", function () {
+        state.phase = 0;
+        state.playing = false;
+        controls.playBtn.textContent = "播放";
+        controls.playBtn.classList.remove("active");
+        render();
+      });
+
+      window.addEventListener("resize", render);
+
+      // 初值来自 HTML，保证滑杆与状态一致
+      state.bmT = Number(controls.bSlider.value);
+      state.vM = Number(controls.vSlider.value);
+      state.qe = Number(controls.qSlider.value);
+      state.mU = Number(controls.mSlider.value);
+
+      render();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

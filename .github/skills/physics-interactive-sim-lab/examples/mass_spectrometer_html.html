@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>质谱仪可视化资源</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #070a10;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --path: #ffd166;
+      --warn: #b45309;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 18px 0 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 17px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-panel,
+    .side-panel,
+    .control-panel,
+    .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stage-panel { padding: 12px; }
+
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 430px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+
+    #spectrometerCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .side-panel { padding: 14px; }
+    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
+
+    .metric {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #f8fafc;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 19px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value.neutral { color: var(--accent); }
+    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .metric-note.warn { color: var(--warn); }
+
+    .control-panel { margin-top: 14px; padding: 14px; }
+    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
+    .field { margin-top: 10px; }
+    .field label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    select {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 0 8px;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .iso-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #f1f5f9; }
+    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
+    button.active:hover, .primary-btn:hover { background: #0d665f; }
+
+    .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+    .toggles { display: grid; gap: 9px; }
+    .toggle { display: flex; align-items: center; gap: 9px; font-size: 14px; user-select: none; }
+    .toggle input { width: 19px; height: 19px; accent-color: var(--accent); }
+
+    .inquiry-panel { margin-top: 14px; padding: 14px; }
+    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+    @media (max-width: 960px) {
+      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
+      .topbar { align-items: start; flex-direction: column; }
+      .formula { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>质谱仪可视化资源</h1>
+        <p class="subtitle">先由速度选择器筛出 v = E / B₁ 的离子，再垂直进入偏转磁场 B₂ 做半圆运动，底片上的落点 x = 2r 用来比较质量。</p>
+      </div>
+      <div class="formula">qE = qvB₁ → v = E/B₁ &nbsp;|&nbsp; r = mv/(qB₂) &nbsp;|&nbsp; x = 2r</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="质谱仪演示区">
+          <div class="stage-wrap">
+            <canvas id="spectrometerCanvas" width="960" height="540"></canvas>
+          </div>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>参数调节</h2>
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">电场与磁场</div>
+              <div class="field">
+                <label for="eSlider"><span>选择器电场 E</span><span id="eValue">2.0×10⁴ V/m</span></label>
+                <input id="eSlider" type="range" min="1" max="3" step="0.1" value="2" />
+              </div>
+              <div class="field">
+                <label for="b1Slider"><span>选择器磁场 B₁</span><span id="b1Value">0.10 T</span></label>
+                <input id="b1Slider" type="range" min="0.08" max="0.20" step="0.01" value="0.10" />
+              </div>
+              <div class="field">
+                <label for="b2Slider"><span>偏转磁场 B₂</span><span id="b2Value">0.50 T</span></label>
+                <input id="b2Slider" type="range" min="0.30" max="0.90" step="0.05" value="0.50" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">离子与电荷</div>
+              <div class="iso-grid">
+                <button type="button" class="iso-btn" data-iso="c12">¹²C⁺</button>
+                <button type="button" class="iso-btn" data-iso="c13">¹³C⁺</button>
+                <button type="button" class="iso-btn active" data-iso="ne20">²⁰Ne⁺</button>
+                <button type="button" class="iso-btn" data-iso="ne22">²²Ne⁺</button>
+              </div>
+              <div class="field">
+                <label for="massSlider"><span>主离子质量数 A</span><span id="massValue">20</span></label>
+                <input id="massSlider" type="range" min="12" max="24" step="1" value="20" />
+              </div>
+              <div class="field">
+                <div class="segmented">
+                  <button type="button" class="charge-btn active" data-z="1">电荷 +e</button>
+                  <button type="button" class="charge-btn" data-z="2">电荷 +2e</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">量程与播放</div>
+              <div class="field">
+                <label for="rangeSelect"><span>底片量程</span><span id="rangeValue">0–20 cm</span></label>
+                <select id="rangeSelect">
+                  <option value="10">0 – 10 cm</option>
+                  <option value="20" selected>0 – 20 cm</option>
+                  <option value="40">0 – 40 cm</option>
+                </select>
+              </div>
+              <div class="toggles">
+                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示速度与受力矢量</span></label>
+                <label class="toggle"><input type="checkbox" id="showGhost" checked /><span>显示对比同位素</span></label>
+                <label class="toggle"><input type="checkbox" id="showRejected" checked /><span>显示被挡掉的离子</span></label>
+              </div>
+              <div class="field">
+                <div class="btn-row">
+                  <button type="button" class="primary-btn" id="playBtn">播放</button>
+                  <button type="button" id="resetBtn">重置</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>把 B₂ 从 0.50 T 调到 0.90 T，速度 v 变不变？半径 r 与落点 x 怎样变化？</li>
+            <li>²⁰Ne⁺ 与 ²²Ne⁺ 进入偏转磁场时速度相同，为什么半径不同？质量大的落点更远还是更近？</li>
+            <li>把电荷量从 +e 换成 +2e，两个落点的间距会怎样变化？这与 r ∝ m/q 一致吗？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="资源说明">
+        <h2>读数与关系</h2>
+        <div class="metric">
+          <div class="metric-label">选择速度 v = E / B₁</div>
+          <div class="metric-value neutral" id="mSpeed">2.00×10⁵ m/s</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">偏转半径 r = mv / (qB₂)</div>
+          <div class="metric-value" id="mRadius">8.30 cm</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">落点位置 x = 2r</div>
+          <div class="metric-value" id="mLanding">16.60 cm</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">两同位素落点间距 Δx</div>
+          <div class="metric-value" id="mDelta">1.66 cm</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">比例关系</div>
+          <div class="metric-note">同速、同电荷时 r ∝ m，所以 Δx / x = Δm / m；反过来可由落点反推质量 m = qB₁B₂x / (2E)。</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">简化假设</div>
+          <div class="metric-note warn">忽略重力；非相对论（v ≪ c）；忽略边缘场与离子间相互作用；底片处为真空。本页只演示正离子，若换成负离子，洛伦兹力反向，轨迹向上偏转。</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const canvas = document.getElementById("spectrometerCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const U_ATOMIC = 1.6605390666e-27;   // kg，原子质量单位
+      const Q_E = 1.602176634e-19;         // C，元电荷
+      const FONT = '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif';
+
+      const COLORS = {
+        bg: "#070a10",
+        ink: "#e6ebf5",
+        muted: "#8fa0b8",
+        line: "rgba(255,255,255,0.16)",
+        panel: "rgba(255,255,255,0.035)",
+        plate: "#94a3b8",
+        positive: "#ef4444",
+        negative: "#60a5fa",
+        vector: "#ffffff",
+        forceE: "#ffd166",
+        lorentz: "#7dd3fc",
+        track: "#22c55e",
+        ghost: "#86efac",
+        warn: "#fb923c",
+        field: "#7c8ba1"
+      };
+
+      // 画面几何：画布固定 960 × 540，保证投影时布局稳定
+      const GEO = {
+        plateX: 340,
+        plateTopY: 110,
+        entryY: 150,
+        plateBottomY: 480,
+        b2: { x: 340, y: 96, w: 366, h: 396 },
+        side: { x: 718, y: 96, w: 226, h: 388 },
+        sel: { x: 20, y: 78, w: 276, h: 162 },
+        selPlateX0: 100,
+        selPlateX1: 280,
+        selTop: 128,
+        selBottom: 174,
+        beamY: 150,
+        beamStart: 86,
+        source: { x: 24, y: 134, w: 62, h: 32 }
+      };
+
+      const DEFAULTS = { E: 2e4, B1: 0.10, B2: 0.50, A1: 20, dA: 2, z: 1, rangeCm: 20 };
+
+      const state = {
+        E: DEFAULTS.E,
+        B1: DEFAULTS.B1,
+        B2: DEFAULTS.B2,
+        A1: DEFAULTS.A1,
+        dA: DEFAULTS.dA,
+        z: DEFAULTS.z,
+        rangeCm: DEFAULTS.rangeCm,
+        playing: false,
+        t: Number.POSITIVE_INFINITY,
+        showVectors: true,
+        showGhost: true,
+        showRejected: true
+      };
+
+      const controls = {
+        eSlider: document.getElementById("eSlider"),
+        b1Slider: document.getElementById("b1Slider"),
+        b2Slider: document.getElementById("b2Slider"),
+        massSlider: document.getElementById("massSlider"),
+        rangeSelect: document.getElementById("rangeSelect"),
+        showVectors: document.getElementById("showVectors"),
+        showGhost: document.getElementById("showGhost"),
+        showRejected: document.getElementById("showRejected"),
+        playBtn: document.getElementById("playBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        isoButtons: Array.from(document.querySelectorAll(".iso-btn")),
+        chargeButtons: Array.from(document.querySelectorAll(".charge-btn"))
+      };
+
+      const output = {
+        eValue: document.getElementById("eValue"),
+        b1Value: document.getElementById("b1Value"),
+        b2Value: document.getElementById("b2Value"),
+        massValue: document.getElementById("massValue"),
+        rangeValue: document.getElementById("rangeValue"),
+        mSpeed: document.getElementById("mSpeed"),
+        mRadius: document.getElementById("mRadius"),
+        mLanding: document.getElementById("mLanding"),
+        mDelta: document.getElementById("mDelta")
+      };
+
+      // 同位素预设：主离子 A1，对比离子 A2 = A1 + dA
+      const ISOTOPES = {
+        c12: { A1: 12, dA: 1 },
+        c13: { A1: 13, dA: -1 },
+        ne20: { A1: 20, dA: 2 },
+        ne22: { A1: 22, dA: -2 }
+      };
+
+      const NUCLIDE = {
+        12: "¹²C", 13: "¹³C", 14: "¹⁴C", 16: "¹⁶O",
+        18: "¹⁸O", 20: "²⁰Ne", 21: "²¹Ne", 22: "²²Ne", 24: "²⁴Mg"
+      };
+
+      const SUP = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻" };
+      function sup(n) {
+        return String(n).split("").map(function (c) { return SUP[c] || c; }).join("");
+      }
+
+      function sci(value, digits) {
+        if (!isFinite(value) || value === 0) { return "0"; }
+        const exp = Math.floor(Math.log10(Math.abs(value)));
+        const mant = value / Math.pow(10, exp);
+        return mant.toFixed(digits === undefined ? 2 : digits) + "×10" + sup(exp);
+      }
+
+      function fmtLen(cm) {
+        if (!isFinite(cm)) { return "—"; }
+        if (cm >= 100) { return cm.toFixed(0); }
+        if (cm >= 10) { return cm.toFixed(1); }
+        if (cm >= 1) { return cm.toFixed(2); }
+        return cm.toFixed(3);
+      }
+
+      function ionLabel(A) {
+        const core = NUCLIDE[A] || ("A=" + A);
+        return core + (state.z === 2 ? "²⁺" : "⁺");
+      }
+
+      function clamp(value, lo, hi) {
+        return Math.min(hi, Math.max(lo, value));
+      }
+
+      // ---------------- 物理模型 ----------------
+      function metrics() {
+        const v = state.E / state.B1;                    // m/s，速度选择器
+        const q = state.z * Q_E;                          // C
+        const m1 = state.A1 * U_ATOMIC;                   // kg
+        const m2 = state.A2 * U_ATOMIC;
+        const r1 = (m1 * v) / (q * state.B2);             // m
+        const r2 = (m2 * v) / (q * state.B2);
+        const r1cm = r1 * 100;
+        const r2cm = r2 * 100;
+        const pxPerCm = (GEO.plateBottomY - GEO.entryY) / state.rangeCm;
+        const R1 = r1cm * pxPerCm;
+        const R2 = r2cm * pxPerCm;
+        return {
+          v: v,
+          q: q,
+          m1: m1,
+          m2: m2,
+          r1cm: r1cm,
+          r2cm: r2cm,
+          x1cm: 2 * r1cm,
+          x2cm: 2 * r2cm,
+          dx: Math.abs(2 * r2cm - 2 * r1cm),
+          pxPerCm: pxPerCm,
+          R1: R1,
+          R2: R2,
+          rMaxPx: Math.max(R1, R2),
+          xMaxCm: Math.max(2 * r1cm, 2 * r2cm)
+        };
+      }
+
+      const PATH_SPEED = 150;   // 画布像素 / 秒
+      const SEL_TIME = (GEO.plateX - GEO.beamStart) / PATH_SPEED;
+
+      function arcPoint(R, u) {
+        const phi = -Math.PI / 2 + u;
+        return {
+          x: GEO.plateX + R * Math.cos(phi),
+          y: GEO.entryY + R + R * Math.sin(phi)
+        };
+      }
+
+      function ionState(t, R) {
+        if (t <= SEL_TIME) {
+          return { phase: "select", x: GEO.beamStart + PATH_SPEED * t, y: GEO.beamY, u: 0, R: R };
+        }
+        const s = (t - SEL_TIME) * PATH_SPEED;
+        const u = Math.min(Math.PI, s / R);
+        const p = arcPoint(R, u);
+        return { phase: "arc", x: p.x, y: p.y, u: u, R: R };
+      }
+
+      function totalTime(m) {
+        return SEL_TIME + (Math.PI * m.rMaxPx) / PATH_SPEED;
+      }
+
+      // ---------------- 绘图工具 ----------------
+      function roundRectPath(x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + w - radius, y);
+        ctx.arcTo(x + w, y, x + w, y + radius, radius);
+        ctx.lineTo(x + w, y + h - radius);
+        ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+        ctx.lineTo(x + radius, y + h);
+        ctx.arcTo(x, y + h, x, y + h - radius, radius);
+        ctx.lineTo(x, y + radius);
+        ctx.arcTo(x, y, x + radius, y, radius);
+        ctx.closePath();
+      }
+
+      function text(str, x, y, opts) {
+        const o = opts || {};
+        const size = o.size || 13;
+        const weight = o.weight || "400";
+        const align = o.align || "left";
+        const baseline = o.baseline || "middle";
+        ctx.save();
+        ctx.font = weight + " " + size + "px " + FONT;
+        ctx.textAlign = align;
+        ctx.textBaseline = baseline;
+        if (o.halo) {
+          ctx.strokeStyle = o.halo;
+          ctx.lineWidth = o.haloWidth || 4;
+          ctx.lineJoin = "round";
+          ctx.strokeText(str, x, y);
+        }
+        ctx.fillStyle = o.color || COLORS.ink;
+        ctx.fillText(str, x, y);
+        ctx.restore();
+      }
+
+      function arrow(x1, y1, x2, y2, color, width, head) {
+        const w = width || 3;
+        const h = head || 9;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = w;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - h * Math.cos(angle - Math.PI / 6), y2 - h * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - h * Math.cos(angle + Math.PI / 6), y2 - h * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function dotSymbol(x, y, r, color) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function wrapLines(str, maxWidth, size) {
+        ctx.save();
+        ctx.font = "400 " + size + "px " + FONT;
+        const lines = [];
+        let line = "";
+        for (let i = 0; i < str.length; i += 1) {
+          const test = line + str[i];
+          if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line);
+            line = str[i];
+          } else {
+            line = test;
+          }
+        }
+        if (line) { lines.push(line); }
+        ctx.restore();
+        return lines;
+      }
+
+      // ---------------- 各功能区绘制 ----------------
+      function drawBackground() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "rgba(45,72,110,0.28)");
+        grad.addColorStop(0.55, "rgba(10,14,22,0)");
+        grad.addColorStop(1, "rgba(8,11,17,0.6)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function drawB2Zone() {
+        const z = GEO.b2;
+        roundRectPath(z.x, z.y, z.w, z.h, 10);
+        ctx.save();
+        ctx.fillStyle = COLORS.panel;
+        ctx.fill();
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+
+        // 垂直纸面向外的磁场符号 ⊙
+        for (let y = 136; y <= 466; y += 44) {
+          for (let x = 372; x <= 690; x += 44) {
+            dotSymbol(x, y, 3.6, "rgba(148,163,184,0.34)");
+          }
+        }
+
+        text("② 匀强磁场 B₂ ⊙ 垂直纸面向外", 470, 116, { size: 12, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
+      }
+
+      function drawPlate(m) {
+        // 照相底片（同时是偏转区边界）
+        ctx.save();
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(GEO.plateX, GEO.plateTopY);
+        ctx.lineTo(GEO.plateX, GEO.plateBottomY + 6);
+        ctx.stroke();
+        ctx.restore();
+
+        const step = (GEO.plateBottomY - GEO.entryY) / 10;
+        for (let i = 0; i <= 10; i += 1) {
+          const y = GEO.entryY + i * step;
+          ctx.save();
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(GEO.plateX - 9, y);
+          ctx.lineTo(GEO.plateX, y);
+          ctx.stroke();
+          ctx.restore();
+          if (i > 0) {
+            const tickVal = (i * state.rangeCm) / 10;
+            text(Number.isInteger(tickVal) ? String(tickVal) : tickVal.toFixed(1), GEO.plateX - 14, y, {
+              size: 11,
+              align: "right",
+              color: "#9fb0c6",
+              halo: COLORS.bg,
+              haloWidth: 3
+            });
+          }
+        }
+
+        text("③ 照相底片", GEO.plateX + 12, 108, { size: 13, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
+        text("刻度 x / cm", GEO.plateX + 12, 126, { size: 11, color: COLORS.field, halo: COLORS.bg });
+      }
+
+      function drawArcProgress(R, u, color, width, dashed) {
+        const end = -Math.PI / 2 + u;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        if (dashed) { ctx.setLineDash([7, 6]); }
+        ctx.beginPath();
+        ctx.arc(GEO.plateX, GEO.entryY + R, R, -Math.PI / 2, end, false);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawTrajectories(m) {
+        const t = state.t;
+        const s1 = ionState(t, m.R1);
+        const s2 = ionState(t, m.R2);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(GEO.b2.x, GEO.b2.y, GEO.b2.w, GEO.b2.h);
+        ctx.clip();
+
+        if (state.showGhost) {
+          drawArcProgress(m.R2, s2.u, "rgba(134,239,172,0.75)", 2, true);
+        }
+        drawArcProgress(m.R1, s1.u, COLORS.track, 3, false);
+
+        // 半径标注（圆心在底片上）
+        if (m.R1 > 8) {
+          const cy = GEO.entryY + m.R1;
+          ctx.save();
+          ctx.setLineDash([5, 5]);
+          ctx.strokeStyle = "rgba(255,209,102,0.55)";
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(GEO.plateX, cy);
+          ctx.lineTo(GEO.plateX + m.R1, cy);
+          ctx.stroke();
+          ctx.restore();
+          ctx.fillStyle = "#ffd166";
+          ctx.beginPath();
+          ctx.arc(GEO.plateX, cy, 3, 0, Math.PI * 2);
+          ctx.fill();
+          text("r₁", GEO.plateX + m.R1 * 0.45, cy - 14, { size: 12, color: "#ffd166", align: "center", halo: COLORS.bg });
+        }
+
+        // 落点标记（两落点很近时把 x₂ 标签继续下移，避免文字重叠）
+        const crowded = Math.abs(2 * (m.R2 - m.R1)) < 22;
+        if (s1.u >= Math.PI - 1e-6) {
+          drawLanding(m.R1, "x₁", m.x1cm, COLORS.track, 0);
+        }
+        if (state.showGhost && s2.u >= Math.PI - 1e-6) {
+          drawLanding(m.R2, "x₂", m.x2cm, COLORS.ghost, crowded ? 16 : 0);
+        }
+        ctx.restore();
+      }
+
+      function drawLanding(R, tag, xcm, color, extra) {
+        const y = GEO.entryY + 2 * R;
+        if (y > GEO.b2.y + GEO.b2.h - 2) { return; }
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(GEO.plateX, y);
+        ctx.lineTo(GEO.plateX + 9, y - 6);
+        ctx.lineTo(GEO.plateX + 9, y + 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        let labelY = y + 14 + (extra || 0);
+        if (labelY > GEO.b2.y + GEO.b2.h - 8) {
+          labelY = y - 16 - (extra || 0);
+        }
+        text(tag + " = " + fmtLen(xcm) + " cm", GEO.plateX + 14, labelY, {
+          size: 11,
+          weight: "700",
+          color: color,
+          halo: COLORS.bg,
+          haloWidth: 3
+        });
+      }
+
+      function drawSelector(m) {
+        const z = GEO.sel;
+        roundRectPath(z.x, z.y, z.w, z.h, 10);
+        ctx.save();
+        ctx.fillStyle = COLORS.panel;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+
+        text("① 速度选择器（E ⊥ B₁）", 30, 100, { size: 13, weight: "700", color: "#c7d2e2" });
+        text("B₁ ⊙", 286, 100, { size: 12, align: "right", color: COLORS.field });
+
+        // 入射直线（选速正确的离子）
+        ctx.save();
+        ctx.strokeStyle = COLORS.track;
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(GEO.beamStart, GEO.beamY);
+        ctx.lineTo(GEO.plateX, GEO.beamY);
+        ctx.stroke();
+        ctx.restore();
+
+        // 被挡掉的离子（v 偏小向上、v 偏大向下）
+        if (state.showRejected) {
+          ctx.save();
+          ctx.setLineDash([4, 5]);
+          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = "rgba(251,146,60,0.55)";
+          ctx.beginPath();
+          ctx.moveTo(GEO.beamStart, GEO.beamY);
+          ctx.quadraticCurveTo(140, GEO.beamY, 196, GEO.selTop + 3);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(GEO.beamStart, GEO.beamY);
+          ctx.quadraticCurveTo(140, GEO.beamY, 196, GEO.selBottom - 3);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 极板：上板为负、下板为正，E 竖直向上
+        ctx.save();
+        ctx.strokeStyle = COLORS.plate;
+        ctx.lineWidth = 7;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(GEO.selPlateX0, GEO.selTop);
+        ctx.lineTo(GEO.selPlateX1, GEO.selTop);
+        ctx.moveTo(GEO.selPlateX0, GEO.selBottom);
+        ctx.lineTo(GEO.selPlateX1, GEO.selBottom);
+        ctx.stroke();
+        ctx.restore();
+
+        text("−", 190, 116, { size: 18, weight: "700", align: "center", color: COLORS.negative });
+        text("+", 190, 186, { size: 18, weight: "700", align: "center", color: COLORS.positive });
+
+        [150, 195, 240].forEach(function (x) {
+          arrow(x, GEO.selBottom - 4, x, GEO.selTop + 4, COLORS.forceE, 2.2, 7);
+        });
+        text("E", 262, 140, { size: 13, weight: "700", color: COLORS.forceE });
+
+        dotSymbol(124, 139, 3.4, "rgba(148,163,184,0.55)");
+        dotSymbol(124, 161, 3.4, "rgba(148,163,184,0.55)");
+        dotSymbol(268, 161, 3.4, "rgba(148,163,184,0.55)");
+
+        text("qE = qvB₁  ⇒  v = E / B₁", 30, 208, { size: 13, weight: "700", color: COLORS.forceE });
+        text("偏离直线者被极板挡掉", 30, 228, { size: 11, color: COLORS.muted });
+      }
+
+      function drawSource() {
+        const s = GEO.source;
+        roundRectPath(s.x, s.y, s.w, s.h, 6);
+        ctx.save();
+        ctx.fillStyle = "#131b28";
+        ctx.fill();
+        ctx.strokeStyle = COLORS.plate;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = COLORS.positive;
+        ctx.beginPath();
+        ctx.arc(s.x + 22, s.y + s.h / 2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        text("+", s.x + 22, s.y + s.h / 2 + 1, { size: 12, weight: "700", align: "center", color: "#ffffff" });
+        text("离子源", s.x + s.w / 2, s.y - 13, { size: 12, color: COLORS.muted, align: "center" });
+      }
+
+      // 静止时把离子停在半圆的最低速位置（u = π/2），便于看清 v 与 F洛 的方向
+      function displayTime(R) {
+        if (state.playing) { return state.t; }
+        return SEL_TIME + (Math.PI / 2) * (R / PATH_SPEED);
+      }
+
+      function drawIons(m) {
+        const s2 = ionState(displayTime(m.R2), m.R2);
+        const s1 = ionState(displayTime(m.R1), m.R1);
+
+        if (state.showGhost) {
+          drawIonDot(s2, m.R2, 6, "rgba(134,239,172,0.9)");
+        }
+        drawIonDot(s1, m.R1, 8, COLORS.positive);
+
+        if (state.showVectors) {
+          drawVectors(s1, m.R1);
+        }
+      }
+
+      function drawIonDot(s, R, radius, color) {
+        ctx.save();
+        ctx.shadowColor = "rgba(255,255,255,0.35)";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        text("+", s.x, s.y + 1, { size: radius * 1.5, weight: "700", align: "center", color: "#ffffff" });
+      }
+
+      function drawVectors(s, R) {
+        if (s.phase === "select") {
+          // 电场力向上（画布向上为 -y），洛伦兹力向下，大小相等 => 合力为零
+          arrow(s.x, s.y, s.x, s.y - 26, COLORS.forceE, 2.4, 8);
+          arrow(s.x, s.y, s.x, s.y + 26, COLORS.lorentz, 2.4, 8);
+          text("F电", s.x + 9, s.y - 17, { size: 10, color: COLORS.forceE, halo: COLORS.bg });
+          text("F洛", s.x + 9, s.y + 17, { size: 10, color: COLORS.lorentz, halo: COLORS.bg });
+          return;
+        }
+        const phi = -Math.PI / 2 + s.u;
+        const tx = -Math.sin(phi);
+        const ty = Math.cos(phi);
+        const cx = GEO.plateX - s.x;
+        const cy = GEO.entryY + R - s.y;
+        arrow(s.x, s.y, s.x + tx * 42, s.y + ty * 42, COLORS.vector, 2.6, 9);
+        arrow(s.x, s.y, s.x + (cx / R) * 40, s.y + (cy / R) * 40, COLORS.lorentz, 2.6, 9);
+        text("v", s.x + tx * 54, s.y + ty * 54, { size: 13, weight: "700", align: "center", color: COLORS.vector, halo: COLORS.bg });
+        text("F洛", s.x + (cx / R) * 50, s.y + (cy / R) * 50 + 15, { size: 12, align: "center", color: COLORS.lorentz, halo: COLORS.bg });
+      }
+
+      function drawLegend() {
+        const x = 20;
+        const y = 256;
+        const w = 276;
+        const h = 148;
+        roundRectPath(x, y, w, h, 10);
+        ctx.save();
+        ctx.fillStyle = COLORS.panel;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+
+        text("图例", x + 14, y + 22, { size: 13, weight: "700" });
+
+        const col1 = x + 16;
+        const col2 = x + 150;
+        let row = y + 52;
+
+        ctx.save();
+        ctx.fillStyle = COLORS.positive;
+        ctx.beginPath();
+        ctx.arc(col1 + 5, row, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        text("正离子", col1 + 18, row, { size: 11, color: "#c7d2e2" });
+        arrow(col2, row + 8, col2, row - 8, COLORS.forceE, 2, 6);
+        text("电场 E", col2 + 16, row, { size: 11, color: "#c7d2e2" });
+
+        row += 26;
+        ctx.save();
+        ctx.strokeStyle = COLORS.track;
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(col1, row);
+        ctx.lineTo(col1 + 16, row);
+        ctx.stroke();
+        ctx.restore();
+        text("离子轨迹", col1 + 22, row, { size: 11, color: "#c7d2e2" });
+        arrow(col2, row, col2 + 18, row, COLORS.lorentz, 2, 6);
+        text("洛伦兹力", col2 + 22, row, { size: 11, color: "#c7d2e2" });
+
+        row += 26;
+        ctx.save();
+        ctx.strokeStyle = "rgba(134,239,172,0.9)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        ctx.moveTo(col1, row);
+        ctx.lineTo(col1 + 16, row);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(251,146,60,0.75)";
+        ctx.setLineDash([4, 5]);
+        ctx.beginPath();
+        ctx.moveTo(col2, row);
+        ctx.lineTo(col2 + 16, row);
+        ctx.stroke();
+        ctx.restore();
+        text("对比同位素", col1 + 22, row, { size: 11, color: "#c7d2e2" });
+        text("被挡掉的离子", col2 + 22, row, { size: 11, color: "#c7d2e2" });
+
+        text("同速、同电荷时 r ∝ m / q，落点 x = 2r", x + 16, y + 120, { size: 11, color: COLORS.forceE });
+        text("越大，说明质量越大。", x + 16, y + 136, { size: 11, color: COLORS.forceE });
+      }
+
+      function drawChips(m) {
+        const items = [
+          { label: "速度 v = E / B₁", value: sci(m.v, 2) + " m/s", color: "#ffffff" },
+          { label: "半径 r = mv / (qB₂)", value: fmtLen(m.r1cm) + " cm", color: COLORS.track },
+          { label: "落点 x = 2r", value: fmtLen(m.x1cm) + " cm", color: COLORS.track },
+          { label: "落点间距 Δx", value: fmtLen(m.dx) + " cm", color: COLORS.forceE }
+        ];
+        const x0 = 20;
+        const gap = 10;
+        const w = (canvas.width - 40 - gap * 3) / 4;
+        const h = 64;
+        items.forEach(function (item, i) {
+          const x = x0 + i * (w + gap);
+          roundRectPath(x, 12, w, h, 9);
+          ctx.save();
+          ctx.fillStyle = "rgba(255,255,255,0.06)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.14)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+          text(item.label, x + 12, 32, { size: 11, color: COLORS.muted });
+          text(item.value, x + 12, 54, { size: 19, weight: "700", color: item.color });
+        });
+      }
+
+      function drawSidePanel(m) {
+        const s = GEO.side;
+        roundRectPath(s.x, s.y, s.w, s.h, 10);
+        ctx.save();
+        ctx.fillStyle = COLORS.panel;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+
+        const left = s.x + 14;
+        const right = s.x + s.w - 14;
+        let y = s.y + 24;
+
+        text("离子与读数", left, y, { size: 14, weight: "700" });
+        y += 24;
+
+        text("主离子", left, y, { size: 11, color: COLORS.muted });
+        text(ionLabel(state.A1), right, y, { size: 14, weight: "700", align: "right", color: COLORS.positive });
+        y += 20;
+        text("A = " + state.A1 + "，q = " + (state.z === 2 ? "2e" : "e"), left, y, { size: 11, color: "#c7d2e2" });
+        y += 18;
+        text("m = " + sci(m.m1, 2) + " kg", left, y, { size: 11, color: "#c7d2e2" });
+        y += 22;
+
+        text("对比离子", left, y, { size: 11, color: COLORS.muted });
+        text(ionLabel(state.A2), right, y, { size: 13, weight: "700", align: "right", color: COLORS.ghost });
+        y += 18;
+        text("m = " + sci(m.m2, 2) + " kg", left, y, { size: 11, color: "#c7d2e2" });
+        y += 16;
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(right, y);
+        ctx.stroke();
+        ctx.restore();
+        y += 22;
+
+        function row(label, value, color) {
+          text(label, left, y, { size: 11, color: COLORS.muted });
+          text(value, right, y, { size: 12, weight: "700", align: "right", color: color || COLORS.ink });
+          y += 20;
+        }
+
+        row("半径 r₁ / r₂", fmtLen(m.r1cm) + " / " + fmtLen(m.r2cm) + " cm", COLORS.track);
+        row("落点 x₁ / x₂", fmtLen(m.x1cm) + " / " + fmtLen(m.x2cm) + " cm", COLORS.track);
+        row("间距 Δx", fmtLen(m.dx) + " cm", COLORS.forceE);
+
+        y += 4;
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(right, y);
+        ctx.stroke();
+        ctx.restore();
+        y += 20;
+
+        text("量程 0–" + state.rangeCm + " cm", left, y, { size: 11, color: "#c7d2e2" });
+        y += 18;
+        text("刻度 " + fmtLen(state.rangeCm / 10) + " cm/格", left, y, { size: 11, color: COLORS.muted });
+        y += 22;
+
+        // 提示 / 警告
+        let warnText = "";
+        if (m.xMaxCm > state.rangeCm) {
+          warnText = "落点超出底片量程：可增大 B₂、减小 E，或把量程改为 40 cm。";
+        } else if (m.rMaxPx < 40) {
+          warnText = "半径过小，建议把量程改为 10 cm 便于观察。";
+        } else {
+          warnText = "同速、同电荷时 r ∝ m：落点越远，质量越大。";
+        }
+        const color = warnText.indexOf("超出") >= 0 || warnText.indexOf("过小") >= 0 ? COLORS.warn : COLORS.muted;
+        const lines = wrapLines(warnText, s.w - 28, 11);
+        lines.forEach(function (line) {
+          text(line, left, y, { size: 11, color: color });
+          y += 16;
+        });
+      }
+
+      function drawFooter() {
+        text("简化模型：忽略重力 · 非相对论（v ≪ c） · 忽略边缘场与离子间相互作用 · 底片处为真空", canvas.width / 2, 516, {
+          size: 12,
+          align: "center",
+          color: "rgba(251,146,60,0.78)"
+        });
+      }
+
+      function updateDom(m) {
+        output.eValue.textContent = (state.E / 1e4).toFixed(1) + "×10⁴ V/m";
+        output.b1Value.textContent = state.B1.toFixed(2) + " T";
+        output.b2Value.textContent = state.B2.toFixed(2) + " T";
+        output.massValue.textContent = "A = " + state.A1;
+        output.rangeValue.textContent = "0–" + state.rangeCm + " cm";
+        output.mSpeed.textContent = sci(m.v, 2) + " m/s";
+        output.mRadius.textContent = fmtLen(m.r1cm) + " cm";
+        output.mLanding.textContent = fmtLen(m.x1cm) + " cm";
+        output.mDelta.textContent = fmtLen(m.dx) + " cm";
+      }
+
+      function render() {
+        const m = metrics();
+        drawBackground();
+        drawB2Zone();
+        drawTrajectories(m);
+        drawPlate(m);
+        drawSelector(m);
+        drawSource();
+        drawLegend();
+        drawIons(m);
+        drawChips(m);
+        drawSidePanel(m);
+        drawFooter();
+        updateDom(m);
+      }
+
+      // ---------------- 交互 ----------------
+      function syncIsoButtons() {
+        controls.isoButtons.forEach(function (btn) {
+          const preset = ISOTOPES[btn.dataset.iso];
+          const active = preset && preset.A1 === state.A1 && preset.dA === state.dA;
+          btn.classList.toggle("active", Boolean(active));
+        });
+      }
+
+      function setPlaying(value) {
+        state.playing = value;
+        controls.playBtn.textContent = value ? "暂停" : "播放";
+      }
+
+      function restartPlayback() {
+        state.t = 0;
+        setPlaying(true);
+        render();
+      }
+
+      controls.eSlider.addEventListener("input", function () {
+        state.E = Number(controls.eSlider.value) * 1e4;
+        render();
+      });
+
+      controls.b1Slider.addEventListener("input", function () {
+        state.B1 = Number(controls.b1Slider.value);
+        render();
+      });
+
+      controls.b2Slider.addEventListener("input", function () {
+        state.B2 = Number(controls.b2Slider.value);
+        render();
+      });
+
+      controls.massSlider.addEventListener("input", function () {
+        state.A1 = Number(controls.massSlider.value);
+        state.A2 = clamp(state.A1 + state.dA, 1, 40);
+        syncIsoButtons();
+        render();
+      });
+
+      controls.rangeSelect.addEventListener("change", function () {
+        state.rangeCm = Number(controls.rangeSelect.value);
+        render();
+      });
+
+      controls.showVectors.addEventListener("change", function () {
+        state.showVectors = controls.showVectors.checked;
+        render();
+      });
+
+      controls.showGhost.addEventListener("change", function () {
+        state.showGhost = controls.showGhost.checked;
+        render();
+      });
+
+      controls.showRejected.addEventListener("change", function () {
+        state.showRejected = controls.showRejected.checked;
+        render();
+      });
+
+      controls.isoButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          const preset = ISOTOPES[btn.dataset.iso];
+          if (!preset) { return; }
+          state.A1 = preset.A1;
+          state.dA = preset.dA;
+          state.A2 = preset.A1 + preset.dA;
+          controls.massSlider.value = String(state.A1);
+          syncIsoButtons();
+          render();
+        });
+      });
+
+      controls.chargeButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          state.z = Number(btn.dataset.z);
+          controls.chargeButtons.forEach(function (other) {
+            other.classList.toggle("active", other === btn);
+          });
+          render();
+        });
+      });
+
+      controls.playBtn.addEventListener("click", function () {
+        if (state.playing) {
+          setPlaying(false);
+          render();
+          return;
+        }
+        restartPlayback();
+      });
+
+      controls.resetBtn.addEventListener("click", function () {
+        state.E = DEFAULTS.E;
+        state.B1 = DEFAULTS.B1;
+        state.B2 = DEFAULTS.B2;
+        state.A1 = DEFAULTS.A1;
+        state.dA = DEFAULTS.dA;
+        state.A2 = DEFAULTS.A1 + DEFAULTS.dA;
+        state.z = DEFAULTS.z;
+        state.rangeCm = DEFAULTS.rangeCm;
+        state.showVectors = true;
+        state.showGhost = true;
+        state.showRejected = true;
+
+        controls.eSlider.value = String(DEFAULTS.E / 1e4);
+        controls.b1Slider.value = String(DEFAULTS.B1);
+        controls.b2Slider.value = String(DEFAULTS.B2);
+        controls.massSlider.value = String(DEFAULTS.A1);
+        controls.rangeSelect.value = String(DEFAULTS.rangeCm);
+        controls.showVectors.checked = true;
+        controls.showGhost.checked = true;
+        controls.showRejected.checked = true;
+        controls.chargeButtons.forEach(function (btn) {
+          btn.classList.toggle("active", Number(btn.dataset.z) === DEFAULTS.z);
+        });
+
+        syncIsoButtons();
+        state.t = Number.POSITIVE_INFINITY;
+        setPlaying(false);
+        render();
+      });
+
+      let lastTs = 0;
+      function loop(ts) {
+        const dt = lastTs ? (ts - lastTs) / 1000 : 0;
+        lastTs = ts;
+        if (state.playing) {
+          const m = metrics();
+          const total = totalTime(m);
+          state.t += dt;
+          if (state.t >= total) {
+            state.t = total;
+            setPlaying(false);
+          }
+          render();
+        }
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener("resize", render);
+
+      state.A2 = state.A1 + state.dA;
+      syncIsoButtons();
+      render();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

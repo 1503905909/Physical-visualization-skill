@@ -135,5 +135,10 @@ description: 生成面向高中物理课堂的 Manim 教学动画，尤其适用
 - `examples/electric_potential_equipotential.py`：电势与等势面课堂动画，强调电势、等势线、电场方向、二者垂直关系，并包含三维等势面和电势高度图场景。
 - `examples/charged_particle_uniform_field.py`：带电粒子在匀强电场中偏转的课堂动画，包含受力方向、运动分解、抛物线轨迹和参数比较。
 - `examples/cyclotron.py`：回旋加速器课堂动画，包含 D 形盒结构、磁场偏转、缝隙加速、半径增大和周期关系。
+- `examples/capacitor.py`：电容器课堂动画，包含充电过程、C = ε0εrS/d 中 S、d、εr 的影响，"U 不变"与"Q 不变"两种情形的对比。
+- `examples/magnetic_flux.py`：磁场与磁通量课堂动画，包含磁通量概念、线圈转动与进出磁场、感应电流产生条件的归纳。
+- `examples/lorentz_force.py`：安培力与洛伦兹力课堂动画，包含受力方向判断、匀速圆周运动、r = mv/(qB) 与 T = 2πm/(qB) 的关系。
+- `examples/mass_spectrometer.py`：质谱仪课堂动画，包含装置结构、速度选择器原理、半圆偏转与质量测定。
+- `examples/faraday_lenz.py`：法拉第电磁感应定律与楞次定律课堂动画，包含磁铁插入拔出线圈、ε = n·ΔΦ/Δt，以及磁通量增大与减小时感应电流方向相反。
 - `examples/template_formula.py`：公式推导、矢量演示和曲线追踪的可复用模板。
 - `examples/test_chinese.py`：中文文字渲染测试示例。

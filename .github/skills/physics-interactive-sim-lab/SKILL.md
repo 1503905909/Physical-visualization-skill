@@ -158,5 +158,10 @@ rcParams["axes.unicode_minus"] = False
 - `examples/electric_potential_equipotential_html.html`：电势与等势面网页资源，包含电势颜色图、等势线、电场方向箭头和可拖拽电势探针。
 - `examples/charged_particle_uniform_field_html.html`：带电粒子在匀强电场中偏转的网页资源，包含平行板电场、轨迹、矢量、播放和参数控制。
 - `examples/cyclotron_html.html`：回旋加速器网页资源，包含 D 形盒、磁场符号、缝隙加速、螺旋轨迹以及 B、U、粒子类型调节。
+- `examples/capacitor_html.html`：平行板电容器网页资源，包含 S、d、εr、U 调节，"接通电源 U 不变/断开电源 Q 不变"两种情形对比，以及 C、Q、E、W 实时读数。
+- `examples/magnetic_flux_html.html`：磁场与磁通量网页资源，包含线圈平移、转动、静止三种场景切换，Φ = BS·cosθ 实时数值与感应电流判定。
+- `examples/lorentz_force_html.html`：洛伦兹力网页资源，包含 B、v、q、m 调节，正负电荷与磁场方向切换，圆形轨迹、圆心半径和 r、T、F 实时读数。
+- `examples/mass_spectrometer_html.html`：质谱仪网页资源，包含速度选择器、偏转磁场、同位素落点对比，以及 v、r、x 实时读数。
+- `examples/alternating_current_transformer_html.html`：交变电流与变压器网页资源，包含线圈转动、e-t 正弦波形、峰值与有效值换算，理想变压器的电压比与电流比。
 - `examples/coulombs_law_sim.py`：库仑定律 Streamlit 数据探究版本。
 - `examples/template_streamlit.py`：物理滑块、指标、图像和可选数据导出的 Streamlit 基础模板。

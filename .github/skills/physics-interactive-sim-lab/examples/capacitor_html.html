@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>平行板电容器交互仿真</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --warning: #b45309;
+      --force: #ffd166;
+      --path: #22c55e;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 16px 0 26px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13.5px;
+    }
+
+    .formula {
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 16px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-panel,
+    .readout-panel,
+    .side-panel,
+    .conclusion-panel,
+    .inquiry-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stage-panel {
+      padding: 10px;
+    }
+
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 320px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+
+    #capCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .stage-readout {
+      position: absolute;
+      left: 12px;
+      top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      pointer-events: none;
+    }
+
+    .readout-item {
+      padding: 5px 9px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+
+    .stage-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #344054;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .legend-item.assumption {
+      border-color: #f0b429;
+      background: #fffbeb;
+      color: #92400e;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      flex: none;
+    }
+
+    .dot-red {
+      background: var(--positive);
+    }
+
+    .dot-blue {
+      background: var(--negative);
+    }
+
+    .dot-green {
+      background: var(--path);
+    }
+
+    .arrow-glyph {
+      color: #b45309;
+      font-weight: 900;
+    }
+
+    .readout-panel {
+      margin-top: 12px;
+      padding: 10px;
+    }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tile {
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .tile-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .tile-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .tile-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #475569;
+      white-space: nowrap;
+    }
+
+    .tile-badge.same {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .tile-badge.na {
+      background: #f1f5f9;
+      color: #94a3b8;
+    }
+
+    .tile-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-top: 1px;
+    }
+
+    .tile-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .tile-unit {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .unit-note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .side-panel {
+      padding: 13px;
+    }
+
+    .side-panel h2,
+    .conclusion-panel h2,
+    .inquiry-panel h2 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 9px;
+    }
+
+    .mode-btn {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 10px;
+      min-height: 54px;
+      text-align: left;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .mode-btn .mode-title {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .mode-btn .mode-sub {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .mode-btn:hover {
+      background: #f1f5f9;
+    }
+
+    .mode-btn.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .mode-btn.active .mode-sub {
+      color: rgba(255, 255, 255, 0.88);
+    }
+
+    .mode-btn.active:hover {
+      background: #0d665f;
+    }
+
+    .mode-hint {
+      margin: 0 0 4px;
+      padding: 8px 10px;
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      background: #f0fdfa;
+      color: #134e4a;
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    .mode-hint.warn {
+      border-left-color: var(--warning);
+      background: #fffbeb;
+      color: #92400e;
+    }
+
+    .slider-field {
+      margin-top: 9px;
+    }
+
+    .slider-field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 5px;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .slider-field label span:last-child {
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input[type="range"]:disabled {
+      opacity: 0.45;
+    }
+
+    .toggles {
+      display: grid;
+      gap: 7px;
+      margin-top: 11px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--line);
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      user-select: none;
+    }
+
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    button {
+      min-height: 34px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .primary-btn {
+      border-color: #0f766e;
+      background: #0f766e;
+      color: #ffffff;
+    }
+
+    .primary-btn:hover {
+      background: #0d665f;
+    }
+
+    .reset-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 11px;
+    }
+
+    .reset-row button {
+      flex: 1;
+    }
+
+    .footnote {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .conclusion-panel {
+      margin-top: 12px;
+      padding: 13px;
+    }
+
+    .conclusion-head {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      margin-bottom: 8px;
+    }
+
+    .conclusion-head h2 {
+      margin: 0;
+    }
+
+    .mode-tag {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .mode-tag.warn {
+      color: var(--warning);
+    }
+
+    .conclusion-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .conclusion-card {
+      padding: 11px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      background: #f0fdfa;
+    }
+
+    .conclusion-card.warn {
+      border-color: var(--warning);
+      background: #fffbeb;
+    }
+
+    .conclusion-body {
+      margin: 0 0 7px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #1f2937;
+    }
+
+    .conclusion-key {
+      font-size: 13px;
+      line-height: 1.6;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .conclusion-side {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .conclusion-formula {
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px dashed #a7b6c8;
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .conclusion-note {
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #475569;
+    }
+
+    .inquiry-panel {
+      margin-top: 12px;
+      padding: 13px;
+    }
+
+    .inquiry-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inquiry-list li {
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+      color: #344054;
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1180px) {
+      .tile-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .inquiry-list,
+      .mode-switch,
+      .conclusion-grid,
+      .tile-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .formula {
+        white-space: normal;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>平行板电容器：改变板间距会发生什么？</h1>
+        <p class="subtitle">同一个 d 的变化，在「接通电源」和「断开电源」两种情形下，U、Q、E、W 的结论完全不同。</p>
+      </div>
+      <div class="formula">C = ε₀εᵣS / d　·　Q = CU　·　E = U / d　·　W = ½CU²</div>
+    </header>
+
+    <section class="layout">
+      <div class="main-col">
+        <section class="stage-panel" aria-label="平行板电容器演示区">
+          <div class="stage-wrap">
+            <canvas id="capCanvas" width="1600" height="900"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">情形：<span id="stageMode">接通电源（U 不变）</span></div>
+              <div class="readout-item">场线：<span id="stageLines">0 条</span></div>
+              <div class="readout-item">电荷：<span id="stageState">由电源补充</span></div>
+            </div>
+          </div>
+          <div class="stage-legend">
+            <span class="legend-item"><b class="dot dot-red"></b>正电荷</span>
+            <span class="legend-item"><b class="dot dot-blue"></b>负电荷</span>
+            <span class="legend-item"><b class="arrow-glyph">→</b>白箭头：板间场强 E，方向由正极板指向负极板</span>
+            <span class="legend-item"><b class="dot dot-green"></b>绿色：板间距 d</span>
+            <span class="legend-item assumption">模型假设：理想平行板，边缘效应忽略</span>
+            <span class="legend-item assumption" id="breakdownChip" hidden>E 已超过 1 MV/m：实际装置需考虑空气击穿（约 3×10⁶ V/m）</span>
+          </div>
+        </section>
+
+        <section class="readout-panel" aria-label="实时读数">
+          <div class="tile-grid">
+            <div class="tile" id="tileC">
+              <div class="tile-top"><span class="tile-label">电容 C</span><span class="tile-badge na">—</span></div>
+              <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
+            </div>
+            <div class="tile" id="tileQ">
+              <div class="tile-top"><span class="tile-label">电荷量 Q</span><span class="tile-badge na">—</span></div>
+              <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
+            </div>
+            <div class="tile" id="tileU">
+              <div class="tile-top"><span class="tile-label">电压 U</span><span class="tile-badge na">—</span></div>
+              <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
+            </div>
+            <div class="tile" id="tileE">
+              <div class="tile-top"><span class="tile-label">场强 E</span><span class="tile-badge na">—</span></div>
+              <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
+            </div>
+            <div class="tile" id="tileW">
+              <div class="tile-top"><span class="tile-label">电场能 W</span><span class="tile-badge na">—</span></div>
+              <div class="tile-value-row"><span class="tile-value">—</span><span class="tile-unit"></span></div>
+            </div>
+          </div>
+          <p class="unit-note" id="unitNote">—</p>
+        </section>
+
+        <section class="conclusion-panel" aria-label="结论">
+          <div class="conclusion-head">
+            <h2>实时结论</h2>
+            <span class="mode-tag" id="modeTag">U 不变</span>
+          </div>
+          <div class="conclusion-grid">
+            <div class="conclusion-card" id="conclusionCard">
+              <p class="conclusion-body" id="conclusionBody">—</p>
+              <div class="conclusion-key" id="conclusionKey">—</div>
+            </div>
+            <div class="conclusion-side">
+              <div class="conclusion-formula" id="conclusionFormula">—</div>
+              <div class="conclusion-note" id="conclusionExtra">—</div>
+              <div class="conclusion-note" id="deltaHint">—</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li>保持「接通电源」，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
+            <li>先接通电源充好电，再切到「断开电源」，只改变 d：E 的读数和场线疏密为什么几乎不变？此时 U 与 d 成什么关系？</li>
+            <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、W 也变小？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="开关与参数">
+        <h2>开关与参数</h2>
+        <div class="mode-switch" role="group" aria-label="电源开关">
+          <button type="button" class="mode-btn active" data-mode="uconst" aria-pressed="true">
+            <span class="mode-title">接通电源</span>
+            <span class="mode-sub">U 不变（Q 随 C 变）</span>
+          </button>
+          <button type="button" class="mode-btn" data-mode="qconst" aria-pressed="false">
+            <span class="mode-title">断开电源</span>
+            <span class="mode-sub">Q 不变（U 随 C 变）</span>
+          </button>
+        </div>
+        <p class="mode-hint" id="modeHint">接通电源：极板两端电压由电源决定，始终等于 U。</p>
+
+        <div class="slider-field">
+          <label for="areaSlider"><span>极板面积 S</span><span id="areaValue">300 cm²</span></label>
+          <input id="areaSlider" type="range" min="100" max="1000" value="300" step="10" />
+        </div>
+        <div class="slider-field">
+          <label for="gapSlider"><span>极板间距 d</span><span id="gapValue">3.0 mm</span></label>
+          <input id="gapSlider" type="range" min="0.5" max="10" value="3" step="0.1" />
+        </div>
+        <div class="slider-field">
+          <label for="erSlider"><span>相对介电常数 εᵣ</span><span id="erValue">1.0</span></label>
+          <input id="erSlider" type="range" min="1" max="5" value="1" step="0.1" />
+        </div>
+        <div class="slider-field">
+          <label for="voltSlider"><span>电压 U</span><span id="voltValue">300 V</span></label>
+          <input id="voltSlider" type="range" min="0" max="1000" value="300" step="10" />
+          <p class="footnote" id="voltHint">接通电源时 U 由电源提供。</p>
+        </div>
+
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示板间场线</span></label>
+          <label class="toggle"><input type="checkbox" id="showCharge" checked /><span>显示极板电荷</span></label>
+          <label class="toggle"><input type="checkbox" id="showFlow" checked /><span>箭头流动（标方向）</span></label>
+        </div>
+        <div class="reset-row">
+          <button type="button" class="primary-btn" id="resetBtn">重置</button>
+        </div>
+        <p class="footnote">模型：理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场；极板高度按 S 比例示意。</p>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("capCanvas");
+    const ctx = canvas.getContext("2d");
+    const CW = canvas.width;
+    const CH = canvas.height;
+
+    const EPS0 = 8.8541878128e-12;
+    const FONT_CN = "'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', Arial, sans-serif";
+
+    const DEFAULTS = { S: 300, d: 3.0, er: 1.0, U: 300, refD: 3.0 };
+
+    const state = {
+      S: DEFAULTS.S,
+      d: DEFAULTS.d,
+      er: DEFAULTS.er,
+      U: DEFAULTS.U,
+      mode: "uconst",
+      Qfrozen: 0,
+      refD: DEFAULTS.refD,
+      time: 0,
+      showField: true,
+      showCharge: true,
+      showFlow: true
+    };
+
+    const el = {
+      s: document.getElementById("areaSlider"),
+      d: document.getElementById("gapSlider"),
+      er: document.getElementById("erSlider"),
+      u: document.getElementById("voltSlider"),
+      sOut: document.getElementById("areaValue"),
+      dOut: document.getElementById("gapValue"),
+      erOut: document.getElementById("erValue"),
+      uOut: document.getElementById("voltValue"),
+      voltHint: document.getElementById("voltHint"),
+      modeButtons: Array.from(document.querySelectorAll(".mode-btn")),
+      modeHint: document.getElementById("modeHint"),
+      modeTag: document.getElementById("modeTag"),
+      showField: document.getElementById("showField"),
+      showCharge: document.getElementById("showCharge"),
+      showFlow: document.getElementById("showFlow"),
+      resetBtn: document.getElementById("resetBtn"),
+      stageMode: document.getElementById("stageMode"),
+      stageLines: document.getElementById("stageLines"),
+      stageState: document.getElementById("stageState"),
+      conclusionCard: document.getElementById("conclusionCard"),
+      conclusionBody: document.getElementById("conclusionBody"),
+      conclusionFormula: document.getElementById("conclusionFormula"),
+      conclusionKey: document.getElementById("conclusionKey"),
+      conclusionExtra: document.getElementById("conclusionExtra"),
+      unitNote: document.getElementById("unitNote"),
+      deltaHint: document.getElementById("deltaHint"),
+      breakdownChip: document.getElementById("breakdownChip"),
+      tiles: {
+        C: document.getElementById("tileC"),
+        Q: document.getElementById("tileQ"),
+        U: document.getElementById("tileU"),
+        E: document.getElementById("tileE"),
+        W: document.getElementById("tileW")
+      }
+    };
+
+    const MODE_TEXT = {
+      uconst: {
+        name: "接通电源（U 不变）",
+        hint: "接通电源：极板两端电压由电源决定，始终等于 U。调节 d 时电源会自动补充或取回电荷，所以 Q 会变，U 不变。",
+        tag: "U 不变",
+        body: "d 减小 → C 增大、Q 增大、E 增大、W 增大；d 增大则 C、Q、E、W 全部减小。整个过程中 U 保持不变。",
+        formula: "C = ε₀εᵣS/d　　Q = CU　　E = U/d　　W = ½CU²",
+        key: "关键：E = U/d。电压被电源固定后，板间场强只由板间距 d 决定 —— d 越小，电场越强。",
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，Q 增大，W 增大；而 E = U/d 保持不变。"
+      },
+      qconst: {
+        name: "断开电源（Q 不变）",
+        hint: "已断开电源：极板上的电荷无处流走，Q 保持不变，电压由 U = Q/C 决定。此时电压滑块失效。",
+        tag: "Q 不变",
+        body: "d 减小 → C 增大、U 减小、W 减小；d 增大则 C 减小、U 增大、W 增大。整个过程中 E 保持不变。",
+        formula: "C = ε₀εᵣS/d　　U = Q/C = Qd/(ε₀εᵣS)　　E = U/d = Q/(ε₀εᵣS)　　W = ½Q²/C",
+        key: "关键：E = Q/(ε₀εᵣS)，式中没有 d。断开电源后「锁住」的电荷量使板间场强不随 d 改变。",
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，U 减小，E 减小，W 减小。"
+      }
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function roundRect(x, y, w, h, r) {
+      const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.lineTo(x + w - rr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+      ctx.lineTo(x + w, y + h - rr);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+      ctx.lineTo(x + rr, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+      ctx.lineTo(x, y + rr);
+      ctx.quadraticCurveTo(x, y, x + rr, y);
+      ctx.closePath();
+    }
+
+    function setFont(size, weight) {
+      ctx.font = (weight || "bold") + " " + size + "px " + FONT_CN;
+    }
+
+    const SUP = {
+      "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³",
+      "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
+    };
+
+    function sci(x) {
+      if (!(Math.abs(x) > 0)) return "0";
+      const exp = Math.floor(Math.log10(Math.abs(x)));
+      const mant = x / Math.pow(10, exp);
+      const sup = String(exp).split("").map(function (c) { return SUP[c] || c; }).join("");
+      return mant.toFixed(2) + "×10" + sup;
+    }
+
+    function sig3(v) {
+      if (!isFinite(v) || v === 0) return "0";
+      const a = Math.abs(v);
+      const digits = 2 - Math.floor(Math.log10(a));
+      return v.toFixed(clamp(digits, 0, 6));
+    }
+
+    function fmtCap(C) {
+      if (!(C > 0)) return ["0", "F"];
+      if (C >= 1e-6) return [sig3(C / 1e-6), "μF"];
+      if (C >= 1e-9) return [sig3(C / 1e-9), "nF"];
+      if (C >= 1e-12) return [sig3(C / 1e-12), "pF"];
+      return [sig3(C / 1e-15), "fF"];
+    }
+
+    function fmtCharge(Q) {
+      if (!(Q > 0)) return ["0", "C"];
+      if (Q >= 1e-3) return [sig3(Q / 1e-3), "mC"];
+      if (Q >= 1e-6) return [sig3(Q / 1e-6), "μC"];
+      if (Q >= 1e-9) return [sig3(Q / 1e-9), "nC"];
+      return [sig3(Q / 1e-12), "pC"];
+    }
+
+    function fmtVolt(U) {
+      if (!(U > 0)) return ["0", "V"];
+      if (U >= 1e4) return [sig3(U / 1e3), "kV"];
+      return [sig3(U), "V"];
+    }
+
+    function fmtField(E) {
+      if (!(E > 0)) return ["0", "V/m"];
+      if (E >= 1e6) return [sig3(E / 1e6), "MV/m"];
+      if (E >= 1e3) return [sig3(E / 1e3), "kV/m"];
+      return [sig3(E), "V/m"];
+    }
+
+    function fmtEnergy(Wv) {
+      if (!(Wv > 0)) return ["0", "J"];
+      if (Wv >= 1e-3) return [sig3(Wv / 1e-3), "mJ"];
+      if (Wv >= 1e-6) return [sig3(Wv / 1e-6), "μJ"];
+      if (Wv >= 1e-9) return [sig3(Wv / 1e-9), "nJ"];
+      return [sig3(Wv / 1e-12), "pJ"];
+    }
+
+    function computeAt(dMm) {
+      const S = state.S * 1e-4;
+      const dM = Math.max(dMm, 0.01) * 1e-3;
+      const C = EPS0 * state.er * S / dM;
+      if (state.mode === "uconst") {
+        const U = state.U;
+        return { C: C, Q: C * U, U: U, E: U / dM, W: 0.5 * C * U * U };
+      }
+      const Q = state.Qfrozen;
+      const U = Q / C;
+      return { C: C, Q: Q, U: U, E: U / dM, W: 0.5 * Q * Q / C };
+    }
+
+    function deltaBadge(cur, ref) {
+      if (Math.abs(state.d - state.refD) < 1e-9) return { text: "—", cls: "na" };
+      if (!(Math.abs(ref) > 1e-20)) return { text: "—", cls: "na" };
+      const pct = (cur - ref) / ref;
+      if (Math.abs(pct) < 0.001) return { text: "不变", cls: "same" };
+      const p = Math.round(Math.abs(pct) * 100);
+      return { text: (cur > ref ? "↑ " : "↓ ") + p + "%", cls: cur > ref ? "up" : "down" };
+    }
+
+    function stageGeom() {
+      const cx = 800;
+      const cy = 470;
+      const plateH = 180 + 200 * (state.S - 100) / 900;
+      const gap = 90 + 330 * (state.d - 0.5) / 9.5;
+      return {
+        cx: cx,
+        cy: cy,
+        plateH: plateH,
+        gap: gap,
+        leftInner: cx - gap / 2,
+        rightInner: cx + gap / 2,
+        top: cy - plateH / 2,
+        bottom: cy + plateH / 2,
+        thickness: 16
+      };
+    }
+
+    function fieldLineCount(E) {
+      if (!(E > 1)) return 0;
+      const g = stageGeom();
+      const span = g.plateH * 0.72;
+      let n = Math.round(2 + 3.6 * Math.log10(E / 1e4));
+      n = clamp(n, 2, 16);
+      n = Math.min(n, Math.max(2, Math.floor(span / 16)));
+      return n;
+    }
+
+    function chargeCount(Q) {
+      if (!(Q > 1e-15)) return 0;
+      const n = Math.round(3 + 3 * Math.log10(Q / 1e-9));
+      return clamp(n, 2, 14);
+    }
+
+    function arrowHead(x, y, size, color, dir) {
+      const s = dir === -1 ? -1 : 1;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(s, 1);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(size, 0);
+      ctx.lineTo(-size * 0.62, size * 0.58);
+      ctx.lineTo(-size * 0.62, -size * 0.58);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function chip(text, x, y, color, align) {
+      ctx.save();
+      setFont(19, "bold");
+      const w = ctx.measureText(text).width;
+      let left = x - w / 2;
+      if (align === "right") left = x - w;
+      if (align === "left") left = x;
+      ctx.fillStyle = "rgba(8,10,14,0.74)";
+      roundRect(left - 9, y - 16, w + 18, 32, 8);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, left, y + 1);
+      ctx.restore();
+    }
+
+    function drawBackground(g) {
+      const grad = ctx.createLinearGradient(0, 0, 0, CH);
+      grad.addColorStop(0, "#0a0d13");
+      grad.addColorStop(1, "#05070a");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CW, CH);
+
+      const glow = ctx.createRadialGradient(g.cx, g.cy, 60, g.cx, g.cy, 560);
+      glow.addColorStop(0, "rgba(120, 160, 220, 0.10)");
+      glow.addColorStop(1, "rgba(120, 160, 220, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, CW, CH);
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.045)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= CW; x += 100) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, CH);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= CH; y += 100) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(CW, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawCircuit(g) {
+      const yTop = 190;
+      const lx = g.leftInner - 8;
+      const rx = g.rightInner + 8;
+      const barL = g.cx - 14;
+      const barR = g.cx + 14;
+      const wire = "#94a3b8";
+
+      ctx.save();
+      ctx.strokeStyle = wire;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(lx, g.top);
+      ctx.lineTo(lx, yTop);
+      ctx.moveTo(rx, g.top);
+      ctx.lineTo(rx, yTop);
+      ctx.stroke();
+
+      if (state.mode === "uconst") {
+        ctx.beginPath();
+        ctx.moveTo(lx, yTop);
+        ctx.lineTo(barL, yTop);
+        ctx.moveTo(barR, yTop);
+        ctx.lineTo(rx, yTop);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#e73535";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(barL, yTop - 26);
+        ctx.lineTo(barL, yTop + 26);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#3558ff";
+        ctx.beginPath();
+        ctx.moveTo(barR, yTop - 13);
+        ctx.lineTo(barR, yTop + 13);
+        ctx.stroke();
+
+        setFont(17, "bold");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ff8f8f";
+        ctx.fillText("+", barL - 18, yTop);
+        ctx.fillStyle = "#8fa8ff";
+        ctx.fillText("−", barR + 18, yTop);
+
+        const u = fmtVolt(state.U);
+        chip("U = " + u[0] + " " + u[1] + "　电源接通", g.cx, yTop - 62, "#e2e8f0", "center");
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(lx, yTop);
+        ctx.lineTo(g.cx - 70, yTop);
+        ctx.moveTo(g.cx + 70, yTop);
+        ctx.lineTo(rx, yTop);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(g.cx - 70, yTop, 6, 0, Math.PI * 2);
+        ctx.arc(g.cx + 70, yTop, 6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.save();
+        ctx.setLineDash([9, 8]);
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(g.cx - 58, yTop);
+        ctx.lineTo(g.cx - 14, yTop);
+        ctx.moveTo(g.cx + 14, yTop);
+        ctx.lineTo(g.cx + 58, yTop);
+        ctx.stroke();
+        ctx.restore();
+
+        chip("已断开电源：Q 保持不变", g.cx, yTop - 62, "#fbbf24", "center");
+      }
+      ctx.restore();
+    }
+
+    function drawMedium(g) {
+      if (state.er <= 1.02) return;
+      const alpha = clamp(0.05 + 0.07 * (state.er - 1), 0.05, 0.32);
+      ctx.save();
+      ctx.fillStyle = "rgba(56, 189, 248, " + alpha.toFixed(3) + ")";
+      ctx.fillRect(g.leftInner, g.top, g.gap, g.plateH);
+      ctx.strokeStyle = "rgba(125, 211, 252, 0.45)";
+      ctx.setLineDash([7, 7]);
+      ctx.lineWidth = 1.6;
+      ctx.strokeRect(g.leftInner + 1, g.top + 1, g.gap - 2, g.plateH - 2);
+      ctx.restore();
+    }
+
+    function drawPlates(g) {
+      const t = g.thickness;
+
+      ctx.save();
+      ctx.shadowColor = "rgba(231, 53, 53, 0.55)";
+      ctx.shadowBlur = 26;
+      ctx.fillStyle = "rgba(231, 53, 53, 0.22)";
+      roundRect(g.leftInner - t, g.top, t, g.plateH, 7);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = "#e73535";
+      ctx.lineWidth = 2.6;
+      roundRect(g.leftInner - t, g.top, t, g.plateH, 7);
+      ctx.stroke();
+      ctx.strokeStyle = "#ff6b6b";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(g.leftInner - 3, g.top + 8);
+      ctx.lineTo(g.leftInner - 3, g.bottom - 8);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.shadowColor = "rgba(53, 88, 255, 0.55)";
+      ctx.shadowBlur = 26;
+      ctx.fillStyle = "rgba(53, 88, 255, 0.22)";
+      roundRect(g.rightInner, g.top, t, g.plateH, 7);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = "#3558ff";
+      ctx.lineWidth = 2.6;
+      roundRect(g.rightInner, g.top, t, g.plateH, 7);
+      ctx.stroke();
+      ctx.strokeStyle = "#8fa8ff";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(g.rightInner + 3, g.top + 8);
+      ctx.lineTo(g.rightInner + 3, g.bottom - 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawFieldLines(g, m) {
+      const n = fieldLineCount(m.E);
+      if (n <= 0) {
+        chip("E = 0：板间无电场", g.cx, g.cy - 34, "#cbd5e1", "center");
+        return;
+      }
+      const x0 = g.leftInner + 5;
+      const x1 = g.rightInner - 5;
+      const span = g.plateH * 0.80;
+      const flow = state.showFlow ? (state.time * 0.00035) % 1 : 0;
+      const headScale = clamp((x1 - x0) / 150, 0.55, 1);
+
+      for (let i = 0; i < n; i += 1) {
+        const y = g.cy - span / 2 + span * (i + 0.5) / n;
+        ctx.save();
+        ctx.strokeStyle = "rgba(248, 250, 252, 0.78)";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x1, y);
+        ctx.stroke();
+        ctx.restore();
+
+        arrowHead(x0 + (x1 - x0) * 0.55, y, 10 * headScale, "#f8fafc");
+        arrowHead(x1 - 8, y, 10 * headScale, "#f8fafc");
+
+        if (state.showFlow) {
+          const tt = (flow + i * 0.07) % 1;
+          const fx = x0 + 10 + (x1 - x0 - 20) * tt;
+          arrowHead(fx, y, 12 * headScale, "#ffd166");
+        }
+      }
+    }
+
+    function drawSign(x, y, mark, color) {
+      ctx.save();
+      setFont(24, "bold");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = color;
+      ctx.fillText(mark, x, y);
+      ctx.restore();
+    }
+
+    function drawCharges(g, m) {
+      const n = chargeCount(m.Q);
+      if (n <= 0) {
+        chip("极板未带电：先接通电源充电", g.cx, g.cy + 34, "#fbbf24", "center");
+        return;
+      }
+      const span = g.plateH * 0.72;
+      for (let i = 0; i < n; i += 1) {
+        const y = g.cy - span / 2 + span * (i + 0.5) / n;
+        drawSign(g.leftInner - 9, y, "+", "#ff8080");
+        drawSign(g.rightInner + 9, y, "−", "#8fa8ff");
+      }
+    }
+
+    function drawAnnotations(g, m) {
+      const q = fmtCharge(m.Q);
+
+      chip("正极板　+" + q[0] + " " + q[1], g.leftInner - 34, g.bottom + 38, "#ff9a9a", "right");
+      chip("负极板　−" + q[0] + " " + q[1], g.rightInner + 34, g.bottom + 38, "#a5b8ff", "left");
+
+      chip("S = " + state.S + " cm²　εᵣ = " + state.er.toFixed(1), g.leftInner - 34, g.cy - 18, "#cbd5e1", "right");
+      chip("板高按 S 示意", g.leftInner - 34, g.cy + 18, "#94a3b8", "right");
+
+      const yDim = g.bottom + 104;
+      ctx.save();
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(g.leftInner, yDim - 14);
+      ctx.lineTo(g.leftInner, yDim + 14);
+      ctx.moveTo(g.rightInner, yDim - 14);
+      ctx.lineTo(g.rightInner, yDim + 14);
+      ctx.moveTo(g.leftInner + 14, yDim);
+      ctx.lineTo(g.rightInner - 14, yDim);
+      ctx.stroke();
+      ctx.restore();
+
+      arrowHead(g.leftInner + 14, yDim, 9, "#22c55e", -1);
+      arrowHead(g.rightInner - 14, yDim, 9, "#22c55e", 1);
+
+      chip("d = " + state.d.toFixed(1) + " mm", g.cx, yDim - 34, "#86efac", "center");
+    }
+
+    function drawStage(m) {
+      const g = stageGeom();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, CW, CH);
+      drawBackground(g);
+      drawCircuit(g);
+      drawMedium(g);
+      drawPlates(g);
+      if (state.showField) {
+        drawFieldLines(g, m);
+      }
+      if (state.showCharge) {
+        drawCharges(g, m);
+      }
+      drawAnnotations(g, m);
+    }
+
+    function setTile(key, value, unit, badge) {
+      const tile = el.tiles[key];
+      tile.querySelector(".tile-value").textContent = value;
+      tile.querySelector(".tile-unit").textContent = unit;
+      const b = tile.querySelector(".tile-badge");
+      b.textContent = badge.text;
+      b.className = "tile-badge " + badge.cls;
+    }
+
+    function updateReadouts(m, ref) {
+      const c = fmtCap(m.C);
+      const q = fmtCharge(m.Q);
+      const u = fmtVolt(m.U);
+      const e = fmtField(m.E);
+      const w = fmtEnergy(m.W);
+
+      setTile("C", c[0], c[1], deltaBadge(m.C, ref.C));
+      setTile("Q", q[0], q[1], deltaBadge(m.Q, ref.Q));
+      setTile("U", u[0], u[1], deltaBadge(m.U, ref.U));
+      setTile("E", e[0], e[1], deltaBadge(m.E, ref.E));
+      setTile("W", w[0], w[1], deltaBadge(m.W, ref.W));
+
+      el.stageLines.textContent = fieldLineCount(m.E) + " 条（疏密 ∝ E）";
+      el.stageState.textContent = state.mode === "uconst" ? "由电源补充或取回" : "被锁在极板上";
+
+      el.unitNote.textContent = "C = " + c[0] + " " + c[1] + " = " + sci(m.C / 1e-6) + " μF　|　Q = " + q[0] + " " + q[1] + " = " + sci(m.Q / 1e-6) + " μC　|　1 cm² = 10⁻⁴ m²，1 mm = 10⁻³ m，1 μF = 10⁻⁶ F，1 μC = 10⁻⁶ C";
+      el.breakdownChip.hidden = !(m.E >= 1e6);
+    }
+
+    function updateModeText() {
+      const text = MODE_TEXT[state.mode];
+      el.stageMode.textContent = text.name;
+      el.modeTag.textContent = text.tag;
+      el.modeTag.className = state.mode === "uconst" ? "mode-tag" : "mode-tag warn";
+      el.modeHint.textContent = text.hint;
+      el.modeHint.className = state.mode === "uconst" ? "mode-hint" : "mode-hint warn";
+      el.conclusionBody.textContent = text.body;
+      el.conclusionFormula.textContent = text.formula;
+      el.conclusionKey.textContent = text.key;
+      el.conclusionExtra.textContent = text.extra;
+      el.conclusionCard.className = state.mode === "uconst" ? "conclusion-card" : "conclusion-card warn";
+      el.deltaHint.textContent = "读数徽标 ↑↓ 表示相对「d = " + state.refD.toFixed(1) + " mm 时」的变化（S、εᵣ、电源状态不变）；橙色「不变」是本次要强调的结论。";
+    }
+
+    function syncLabels() {
+      el.s.value = state.S;
+      el.d.value = state.d;
+      el.er.value = state.er;
+      el.u.value = state.U;
+      el.sOut.textContent = state.S + " cm²";
+      el.dOut.textContent = state.d.toFixed(1) + " mm";
+      el.erOut.textContent = state.er.toFixed(1);
+      el.uOut.textContent = state.U.toFixed(0) + " V";
+      el.u.disabled = state.mode !== "uconst";
+      el.voltHint.textContent = state.mode === "uconst"
+        ? "接通电源时 U 由电源提供，拖动即改变电源电压。"
+        : "已断开电源：U = Q/C 由电荷量与电容决定，此滑块失效。";
+    }
+
+    function render() {
+      const m = computeAt(state.d);
+      const ref = computeAt(state.refD);
+      updateReadouts(m, ref);
+      drawStage(m);
+    }
+
+    function setMode(mode) {
+      if (mode === state.mode) return;
+      if (mode === "qconst") {
+        state.Qfrozen = computeAt(state.d).Q;
+      }
+      state.mode = mode;
+      state.refD = state.d;
+      el.modeButtons.forEach(function (btn) {
+        const on = btn.dataset.mode === mode;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      updateModeText();
+      syncLabels();
+      render();
+    }
+
+    function animate() {
+      state.time += 16;
+      if (state.showFlow) {
+        render();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    el.s.addEventListener("input", function () {
+      state.S = Number(el.s.value);
+      syncLabels();
+      render();
+    });
+
+    el.d.addEventListener("input", function () {
+      state.d = Number(el.d.value);
+      syncLabels();
+      render();
+    });
+
+    el.er.addEventListener("input", function () {
+      state.er = Number(el.er.value);
+      syncLabels();
+      render();
+    });
+
+    el.u.addEventListener("input", function () {
+      state.U = Number(el.u.value);
+      syncLabels();
+      render();
+    });
+
+    el.modeButtons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setMode(btn.dataset.mode);
+      });
+    });
+
+    el.showField.addEventListener("change", function () {
+      state.showField = el.showField.checked;
+      render();
+    });
+
+    el.showCharge.addEventListener("change", function () {
+      state.showCharge = el.showCharge.checked;
+      render();
+    });
+
+    el.showFlow.addEventListener("change", function () {
+      state.showFlow = el.showFlow.checked;
+      render();
+    });
+
+    el.resetBtn.addEventListener("click", function () {
+      state.S = DEFAULTS.S;
+      state.d = DEFAULTS.d;
+      state.er = DEFAULTS.er;
+      state.U = DEFAULTS.U;
+      state.mode = "uconst";
+      state.Qfrozen = 0;
+      state.refD = DEFAULTS.refD;
+      state.showField = true;
+      state.showCharge = true;
+      state.showFlow = true;
+      el.showField.checked = true;
+      el.showCharge.checked = true;
+      el.showFlow.checked = true;
+      el.modeButtons.forEach(function (btn) {
+        const on = btn.dataset.mode === "uconst";
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      updateModeText();
+      syncLabels();
+      render();
+    });
+
+    updateModeText();
+    syncLabels();
+    render();
+    animate();
+  </script>
+</body>
+</html>

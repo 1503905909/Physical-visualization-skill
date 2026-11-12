@@ -80,6 +80,11 @@ HTML 交互资源：
 - `electric_potential_equipotential_html.html`
 - `charged_particle_uniform_field_html.html`
 - `cyclotron_html.html`
+- `capacitor_html.html`
+- `magnetic_flux_html.html`
+- `lorentz_force_html.html`
+- `mass_spectrometer_html.html`
+- `alternating_current_transformer_html.html`
 
 Manim 动画资源：
 
@@ -88,6 +93,11 @@ Manim 动画资源：
 - `electric_potential_equipotential.py`
 - `charged_particle_uniform_field.py`
 - `cyclotron.py`
+- `capacitor.py`
+- `magnetic_flux.py`
+- `lorentz_force.py`
+- `mass_spectrometer.py`
+- `faraday_lenz.py`
 
 ## 运行环境
 

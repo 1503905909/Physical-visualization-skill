@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>交变电流与变压器可视化资源</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #c9d2df;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+      --accent: #0f766e;
+      --warn: #c2410c;
+      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app {
+      width: min(1256px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 16px 0 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+
+    .subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .formula {
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 17px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 296px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-panel,
+    .side-panel,
+    .control-panel,
+    .inquiry-panel,
+    .transformer-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stage-panel { padding: 12px; }
+
+    .stage-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1000 / 562;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--stage);
+      border: 1px solid #1e2430;
+    }
+
+    #acCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .stage-readout {
+      position: absolute;
+      left: 14px;
+      top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .readout-item {
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+      white-space: nowrap;
+    }
+
+    .stage-legend {
+      position: absolute;
+      left: 14px;
+      bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, auto);
+      gap: 7px;
+      pointer-events: none;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(8, 10, 14, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 10px;
+      border-radius: 3px;
+      flex: 0 0 auto;
+    }
+
+    .swatch.field { background: rgba(226, 232, 240, 0.72); }
+    .swatch.neutral { background: transparent; border-left: 3px dashed #fb923c; border-radius: 0; }
+    .swatch.current { background: #fbbf24; }
+    .swatch.wave { background: #22c55e; }
+
+    .transformer-panel {
+      margin-top: 14px;
+      padding: 12px 14px 14px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .panel-head h2 { margin: 0; font-size: 18px; }
+
+    .panel-head .note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tf-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 232px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .tf-canvas-wrap {
+      background: var(--stage);
+      border: 1px solid #1e2430;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #tfCanvas {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .tf-readouts {
+      display: grid;
+      gap: 8px;
+    }
+
+    .readout-card {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .readout-card .k {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .readout-card .v {
+      margin-top: 2px;
+      font-size: 17px;
+      font-weight: 800;
+      color: #0f172a;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .readout-card .v.accent { color: var(--accent); }
+    .readout-card .v.warn { color: var(--warn); }
+
+    .side-panel { padding: 14px; }
+    .side-panel h2 { margin: 0 0 12px; font-size: 18px; }
+
+    .metric {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 9px;
+      background: #f8fafc;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value.wave { color: #15803d; }
+    .metric-value.peak { color: #b45309; }
+
+    .metric-note {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    .control-panel { margin-top: 14px; padding: 14px; }
+    .control-panel h2 { margin: 0 0 12px; font-size: 18px; }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .control-block {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .control-title {
+      margin-bottom: 8px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .field { margin-top: 9px; }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 5px;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .field label span:last-child {
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      margin: 0;
+    }
+
+    .toggles {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 14.5px;
+      user-select: none;
+    }
+
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    button {
+      min-height: 34px;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #172033;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    button:hover { background: #f1f5f9; }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .primary-btn {
+      border-color: #0f766e;
+      background: #0f766e;
+      color: #ffffff;
+    }
+
+    .primary-btn:hover { background: #0d665f; }
+
+    .inquiry-panel { margin-top: 14px; padding: 14px; }
+    .inquiry-panel h2 { margin: 0 0 10px; font-size: 18px; }
+
+    .inquiry-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inquiry-list li {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+      color: #344054;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .inquiry-list li b { color: var(--accent); }
+
+    .assumption {
+      margin: 10px 0 0;
+      padding: 9px 12px;
+      border: 1px solid #fed7aa;
+      border-left: 4px solid #f97316;
+      border-radius: 8px;
+      background: #fff7ed;
+      color: #7c2d12;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1080px) {
+      .layout,
+      .controls-grid,
+      .inquiry-list,
+      .tf-grid { grid-template-columns: 1fr; }
+      .topbar { align-items: start; flex-direction: column; }
+      .formula { white-space: normal; }
+      .stage-legend { grid-template-columns: repeat(2, auto); }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>交变电流与变压器</h1>
+        <p class="subtitle">矩形线圈在匀强磁场中绕垂直于磁场的轴匀速转动，产生正弦交变电流；理想变压器按匝数比改变电压。</p>
+      </div>
+      <div class="formula">e = E<sub>m</sub> sin&nbsp;ωt，&nbsp;E<sub>m</sub> = NBSω，&nbsp;E = E<sub>m</sub>/√2</div>
+    </header>
+
+    <section class="layout">
+      <div>
+        <section class="stage-panel" aria-label="交变电流产生过程演示区">
+          <div class="stage-wrap">
+            <canvas id="acCanvas" width="1000" height="562"></canvas>
+            <div class="stage-readout">
+              <div class="readout-item">θ = <span id="stageTheta">0.0°</span></div>
+              <div class="readout-item">e = <span id="stageE">0.00 V</span></div>
+              <div class="readout-item">Φ：<span id="stageFlux">最大（中性面）</span></div>
+            </div>
+            <div class="stage-legend" aria-hidden="true">
+              <div class="legend-item"><span class="swatch field"></span><span>磁感线 B</span></div>
+              <div class="legend-item"><span class="swatch neutral"></span><span>中性面</span></div>
+              <div class="legend-item"><span class="swatch current"></span><span>感应电流方向</span></div>
+              <div class="legend-item"><span class="swatch wave"></span><span>e–t 波形</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="transformer-panel" aria-label="理想变压器示意">
+          <div class="panel-head">
+            <h2>理想变压器</h2>
+            <span class="note">原线圈接交流电源，副线圈接负载电阻 R</span>
+          </div>
+          <div class="tf-grid">
+            <div class="tf-canvas-wrap">
+              <canvas id="tfCanvas" width="680" height="320"></canvas>
+            </div>
+            <div class="tf-readouts">
+              <div class="readout-card">
+                <div class="k">副线圈电压 U₂</div>
+                <div class="v accent" id="tfU2">24.0 V</div>
+              </div>
+              <div class="readout-card">
+                <div class="k">副线圈电流 I₂</div>
+                <div class="v" id="tfI2">1.20 A</div>
+              </div>
+              <div class="readout-card">
+                <div class="k">原线圈电流 I₁</div>
+                <div class="v" id="tfI1">2.40 A</div>
+              </div>
+              <div class="readout-card">
+                <div class="k">输入功率 P₁ = 输出功率 P₂</div>
+                <div class="v" id="tfPower">28.8 W</div>
+              </div>
+              <div class="readout-card">
+                <div class="k">匝数比与类型</div>
+                <div class="v warn" id="tfRatio">1 : 2（升压）</div>
+              </div>
+            </div>
+          </div>
+          <p class="assumption">模型假设：理想变压器，忽略漏磁、铁芯涡流损耗与线圈电阻；电压、电流均为有效值；发电机线圈为矩形、匀速转动，磁场为匀强磁场；从线圈经过中性面开始计时，故 e = E<sub>m</sub> sin&nbsp;ωt。</p>
+        </section>
+
+        <section class="control-panel" aria-label="参数控制">
+          <h2>参数调节</h2>
+          <div class="controls-grid">
+            <div class="control-block">
+              <div class="control-title">交流发电机</div>
+              <div class="field">
+                <label for="rpmSlider"><span>转速 n</span><span id="rpmValue">60 r/min</span></label>
+                <input id="rpmSlider" type="range" min="30" max="240" step="10" value="60" />
+              </div>
+              <div class="field">
+                <label for="turnsSlider"><span>线圈匝数 N</span><span id="turnsValue">100 匝</span></label>
+                <input id="turnsSlider" type="range" min="20" max="200" step="10" value="100" />
+              </div>
+              <div class="field">
+                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">0.50 T</span></label>
+                <input id="bSlider" type="range" min="0.10" max="1.00" step="0.05" value="0.50" />
+              </div>
+              <div class="field">
+                <label for="areaSlider"><span>线圈面积 S</span><span id="areaValue">0.020 m²</span></label>
+                <input id="areaSlider" type="range" min="0.005" max="0.050" step="0.005" value="0.020" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">变压器</div>
+              <div class="field">
+                <label for="n1Slider"><span>原线圈匝数 n₁</span><span id="n1Value">200 匝</span></label>
+                <input id="n1Slider" type="range" min="50" max="500" step="10" value="200" />
+              </div>
+              <div class="field">
+                <label for="n2Slider"><span>副线圈匝数 n₂</span><span id="n2Value">400 匝</span></label>
+                <input id="n2Slider" type="range" min="50" max="1000" step="10" value="400" />
+              </div>
+              <div class="field">
+                <label for="u1Slider"><span>输入电压 U₁</span><span id="u1Value">12 V</span></label>
+                <input id="u1Slider" type="range" min="3" max="36" step="1" value="12" />
+              </div>
+              <div class="field">
+                <label for="rSlider"><span>负载电阻 R</span><span id="rValue">20 Ω</span></label>
+                <input id="rSlider" type="range" min="5" max="100" step="5" value="20" />
+              </div>
+            </div>
+
+            <div class="control-block">
+              <div class="control-title">显示与操作</div>
+              <div class="toggles">
+                <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示磁感线与中性面</span></label>
+                <label class="toggle"><input type="checkbox" id="showFlux" checked /><span>显示 Φ–t 曲线（虚线）</span></label>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="pauseBtn">暂停</button>
+                <button type="button" class="primary-btn" id="resetBtn">重置</button>
+              </div>
+              <p class="hint">转速改变时，注意观察波形周期与峰值的变化；变压器部分单独设置 U₁，与发电机解耦，便于分别观察两组规律。变压器两侧的黄色箭头表示电流方向，随交流每半周反向。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="inquiry-panel" aria-label="课堂观察问题">
+          <h2>课堂观察</h2>
+          <ul class="inquiry-list">
+            <li><b>1.</b> 线圈经过中性面时，e 为什么等于 0？此时穿过线圈的磁通量是最大还是最小？</li>
+            <li><b>2.</b> 把转速提高到原来的 2 倍，峰值 E<sub>m</sub> 和有效值 E 各变为原来的几倍？波形周期怎样变化？</li>
+            <li><b>3.</b> 保持 U₁ 不变，只增大 n₂，U₂ 怎样变化？此时 I₂ 与 I₁ 哪个大？为什么？</li>
+          </ul>
+        </section>
+      </div>
+
+      <aside class="side-panel" aria-label="实时数据">
+        <h2>实时数据</h2>
+        <div class="metric">
+          <div class="metric-label">峰值 E<sub>m</sub> = NBSω</div>
+          <div class="metric-value peak" id="mEm">6.28 V</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">有效值 E = E<sub>m</sub>/√2</div>
+          <div class="metric-value wave" id="mErms">4.44 V</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">频率 f 与角速度 ω</div>
+          <div class="metric-value" id="mFreq">f = 1.00 Hz</div>
+          <div class="metric-note" id="mOmega">ω = 2πf = 6.28 rad/s，T = 1.00 s</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">此刻的瞬时值</div>
+          <div class="metric-value" id="mInst">e = 0.00 V</div>
+          <div class="metric-note" id="mInstNote">线圈位于中性面，感应电动势为零</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">变压器输出</div>
+          <div class="metric-value" id="mU2">U₂ = 24.0 V</div>
+          <div class="metric-note" id="mI2">I₂ = 1.20 A，I₁ = 2.40 A</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var TAU = Math.PI * 2;
+      var DEG = 180 / Math.PI;
+
+      var acCanvas = document.getElementById("acCanvas");
+      var acCtx = acCanvas.getContext("2d");
+      var tfCanvas = document.getElementById("tfCanvas");
+      var tfCtx = tfCanvas.getContext("2d");
+
+      var COLORS = {
+        fieldLine: "rgba(226,232,240,0.16)",
+        fieldHead: "rgba(226,232,240,0.42)",
+        coilFront: "#f8fafc",
+        coilBack: "#5b6b82",
+        neutral: "#fb923c",
+        current: "#fbbf24",
+        wave: "#22c55e",
+        flux: "rgba(147,197,253,0.85)",
+        peak: "#fbbf24",
+        rms: "#fb923c",
+        axis: "rgba(148,163,184,0.55)",
+        muted: "#8b97ab",
+        ink: "#e5eaf3",
+        copper: "#d97706"
+      };
+
+      var DEFAULTS = {
+        rpm: 60,
+        turns: 100,
+        B: 0.5,
+        area: 0.02,
+        n1: 200,
+        n2: 400,
+        U1: 12,
+        R: 20
+      };
+
+      var params = {
+        rpm: DEFAULTS.rpm,
+        turns: DEFAULTS.turns,
+        B: DEFAULTS.B,
+        area: DEFAULTS.area,
+        n1: DEFAULTS.n1,
+        n2: DEFAULTS.n2,
+        U1: DEFAULTS.U1,
+        R: DEFAULTS.R
+      };
+
+      var state = {
+        theta: 0,
+        playing: true,
+        lastTs: 0,
+        showField: true,
+        showFlux: true
+      };
+
+      var ui = {
+        rpmSlider: document.getElementById("rpmSlider"),
+        turnsSlider: document.getElementById("turnsSlider"),
+        bSlider: document.getElementById("bSlider"),
+        areaSlider: document.getElementById("areaSlider"),
+        n1Slider: document.getElementById("n1Slider"),
+        n2Slider: document.getElementById("n2Slider"),
+        u1Slider: document.getElementById("u1Slider"),
+        rSlider: document.getElementById("rSlider"),
+        showField: document.getElementById("showField"),
+        showFlux: document.getElementById("showFlux"),
+        pauseBtn: document.getElementById("pauseBtn"),
+        resetBtn: document.getElementById("resetBtn")
+      };
+
+      var out = {
+        rpmValue: document.getElementById("rpmValue"),
+        turnsValue: document.getElementById("turnsValue"),
+        bValue: document.getElementById("bValue"),
+        areaValue: document.getElementById("areaValue"),
+        n1Value: document.getElementById("n1Value"),
+        n2Value: document.getElementById("n2Value"),
+        u1Value: document.getElementById("u1Value"),
+        rValue: document.getElementById("rValue"),
+        stageTheta: document.getElementById("stageTheta"),
+        stageE: document.getElementById("stageE"),
+        stageFlux: document.getElementById("stageFlux"),
+        mEm: document.getElementById("mEm"),
+        mErms: document.getElementById("mErms"),
+        mFreq: document.getElementById("mFreq"),
+        mOmega: document.getElementById("mOmega"),
+        mInst: document.getElementById("mInst"),
+        mInstNote: document.getElementById("mInstNote"),
+        mU2: document.getElementById("mU2"),
+        mI2: document.getElementById("mI2"),
+        tfU2: document.getElementById("tfU2"),
+        tfI2: document.getElementById("tfI2"),
+        tfI1: document.getElementById("tfI1"),
+        tfPower: document.getElementById("tfPower"),
+        tfRatio: document.getElementById("tfRatio")
+      };
+
+      /* ---------- 物理模型 ---------- */
+
+      function derive() {
+        var f = params.rpm / 60;
+        var omega = TAU * f;
+        var phiMax = params.turns * params.B * params.area;
+        var Em = phiMax * omega;
+        var Erms = Em / Math.SQRT2;
+        var T = 1 / f;
+        return { f: f, omega: omega, phiMax: phiMax, Em: Em, Erms: Erms, T: T };
+      }
+
+      function deriveTransformer() {
+        var ratio = params.n2 / params.n1;
+        var U2 = params.U1 * ratio;
+        var I2 = U2 / params.R;
+        var I1 = I2 * ratio;
+        var P = U2 * I2;
+        return { ratio: ratio, U2: U2, I2: I2, I1: I1, P: P };
+      }
+
+      /* ---------- 绘图工具 ---------- */
+
+      function chipLabel(ctx, str, x, y, size, color, align) {
+        ctx.save();
+        ctx.font = "bold " + size + 'px "Microsoft YaHei", "PingFang SC", Arial';
+        var tw = ctx.measureText(str).width;
+        var left = align === "right" ? x - tw : x;
+        ctx.fillStyle = "rgba(8,12,20,0.82)";
+        ctx.fillRect(left - 5, y - 9, tw + 10, 18);
+        ctx.fillStyle = color;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(str, left, y);
+        ctx.restore();
+      }
+
+      function label(ctx, str, x, y, size, color, align, weight) {
+        ctx.save();
+        ctx.font = (weight || "bold") + " " + size + 'px "Microsoft YaHei", "PingFang SC", Arial';
+        ctx.fillStyle = color;
+        ctx.textAlign = align || "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(str, x, y);
+        ctx.restore();
+      }
+
+      function fmtRatio(value) {
+        var s = value.toFixed(2);
+        s = s.replace(/\.00$/, "");
+        s = s.replace(/(\.\d)0$/, "$1");
+        return s;
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function segment(ctx, x1, y1, x2, y2, color, width, dash) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width || 2;
+        ctx.lineCap = "round";
+        if (dash) { ctx.setLineDash(dash); }
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function arrow(ctx, x1, y1, x2, y2, color, width, head) {
+        var angle = Math.atan2(y2 - y1, x2 - x1);
+        var h = head || 9;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width || 2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - h * Math.cos(angle - Math.PI / 7), y2 - h * Math.sin(angle - Math.PI / 7));
+        ctx.lineTo(x2 - h * Math.cos(angle + Math.PI / 7), y2 - h * Math.sin(angle + Math.PI / 7));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      /* ---------- 线圈的三维投影 ----------
+         磁感线 B 沿 x 方向，同时带有朝向观察者的分量：
+         B̂ = (cosβ, 0, sinβ)，β = 42°。
+         转轴 â = (0, 1, 0) 与 B 垂直；屏幕横轴为 x，纵轴为 y。
+         线圈法线 n(θ) = cosθ·B̂ + sinθ·ŵ，ŵ = (sinβ, 0, -cosβ)。
+         于是 n(θ)·B̂ = cosθ，磁通量 Φ = NBS·cosθ，
+         e = -dΦ/dt = NBSω·sinθ，θ = ωt。θ = 0 时线圈处于中性面。 */
+
+      var BETA = 42 * Math.PI / 180;
+      var CB = Math.cos(BETA);
+      var SB = Math.sin(BETA);
+
+      function coilAxes(theta) {
+        var mx = -Math.sin(theta) * CB + Math.cos(theta) * SB;
+        var nx = Math.cos(theta) * CB + Math.sin(theta) * SB;
+        return { mx: mx, nx: nx };
+      }
+
+      var COIL = { w: 2.6, h: 3.4, t: 0.26 };
+      var VIEW = { cx: 300, cy: 284, s: 68 };
+
+      function project(a, b, c, axes) {
+        return {
+          x: VIEW.cx + VIEW.s * (a * axes.mx + c * axes.nx),
+          y: VIEW.cy - VIEW.s * b
+        };
+      }
+
+      function drawFieldLines(ctx) {
+        var rows = [120, 188, 256, 324, 392, 460];
+        var i;
+        for (i = 0; i < rows.length; i += 1) {
+          var y = rows[i];
+          segment(ctx, 34, y, 596, y, COLORS.fieldLine, 1.4);
+          var marks = [96, 300, 504];
+          var j;
+          for (j = 0; j < marks.length; j += 1) {
+            arrow(ctx, marks[j] - 26, y, marks[j] + 12, y, COLORS.fieldHead, 1.4, 6);
+          }
+        }
+        label(ctx, "B", 24, 120, 15, "rgba(226,232,240,0.72)", "center");
+      }
+
+      function drawNeutralPlane(ctx) {
+        var hw = (COIL.w / 2) * SB;
+        var hh = COIL.h / 2;
+        var x1 = VIEW.cx - VIEW.s * hw;
+        var x2 = VIEW.cx + VIEW.s * hw;
+        var y1 = VIEW.cy - VIEW.s * hh;
+        var y2 = VIEW.cy + VIEW.s * hh;
+        ctx.save();
+        ctx.fillStyle = "rgba(251,146,60,0.09)";
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.setLineDash([7, 6]);
+        ctx.strokeStyle = "rgba(251,146,60,0.7)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x1, y2);
+        ctx.moveTo(x2, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.restore();
+        label(ctx, "中性面（线圈平面 ⊥ B）", VIEW.cx, y1 - 22, 13, "#fdba74", "center");
+      }
+
+      function drawAxis(ctx) {
+        segment(ctx, VIEW.cx, 116, VIEW.cx, 470, "rgba(148,163,184,0.28)", 1.5, [5, 7]);
+      }
+
+      function drawCoil(ctx, theta, eFrac) {
+        var axes = coilAxes(theta);
+        var sign = eFrac >= 0 ? 1 : -1;
+        var amp = Math.abs(eFrac);
+        var hw = COIL.w / 2;
+        var hh = COIL.h / 2;
+        var ht = COIL.t / 2;
+        var back = [
+          project(-hw, -hh, -ht, axes),
+          project(hw, -hh, -ht, axes),
+          project(hw, hh, -ht, axes),
+          project(-hw, hh, -ht, axes)
+        ];
+        var front = [
+          project(-hw, -hh, ht, axes),
+          project(hw, -hh, ht, axes),
+          project(hw, hh, ht, axes),
+          project(-hw, hh, ht, axes)
+        ];
+        var i;
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        ctx.strokeStyle = COLORS.coilBack;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (i = 0; i < 4; i += 1) {
+          var a1 = back[i];
+          var a2 = back[(i + 1) % 4];
+          ctx.moveTo(a1.x, a1.y);
+          ctx.lineTo(a2.x, a2.y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(148,163,184,0.55)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (i = 0; i < 4; i += 1) {
+          ctx.moveTo(back[i].x, back[i].y);
+          ctx.lineTo(front[i].x, front[i].y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = COLORS.coilFront;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        for (i = 0; i < 4; i += 1) {
+          var b1 = front[i];
+          var b2 = front[(i + 1) % 4];
+          ctx.moveTo(b1.x, b1.y);
+          ctx.lineTo(b2.x, b2.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 感应电流方向：e > 0 时，+m 一侧电流向上（屏幕 y 减小），-m 一侧电流向下
+        var sideA = project(hw, 0, 0, axes);
+        var sideB = project(-hw, 0, 0, axes);
+        if (amp < 0.05) {
+          label(ctx, "i = 0（中性面处无感应电流）", VIEW.cx, VIEW.cy + 126, 13, "#fdba74", "center");
+          return;
+        }
+        var len = (0.35 + 0.65 * amp) * 0.66 * VIEW.s;
+        var upA = -sign * len;
+        var upB = sign * len;
+        arrow(ctx, sideA.x, sideA.y - upA / 2, sideA.x, sideA.y + upA / 2, COLORS.current, 4, 11);
+        arrow(ctx, sideB.x, sideB.y - upB / 2, sideB.x, sideB.y + upB / 2, COLORS.current, 4, 11);
+      }
+
+      function drawNormal(ctx, theta) {
+        var axes = coilAxes(theta);
+        if (Math.abs(axes.nx) < 0.22) { return; }
+        var len = 1.5 * VIEW.s * axes.nx;
+        var x0 = VIEW.cx;
+        var y0 = VIEW.cy;
+        arrow(ctx, x0, y0, x0 + len, y0, "rgba(250,204,21,0.85)", 2.4, 10);
+        var halfW = VIEW.s * (COIL.w / 2 * Math.abs(axes.mx) + COIL.t / 2 * Math.abs(axes.nx));
+        var tip = x0 + len;
+        if (len > 0) {
+          label(ctx, "法线 n", Math.max(tip + 10, x0 + halfW + 8), y0 - 15, 12.5, "rgba(250,204,21,0.9)", "left");
+        } else {
+          label(ctx, "法线 n", Math.min(tip - 10, x0 - halfW - 8), y0 - 15, 12.5, "rgba(250,204,21,0.9)", "right");
+        }
+      }
+
+      function drawRotationHint(ctx) {
+        label(ctx, "ω", VIEW.cx + 22, 124, 16, "#cbd5e1", "center");
+      }
+
+      function drawCoilLabels(ctx) {
+        label(ctx, "矩形线圈 N = " + params.turns + " 匝", VIEW.cx, 428, 13.5, "#cbd5e1", "center");
+        label(ctx, "转轴竖直，与 B 垂直", VIEW.cx, 452, 12.5, COLORS.muted, "center");
+      }
+
+      /* ---------- e–t 波形 ---------- */
+
+      var PLOT = { x0: 646, x1: 972, y0: 104, y1: 470 };
+
+      function drawWavePanel(ctx, d) {
+        var Em = d.Em;
+        var T = d.T;
+        var midY = (PLOT.y0 + PLOT.y1) / 2;
+        var halfH = (PLOT.y1 - PLOT.y0) / 2 - 12;
+        var span = 2 * T;
+        var scale = 1.18 * Em;
+
+        function xOf(t) { return PLOT.x0 + (t / span) * (PLOT.x1 - PLOT.x0); }
+        function yOf(e) { return midY - (e / scale) * halfH; }
+
+        ctx.save();
+        ctx.fillStyle = "rgba(12,16,24,0.92)";
+        ctx.fillRect(PLOT.x0 - 26, PLOT.y0 - 34, PLOT.x1 - PLOT.x0 + 46, PLOT.y1 - PLOT.y0 + 66);
+        ctx.strokeStyle = "rgba(148,163,184,0.32)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(PLOT.x0 - 26, PLOT.y0 - 34, PLOT.x1 - PLOT.x0 + 46, PLOT.y1 - PLOT.y0 + 66);
+        ctx.restore();
+
+        label(ctx, "e–t 图像（两个周期）", (PLOT.x0 + PLOT.x1) / 2, PLOT.y0 - 16, 14, "#e2e8f0", "center");
+
+        // 网格
+        var k;
+        for (k = 0; k <= 8; k += 1) {
+          var gx = xOf(span * k / 8);
+          segment(ctx, gx, PLOT.y0, gx, PLOT.y1, "rgba(148,163,184,0.16)", 1);
+        }
+
+        // 零线与峰值、有效值
+        segment(ctx, PLOT.x0, midY, PLOT.x1, midY, COLORS.axis, 1.6);
+        segment(ctx, PLOT.x0, yOf(Em), PLOT.x1, yOf(Em), "rgba(251,191,36,0.7)", 1.4, [6, 5]);
+        segment(ctx, PLOT.x0, yOf(-Em), PLOT.x1, yOf(-Em), "rgba(251,191,36,0.7)", 1.4, [6, 5]);
+        segment(ctx, PLOT.x0, yOf(d.Erms), PLOT.x1, yOf(d.Erms), "rgba(251,146,60,0.75)", 1.4, [4, 4]);
+        segment(ctx, PLOT.x0, yOf(-d.Erms), PLOT.x1, yOf(-d.Erms), "rgba(251,146,60,0.75)", 1.4, [4, 4]);
+
+        chipLabel(ctx, "Em = " + Em.toFixed(2) + " V", PLOT.x1 - 4, yOf(Em) - 12, 12, "#fbbf24", "right");
+        chipLabel(ctx, "E = " + d.Erms.toFixed(2) + " V（有效值）", PLOT.x1 - 4, yOf(d.Erms) - 12, 12, "#fb923c", "right");
+        label(ctx, "e = 0", PLOT.x0 + 16, midY - 11, 11.5, COLORS.muted, "center");
+
+        // 中性面对应的时刻：e = 0
+        for (k = 0; k <= 4; k += 1) {
+          var tx = xOf(T * k / 2);
+          segment(ctx, tx, PLOT.y0, tx, PLOT.y1, "rgba(251,146,60,0.4)", 1.2, [4, 5]);
+          ctx.save();
+          ctx.fillStyle = "#fb923c";
+          ctx.beginPath();
+          ctx.arc(tx, midY, 3.4, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+        // 中性面位置用橙点标在零线上（图例见上方）
+
+        // Φ–t 曲线（归一化到与 e 相同的纵向比例）
+        if (state.showFlux) {
+          ctx.save();
+          ctx.strokeStyle = COLORS.flux;
+          ctx.lineWidth = 1.8;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          var i;
+          for (i = 0; i <= 320; i += 1) {
+            var tt = span * i / 320;
+            var phi = Em * Math.cos(d.omega * tt);
+            var px = xOf(tt);
+            var py = yOf(phi);
+            if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // e(t) 正弦曲线
+        ctx.save();
+        ctx.strokeStyle = COLORS.wave;
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        var j;
+        for (j = 0; j <= 480; j += 1) {
+          var t2 = span * j / 480;
+          var e2 = Em * Math.sin(d.omega * t2);
+          var qx = xOf(t2);
+          var qy = yOf(e2);
+          if (j === 0) { ctx.moveTo(qx, qy); } else { ctx.lineTo(qx, qy); }
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 时间轴刻度
+        for (k = 0; k <= 4; k += 1) {
+          var tk = T * k / 2;
+          label(ctx, tk.toFixed(2), xOf(tk), PLOT.y1 + 20, 11.5, COLORS.muted, "center");
+        }
+        label(ctx, "t / s", PLOT.x1 + 4, PLOT.y1 + 38, 12, COLORS.muted, "right");
+
+        // 当前时刻光标
+        var phase = state.theta % (2 * TAU);
+        var tc = span * phase / (2 * TAU);
+        var ec = Em * Math.sin(phase);
+        var cxp = xOf(tc);
+        var cyp = yOf(ec);
+        segment(ctx, cxp, PLOT.y0, cxp, PLOT.y1, "rgba(226,232,240,0.35)", 1.2, [3, 4]);
+        segment(ctx, PLOT.x0, cyp, cxp, cyp, "rgba(226,232,240,0.22)", 1, [3, 4]);
+        ctx.save();
+        ctx.fillStyle = COLORS.wave;
+        ctx.shadowColor = "rgba(34,197,94,0.75)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(cxp, cyp, 5.2, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+
+        // 瞬时值标签：带底色，避免与大数值标注互相压字
+        var instText = "e = " + ec.toFixed(2) + " V";
+        ctx.save();
+        ctx.font = 'bold 12px "Microsoft YaHei", "PingFang SC", Arial';
+        var tw = ctx.measureText(instText).width;
+        var ly = ec >= 0 ? Math.min(cyp + 18, PLOT.y1 - 12) : Math.max(cyp - 18, PLOT.y0 + 12);
+        var lx = cxp > (PLOT.x0 + PLOT.x1) / 2 ? cxp - 12 - tw : cxp + 12;
+        lx = Math.max(PLOT.x0 + 4, Math.min(lx, PLOT.x1 - tw - 4));
+        ctx.fillStyle = "rgba(8,12,20,0.82)";
+        ctx.fillRect(lx - 5, ly - 9, tw + 10, 18);
+        ctx.fillStyle = "#86efac";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(instText, lx, ly);
+        ctx.restore();
+
+        // 图例
+        segment(ctx, PLOT.x0, PLOT.y0 - 40, PLOT.x0 + 22, PLOT.y0 - 40, COLORS.wave, 2.6);
+        label(ctx, "e（绿）", PLOT.x0 + 26, PLOT.y0 - 40, 11.5, "#86efac", "left");
+        if (state.showFlux) {
+          ctx.save();
+          ctx.setLineDash([5, 5]);
+          segment(ctx, PLOT.x0 + 86, PLOT.y0 - 40, PLOT.x0 + 108, PLOT.y0 - 40, COLORS.flux, 1.8);
+          ctx.restore();
+          label(ctx, "Φ（虚线，同一标尺）", PLOT.x0 + 112, PLOT.y0 - 40, 11.5, "#93c5fd", "left");
+        }
+        ctx.save();
+        ctx.fillStyle = "#fb923c";
+        ctx.beginPath();
+        ctx.arc(PLOT.x1 - 78, PLOT.y0 - 40, 3.6, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+        label(ctx, "中性面 e = 0", PLOT.x1 - 70, PLOT.y0 - 40, 11.5, "#fdba74", "left");
+      }
+
+      /* ---------- 变压器 ---------- */
+
+      function drawTransformer(ctx, d, phaseSign) {
+        var W = tfCanvas.width;
+        var H = tfCanvas.height;
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = "#080a0e";
+        ctx.fillRect(0, 0, W, H);
+
+        var coreOuter = { x: 215, y: 70, w: 250, h: 205 };
+        var gap = 42;
+
+        // 铁芯（口字形）
+        ctx.save();
+        var grad = ctx.createLinearGradient(coreOuter.x, coreOuter.y, coreOuter.x + coreOuter.w, coreOuter.y + coreOuter.h);
+        grad.addColorStop(0, "#64748b");
+        grad.addColorStop(0.5, "#94a3b8");
+        grad.addColorStop(1, "#526073");
+        ctx.fillStyle = grad;
+        ctx.fillRect(coreOuter.x, coreOuter.y, coreOuter.w, coreOuter.h);
+        ctx.fillStyle = "#080a0e";
+        ctx.fillRect(coreOuter.x + gap, coreOuter.y + gap, coreOuter.w - 2 * gap, coreOuter.h - 2 * gap);
+        ctx.strokeStyle = "rgba(226,232,240,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(coreOuter.x, coreOuter.y, coreOuter.w, coreOuter.h);
+        ctx.strokeRect(coreOuter.x + gap, coreOuter.y + gap, coreOuter.w - 2 * gap, coreOuter.h - 2 * gap);
+        ctx.restore();
+
+        label(ctx, "铁芯（理想，无漏磁）", coreOuter.x + coreOuter.w / 2, coreOuter.y + coreOuter.h + 26, 13, "rgba(203,213,225,0.85)", "center");
+
+        // 线圈匝数决定画出多少圈，只是示意
+        var primaryTurns = Math.max(4, Math.min(12, Math.round(params.n1 / 42)));
+        var secondaryTurns = Math.max(4, Math.min(12, Math.round(params.n2 / 42)));
+
+        function winding(x, count, side) {
+          var y0 = 100;
+          var y1 = 246;
+          var step = (y1 - y0) / (count - 1);
+          ctx.save();
+          ctx.strokeStyle = COLORS.copper;
+          ctx.lineWidth = 4;
+          ctx.lineCap = "round";
+          var i;
+          for (i = 0; i < count; i += 1) {
+            var cy = y0 + i * step;
+            ctx.beginPath();
+            if (side < 0) {
+              ctx.arc(x, cy, 9, -Math.PI / 2, Math.PI / 2, true);
+            } else {
+              ctx.arc(x, cy, 9, -Math.PI / 2, Math.PI / 2, false);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+          return { y0: y0, y1: y1 };
+        }
+
+        var pW = winding(coreOuter.x, primaryTurns, -1);
+        var sW = winding(coreOuter.x + coreOuter.w, secondaryTurns, 1);
+
+        // 原线圈回路
+        var srcX = 120;
+        var srcY = 175;
+        ctx.save();
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(coreOuter.x, pW.y0);
+        ctx.lineTo(srcX, pW.y0);
+        ctx.lineTo(srcX, srcY - 24);
+        ctx.moveTo(srcX, srcY + 24);
+        ctx.lineTo(srcX, pW.y1);
+        ctx.lineTo(coreOuter.x, pW.y1);
+        ctx.stroke();
+        ctx.restore();
+
+        // 交流电源
+        ctx.save();
+        ctx.fillStyle = "#0b1220";
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(srcX, srcY, 24, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        var i2;
+        for (i2 = 0; i2 <= 40; i2 += 1) {
+          var px = srcX - 13 + 26 * i2 / 40;
+          var py = srcY + 7 * Math.sin(i2 / 40 * TAU);
+          if (i2 === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 副线圈回路与负载
+        var loadX = 575;
+        ctx.save();
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(coreOuter.x + coreOuter.w, sW.y0);
+        ctx.lineTo(loadX, sW.y0);
+        ctx.lineTo(loadX, 128);
+        ctx.moveTo(loadX, 192);
+        ctx.lineTo(loadX, sW.y1);
+        ctx.lineTo(coreOuter.x + coreOuter.w, sW.y1);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "#f8fafc";
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.fillRect(loadX - 17, 128, 34, 64);
+        ctx.strokeRect(loadX - 17, 128, 34, 64);
+        ctx.restore();
+        label(ctx, "R", loadX, 160, 15, "#111827", "center");
+
+        // 电流方向：随交流正负半周反向
+        var pL = srcX + 26;
+        var pR = coreOuter.x - 30;
+        var sL = coreOuter.x + coreOuter.w + 30;
+        var sR = loadX - 26;
+        if (phaseSign > 0) {
+          arrow(ctx, pL, pW.y0, pR, pW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, pR, pW.y1, pL, pW.y1, COLORS.current, 2.6, 9);
+          arrow(ctx, sL, sW.y0, sR, sW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, sR, sW.y1, sL, sW.y1, COLORS.current, 2.6, 9);
+        } else {
+          arrow(ctx, pR, pW.y0, pL, pW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, pL, pW.y1, pR, pW.y1, COLORS.current, 2.6, 9);
+          arrow(ctx, sR, sW.y0, sL, sW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, sL, sW.y1, sR, sW.y1, COLORS.current, 2.6, 9);
+        }
+
+        // 文字标注
+        label(ctx, "原线圈", 215, 38, 14, "#e2e8f0", "center");
+        label(ctx, "n₁ = " + params.n1 + " 匝", 215, 58, 13, "#fbbf24", "center");
+        label(ctx, "副线圈", 465, 38, 14, "#e2e8f0", "center");
+        label(ctx, "n₂ = " + params.n2 + " 匝", 465, 58, 13, "#fbbf24", "center");
+        label(ctx, "U₁ = " + params.U1 + " V", srcX, 288, 13, "#e2e8f0", "center");
+        label(ctx, "U₂ = " + d.U2.toFixed(1) + " V", loadX, 288, 13, "#7dd3fc", "center");
+        label(ctx, "R = " + params.R + " Ω", loadX + 66, 160, 12.5, "#cbd5e1", "center");
+        label(ctx, "I₁", 168, 84, 14, "#fbbf24", "center");
+        label(ctx, "I₂", 522, 84, 14, "#fbbf24", "center");
+
+        var isStepUp = params.n2 > params.n1;
+        var isStepDown = params.n2 < params.n1;
+        var kindText = isStepUp ? "升压变压器" : (isStepDown ? "降压变压器" : "隔离变压器（n₁ = n₂）");
+        label(ctx, kindText, 340, 172, 15, isStepUp ? "#fb923c" : (isStepDown ? "#7dd3fc" : "#e2e8f0"), "center");
+        label(ctx, "n₁ : n₂ = 1 : " + fmtRatio(params.n2 / params.n1), 340, 196, 12.5, "#cbd5e1", "center");
+      }
+
+      /* ---------- 数据读出 ---------- */
+
+      var lastText = {};
+
+      function setText(node, value) {
+        if (lastText[node.id] !== value) {
+          node.textContent = value;
+          lastText[node.id] = value;
+        }
+      }
+
+      function describePhase(deg) {
+        var d = ((deg % 360) + 360) % 360;
+        if (d < 3.5 || d > 356.5) { return { short: "最大（中性面）", long: "线圈位于中性面，磁通量最大，感应电动势为零" }; }
+        if (Math.abs(d - 180) < 3.5) { return { short: "反向最大（中性面）", long: "线圈再次位于中性面，磁通量反向最大，感应电动势为零" }; }
+        if (Math.abs(d - 90) < 3.5 || Math.abs(d - 270) < 3.5) { return { short: "为零（线圈平面 ∥ B）", long: "线圈平面与磁感线平行，磁通量为零，感应电动势最大" }; }
+        if (d < 90) { return { short: "正在减小", long: "线圈离开中性面，磁通量减小，感应电动势增大" }; }
+        if (d < 180) { return { short: "正在减小至零", long: "线圈接近平行位置，磁通量减小到零，感应电动势接近峰值" }; }
+        if (d < 270) { return { short: "正在反向增大", long: "线圈越过平行位置，磁通量反向增大，感应电动势减小" }; }
+        return { short: "正在反向增大", long: "线圈回到中性面前，磁通量反向增大，感应电动势接近零" };
+      }
+
+      function updateReadouts(d, tf) {
+        var phase = state.theta % TAU;
+        var e = d.Em * Math.sin(phase);
+        var deg = phase * DEG;
+        var info = describePhase(deg);
+
+        setText(out.rpmValue, params.rpm + " r/min");
+        setText(out.turnsValue, params.turns + " 匝");
+        setText(out.bValue, params.B.toFixed(2) + " T");
+        setText(out.areaValue, params.area.toFixed(3) + " m²");
+        setText(out.n1Value, params.n1 + " 匝");
+        setText(out.n2Value, params.n2 + " 匝");
+        setText(out.u1Value, params.U1 + " V");
+        setText(out.rValue, params.R + " Ω");
+
+        setText(out.stageTheta, deg.toFixed(1) + "°");
+        setText(out.stageE, e.toFixed(2) + " V");
+        setText(out.stageFlux, info.short);
+
+        setText(out.mEm, d.Em.toFixed(2) + " V");
+        setText(out.mErms, d.Erms.toFixed(2) + " V");
+        setText(out.mFreq, "f = " + d.f.toFixed(2) + " Hz");
+        setText(out.mOmega, "ω = 2πf = " + d.omega.toFixed(2) + " rad/s，T = " + d.T.toFixed(2) + " s");
+        setText(out.mInst, "e = " + e.toFixed(2) + " V");
+        setText(out.mInstNote, info.long);
+
+        setText(out.mU2, "U₂ = " + tf.U2.toFixed(1) + " V");
+        setText(out.mI2, "I₂ = " + tf.I2.toFixed(2) + " A，I₁ = " + tf.I1.toFixed(2) + " A");
+
+        setText(out.tfU2, tf.U2.toFixed(1) + " V");
+        setText(out.tfI2, tf.I2.toFixed(2) + " A");
+        setText(out.tfI1, tf.I1.toFixed(2) + " A");
+        setText(out.tfPower, tf.P.toFixed(1) + " W");
+        var ratioText = "1 : " + fmtRatio(tf.ratio);
+        if (params.n2 > params.n1) { ratioText += "（升压）"; }
+        else if (params.n2 < params.n1) { ratioText += "（降压）"; }
+        else { ratioText += "（隔离）"; }
+        setText(out.tfRatio, ratioText);
+      }
+
+      /* ---------- 主渲染 ---------- */
+
+      function renderAll() {
+        var d = derive();
+        var tf = deriveTransformer();
+        var phase = state.theta % TAU;
+        var e = d.Em * Math.sin(phase);
+        var eFrac = d.Em > 0 ? e / d.Em : 0;
+
+        acCtx.clearRect(0, 0, acCanvas.width, acCanvas.height);
+        acCtx.fillStyle = "#080a0e";
+        acCtx.fillRect(0, 0, acCanvas.width, acCanvas.height);
+
+        if (state.showField) { drawFieldLines(acCtx); }
+        drawAxis(acCtx);
+        if (state.showField) { drawNeutralPlane(acCtx); }
+        drawRotationHint(acCtx);
+        drawCoil(acCtx, phase, eFrac);
+        drawNormal(acCtx, phase);
+        drawCoilLabels(acCtx);
+        drawWavePanel(acCtx, d);
+
+        drawTransformer(tfCtx, tf, Math.sin(phase) >= 0 ? 1 : -1);
+
+        updateReadouts(d, tf);
+      }
+
+      /* ---------- 动画循环 ---------- */
+
+      function frame(ts) {
+        if (!state.lastTs) { state.lastTs = ts; }
+        var dt = (ts - state.lastTs) / 1000;
+        state.lastTs = ts;
+        if (dt > 0.12) { dt = 0.12; }
+        if (state.playing) {
+          state.theta = (state.theta + derive().omega * dt) % (2 * TAU);
+        }
+        renderAll();
+        window.requestAnimationFrame(frame);
+      }
+
+      /* ---------- 交互 ---------- */
+
+      function readControls() {
+        params.rpm = Number(ui.rpmSlider.value);
+        params.turns = Number(ui.turnsSlider.value);
+        params.B = Number(ui.bSlider.value);
+        params.area = Number(ui.areaSlider.value);
+        params.n1 = Number(ui.n1Slider.value);
+        params.n2 = Number(ui.n2Slider.value);
+        params.U1 = Number(ui.u1Slider.value);
+        params.R = Number(ui.rSlider.value);
+      }
+
+      function syncControls() {
+        ui.rpmSlider.value = String(params.rpm);
+        ui.turnsSlider.value = String(params.turns);
+        ui.bSlider.value = String(params.B);
+        ui.areaSlider.value = String(params.area);
+        ui.n1Slider.value = String(params.n1);
+        ui.n2Slider.value = String(params.n2);
+        ui.u1Slider.value = String(params.U1);
+        ui.rSlider.value = String(params.R);
+      }
+
+      [ui.rpmSlider, ui.turnsSlider, ui.bSlider, ui.areaSlider,
+        ui.n1Slider, ui.n2Slider, ui.u1Slider, ui.rSlider].forEach(function (slider) {
+        slider.addEventListener("input", function () {
+          readControls();
+          renderAll();
+        });
+      });
+
+      ui.showField.addEventListener("change", function () {
+        state.showField = ui.showField.checked;
+        renderAll();
+      });
+
+      ui.showFlux.addEventListener("change", function () {
+        state.showFlux = ui.showFlux.checked;
+        renderAll();
+      });
+
+      ui.pauseBtn.addEventListener("click", function () {
+        state.playing = !state.playing;
+        ui.pauseBtn.textContent = state.playing ? "暂停" : "继续";
+      });
+
+      ui.resetBtn.addEventListener("click", function () {
+        params.rpm = DEFAULTS.rpm;
+        params.turns = DEFAULTS.turns;
+        params.B = DEFAULTS.B;
+        params.area = DEFAULTS.area;
+        params.n1 = DEFAULTS.n1;
+        params.n2 = DEFAULTS.n2;
+        params.U1 = DEFAULTS.U1;
+        params.R = DEFAULTS.R;
+        state.theta = 0;
+        state.playing = true;
+        state.showField = true;
+        state.showFlux = true;
+        ui.showField.checked = true;
+        ui.showFlux.checked = true;
+        ui.pauseBtn.textContent = "暂停";
+        lastText = {};
+        syncControls();
+        renderAll();
+      });
+
+      syncControls();
+      renderAll();
+      window.requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
