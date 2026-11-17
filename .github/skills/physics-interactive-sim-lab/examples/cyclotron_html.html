@@ -4,305 +4,309 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>回旋加速器可视化资源</title>
+  <link rel="icon" href="data:," />
   <style>
     :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
-      --stage: #080a0e;
-      --positive: #e73535;
-      --negative: #3558ff;
-      --accent: #0f766e;
-      --path: #ffd166;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+      --ink: #eaf2f5;
+      --muted: #9fb6c1;
+      --accent: #7fd6e4;
+      --accent-strong: #0f766e;
+      --warn: #f0b429;
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; }
+
+    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 286px; }
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .hud-toggle[aria-expanded="true"] { right: 232px; }
     }
 
-    .app {
-      width: min(1180px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 18px 0 24px;
+    /* ---------- 读数 chips（左上角，≤4 个） ---------- */
+    .hud-readout .tile { display: inline-flex; align-items: baseline; gap: 6px; }
+    .hud-readout .tile + .tile { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.14); }
+    .hud-readout .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+    .hud-readout .tile-value { font-size: 14.5px; font-weight: 800; color: #f2f8fa; line-height: 1.2; }
+    .hud-readout .tile-unit { font-size: 10.5px; font-weight: 700; color: var(--accent); }
+    .hud-readout .tile-badge { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px;
+                               background: rgba(255,255,255,.12); color: #d7e6ec; white-space: nowrap; }
+    .hud-readout .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
+    .hud-readout .tile-badge.up   { background: rgba(248,113,113,.2); color: #fca5a5; }
+    .hud-readout .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
+    .hud-readout .tile-badge.na   { opacity: .45; }
+
+    /* ---------- 图例（左下角，默认一行） ---------- */
+    .lg { display: inline-flex; align-items: center; gap: 4px; margin-right: 9px; white-space: nowrap; }
+    .lg:last-child { margin-right: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+    .dot-red { background: #e73535; }
+    .dot-blue { background: #3558ff; }
+    .dot-green { background: #22c55e; }
+    .arrow-glyph { color: #b45309; font-weight: 900; }
+    .lg.warn { color: #fbbf24; font-weight: 700; }
+    .sw { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+
+    /* ---------- 参数面板（右上角，可折叠） ---------- */
+    .panel-mode { margin: 0 0 8px; font-size: 11.5px; color: var(--muted); }
+    .panel-mode b { color: var(--accent); font-size: 12px; }
+    .panel-title { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted);
+                   text-transform: uppercase; margin-bottom: 2px; }
+    .panel-group + .panel-group { margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.16); }
+
+    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mode-btn { display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+                padding: 6px 7px; min-height: 50px; text-align: left; font: inherit;
+                border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+                background: rgba(255,255,255,.06); color: var(--ink); cursor: pointer; }
+    .mode-btn .mode-title { font-size: 13px; font-weight: 800; line-height: 1.25; }
+    .mode-btn .mode-sub { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+    .mode-btn:hover { background: rgba(255,255,255,.12); }
+    .mode-btn.active { border-color: transparent; background: var(--accent-strong); }
+    .mode-btn.active .mode-sub { color: rgba(255,255,255,.86); }
+    .mode-btn.active:hover { background: #0d665f; }
+
+    .slider-field { margin-top: 7px; }
+    .slider-field:first-of-type { margin-top: 0; }
+    .slider-field label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2px;
+                          font-size: 11.5px; font-weight: 700; color: #cfe3e9; }
+    .slider-field label span:last-child { color: var(--accent); white-space: nowrap; }
+    input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: #3fc1c9; }
+    input[type="range"]:disabled { opacity: .4; }
+
+    .footnote { margin: 4px 0 0; font-size: 10.5px; line-height: 1.45; color: #8fa6b1; }
+
+    .toggles { display: grid; gap: 5px; margin-top: 9px; padding-top: 8px;
+               border-top: 1px dashed rgba(255,255,255,.16); }
+    .panel-group .toggles { margin-top: 0; padding-top: 0; border-top: 0; }
+    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .toggle input { width: 15px; height: 15px; margin: 0; accent-color: #3fc1c9; }
+
+    .panel-actions, .reset-row { display: flex; gap: 8px; margin-top: 9px; }
+    .panel-actions button, .reset-row button { flex: 1; }
+    .primary-btn { min-height: 32px; border: 1px solid var(--accent-strong); border-radius: 8px;
+                   background: var(--accent-strong); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+    .primary-btn:hover { background: #0d665f; }
+    .panel-actions button:not(.primary-btn) { min-height: 32px; border: 1px solid rgba(255,255,255,.24);
+                   border-radius: 8px; background: rgba(255,255,255,.08); color: var(--ink);
+                   font: inherit; font-weight: 700; cursor: pointer; }
+    .panel-actions button:not(.primary-btn):hover { background: rgba(255,255,255,.16); }
+
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+    .particle-btn { min-height: 32px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+                    background: rgba(255,255,255,.06); color: var(--ink); font: inherit;
+                    font-size: 12.5px; font-weight: 700; cursor: pointer; }
+    .particle-btn:hover { background: rgba(255,255,255,.14); }
+    .particle-btn.active { border-color: transparent; background: var(--accent-strong); color: #fff; }
+
+    /* ---------- 抽屉内容 ---------- */
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+    .mode-tag { font-size: 12px; font-weight: 800; color: var(--accent); }
+    .mode-tag.warn { color: var(--warn); }
+    .drawer-close { border: 0; background: transparent; color: var(--muted); font-size: 18px;
+                    line-height: 1; cursor: pointer; padding: 0 4px; }
+    .drawer-close:hover { color: #fff; }
+    .conclusion-card { margin: 4px 0 6px; padding: 8px 10px; border-radius: 6px;
+                       border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); }
+    .conclusion-card.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); }
+    .conclusion-body { margin: 0 0 4px; font-size: 13px; line-height: 1.55; color: #e2eef2; }
+    .conclusion-key { margin: 0; font-size: 12.5px; font-weight: 700; color: #bfe9ee; }
+    .conclusion-formula { margin: 6px 0; padding: 6px 8px; border: 1px dashed rgba(255,255,255,.22);
+                          border-radius: 6px; font-size: 12px; line-height: 1.5; color: #dbe9ee; }
+    .conclusion-note { margin: 5px 0; font-size: 12px; line-height: 1.55; color: #a9bfc9; }
+    .drawer-eq { margin: 2px 0; font-size: 14px; font-weight: 800; color: #eaf2f5; }
+    .drawer .tile { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px; margin: 4px 0 8px;
+                    border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.04); }
+    .drawer .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+    .drawer .tile-value { font-size: 16px; font-weight: 800; color: #f2f8fa; }
+    .drawer .tile-unit { font-size: 11px; font-weight: 700; color: var(--accent); }
+    .drawer .tile-badge { margin-left: auto; font-size: 10.5px; font-weight: 800; padding: 1px 6px;
+                          border-radius: 999px; background: rgba(255,255,255,.12); color: #d7e6ec; }
+    .drawer .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
+    .drawer .tile-badge.up { background: rgba(248,113,113,.2); color: #fca5a5; }
+    .drawer .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
+    .drawer .tile-badge.na { opacity: .45; }
+    .mode-hint { margin: 8px 0 0; padding: 7px 9px; border-radius: 6px; font-size: 12px; line-height: 1.55;
+                 border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); color: #bfe9ee; }
+    .mode-hint.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); color: #f9dda2; }
+    .q-list { margin: 4px 0; padding-left: 18px; }
+    .q-list li { margin: 3px 0; font-size: 12.5px; line-height: 1.55; color: #cfe3e9; }
+    .drawer-keys { margin-top: 10px; font-size: 11px; color: #7f95a0; }
+
+    /* ---------- 舞台提示（回旋加速器） ---------- */
+    .stage-alert { position: absolute; right: 58px; bottom: 12px; max-width: min(560px, 56%);
+                   padding: 7px 12px; border-radius: 8px; z-index: 3;
+                   background: rgba(10,13,20,.9); border: 1px solid rgba(255,209,102,.85);
+                   color: #ffd166; font-size: 12px; font-weight: 700; line-height: 1.45;
+                   text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,.4); pointer-events: none; }
+
+    @media (max-width: 1120px) {
+      .hud-panel { width: 210px; }
+      .hud-toggle[aria-expanded="true"] { right: 234px; }
+      .drawer { width: min(380px, 78%); }
     }
-
-    .topbar {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
-    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
-
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 310px;
-      gap: 14px;
-      align-items: start;
-    }
-
-    .stage-panel,
-    .side-panel,
-    .control-panel,
-    .inquiry-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-
-    .stage-panel { padding: 12px; }
-
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      min-height: 430px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
-
-    #cyclotronCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .stage-readout {
-      position: absolute;
-      left: 16px;
-      top: 14px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .readout-item {
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-    }
-
-    .stage-alert {
-      position: absolute;
-      left: 50%;
-      bottom: 14px;
-      transform: translateX(-50%);
-      max-width: calc(100% - 36px);
-      padding: 8px 14px;
-      border-radius: 8px;
-      background: rgba(10, 13, 20, 0.9);
-      border: 1px solid rgba(255, 209, 102, 0.85);
-      color: #ffd166;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1.5;
-      text-align: center;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-      pointer-events: none;
-    }
-
-    .stage-alert[hidden] { display: none; }
-
-    .side-panel { padding: 14px; }
-    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
-
-    .metric {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      margin-bottom: 10px;
-      background: #f8fafc;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-
-    .metric-value {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
-    }
-
-    .metric-value.neutral { color: var(--accent); }
-    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.55; }
-
-    .control-panel { margin-top: 14px; padding: 14px; }
-    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
-    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
-    .field { margin-top: 10px; }
-    .field label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-
-    .segmented {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-
-    button {
-      min-height: 36px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    button:hover { background: #f1f5f9; }
-    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
-    button.active:hover, .primary-btn:hover { background: #0d665f; }
-
-    .toggles { display: grid; gap: 9px; }
-    .toggle { display: flex; align-items: center; gap: 9px; font-size: 15px; user-select: none; }
-    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
-
-    .inquiry-panel { margin-top: 14px; padding: 14px; }
-    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
-    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-
-    @media (max-width: 960px) {
-      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
-      .topbar { align-items: start; flex-direction: column; }
-      .formula { white-space: normal; }
-    }
-  </style>
+</style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>回旋加速器可视化资源</h1>
-        <p class="subtitle">观察粒子在 D 形盒中受磁场偏转、在缝隙中受电场加速，理解 r ∝ √n 与周期不随速率改变的近似条件。</p>
-      </div>
-      <div class="formula">r = mv / qB，T = 2πm / qB，ΔE<sub>k</sub> = qU</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="回旋加速器演示区">
-          <div class="stage-wrap">
-            <canvas id="cyclotronCanvas" width="960" height="540"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">粒子：<span id="stageParticle">质子</span></div>
-              <div class="readout-item">加速次数：<span id="stageBoosts">0 / 10</span></div>
-              <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
-            </div>
-            <div class="stage-alert" id="stageAlert" hidden></div>
+        <canvas id="cyclotronCanvas" width="960" height="540"></canvas>
+
+        <!-- 左上角实时读数：4 个 chips -->
+        <div class="hud hud-readout" aria-label="实时读数">
+          <div class="tile">
+            <span class="tile-label">粒子</span>
+            <span class="tile-value" id="stageParticle">质子</span>
           </div>
-        </section>
+          <div class="tile">
+            <span class="tile-label">加速</span>
+            <span class="tile-value" id="stageBoosts">0 / 10</span>
+          </div>
+          <div class="tile">
+            <span class="tile-label">状态</span>
+            <span class="tile-value" id="stageStatus">暂停</span>
+          </div>
+          <div class="tile">
+            <span class="tile-value" id="radiusValue">r末 / r₁ = 3.16</span>
+          </div>
+        </div>
 
-        <section class="control-panel" aria-label="参数控制">
-          <h2>参数调节</h2>
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">磁场与电压</div>
-              <div class="field">
-                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">1.2</span></label>
-                <input id="bSlider" type="range" min="0.7" max="2.0" value="1.2" step="0.1" />
-              </div>
-              <div class="field">
-                <label for="uSlider"><span>缝隙电压 U</span><span id="uValue">1.5</span></label>
-                <input id="uSlider" type="range" min="0.6" max="2.4" value="1.5" step="0.1" />
-              </div>
+        <!-- 左下角图例：一行 -->
+        <div class="hud hud-legend" aria-label="图例">
+          <span class="lg"><i class="sw" style="background:#ffd166"></i>轨道</span>
+          <span class="lg"><i class="sw" style="background:#ffffff"></i>速度 v</span>
+          <span class="lg"><i class="sw" style="background:#7dd3fc"></i>洛伦兹力 F</span>
+          <span class="lg">· 磁场垂直屏面向外</span>
+        </div>
+
+        <!-- 右上角参数面板（可折叠） -->
+        <button class="hud-toggle" id="ctrlToggle" type="button" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
+          <div class="panel-group">
+            <div class="panel-title">磁场与电压</div>
+            <div class="slider-field">
+              <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">1.2</span></label>
+              <input id="bSlider" type="range" min="0.7" max="2.0" value="1.2" step="0.1" />
             </div>
-
-            <div class="control-block">
-              <div class="control-title">粒子类型</div>
-              <div class="segmented">
-                <button type="button" class="particle-btn active" data-particle="proton">质子</button>
-                <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
-              </div>
-              <p class="hint">用相对 q/m 表示差异：质子 m/q = 1，α 粒子 m/q = 2（半径 √2 倍、周期 2 倍）。</p>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">显示与播放</div>
-              <div class="toggles">
-                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示速度和洛伦兹力</span></label>
-                <label class="toggle"><input type="checkbox" id="showBField" checked /><span>显示垂直屏面的磁场</span></label>
-              </div>
-              <div class="field">
-                <button type="button" class="primary-btn" id="playBtn">播放</button>
-                <button type="button" id="resetBtn">重置</button>
-              </div>
+            <div class="slider-field">
+              <label for="uSlider"><span>缝隙电压 U</span><span id="uValue">1.5</span></label>
+              <input id="uSlider" type="range" min="0.6" max="2.4" value="1.5" step="0.1" />
             </div>
           </div>
-        </section>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
+          <div class="panel-group">
+            <div class="panel-title">粒子类型</div>
+            <div class="segmented">
+              <button type="button" class="particle-btn active" data-particle="proton">质子</button>
+              <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
+            </div>
+          </div>
+
+          <div class="panel-group">
+            <div class="panel-title">显示</div>
+            <div class="toggles">
+              <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>速度与洛伦兹力</span></label>
+              <label class="toggle"><input type="checkbox" id="showBField" checked /><span>磁场符号（出屏）</span></label>
+            </div>
+          </div>
+
+          <div class="panel-actions">
+            <button type="button" class="primary-btn" id="playBtn">播放</button>
+            <button type="button" id="resetBtn">重置</button>
+          </div>
+          <p class="footnote">α 粒子 m/q = 2：同 B 下半径 √2 倍、周期 2 倍。</p>
+        </aside>
+
+        <!-- 底部提示（达到最大半径等） -->
+        <div class="stage-alert" id="stageAlert" hidden></div>
+
+        <!-- 右下角「?」抽屉 -->
+        <button class="hud-more" id="moreBtn" type="button" aria-expanded="false" aria-controls="drawer" title="结论与说明">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="结论与说明">
+          <div class="drawer-head">
+            <span class="mode-tag">回旋加速器</span>
+            <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭抽屉">×</button>
+          </div>
+
+          <h3>半径变化（末端 / 初始）</h3>
+          <p class="conclusion-note" id="radiusNote">—</p>
+
+          <h3>周期关系</h3>
+          <p class="drawer-eq" id="periodValue">T = 2πm / qB</p>
+          <p class="conclusion-note" id="periodNote">—</p>
+
+          <h3>能量增量</h3>
+          <p class="drawer-eq" id="energyValue">ΔE_k = qU</p>
+          <p class="conclusion-note" id="energyNote">—</p>
+
+          <h3>核心关系</h3>
+          <p class="conclusion-formula">r = mv / qB　　T = 2πm / qB　　ΔE_k = qU　　r ∝ √n</p>
+
+          <h3>模型假设</h3>
+          <p class="conclusion-note">非相对论、匀强磁场、薄缝瞬时加速的简化模型。缝隙内无磁场、仅电场；进入 D 形盒后磁场使其做半圆运动。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</p>
+
+          <h3>课堂观察</h3>
+          <ul class="q-list">
             <li>粒子在哪一段受到电场力做功？在 D 形盒内部能量是否增加？</li>
             <li>增大 B 后轨道为什么更紧？回旋周期 T 与速率有没有直接关系？</li>
             <li>换成 α 粒子后，同样 B、U 下半径和周期为什么会改变？</li>
           </ul>
-        </section>
-      </div>
 
-      <aside class="side-panel" aria-label="资源说明">
-        <h2>资源说明</h2>
-        <div class="metric">
-          <div class="metric-label">半径变化（末端 / 初始）</div>
-          <div class="metric-value neutral" id="radiusValue">r末 / r₁ = 3.16</div>
-          <div class="metric-note" id="radiusNote"></div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">周期关系</div>
-          <div class="metric-value" id="periodValue">T = 2πm / qB</div>
-          <div class="metric-note" id="periodNote"></div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">能量增量</div>
-          <div class="metric-value" id="energyValue">ΔE<sub>k</sub> = qU</div>
-          <div class="metric-note" id="energyNote"></div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">模型假设</div>
-          <div class="metric-note" id="modelNote">非相对论、匀强磁场、薄缝瞬时加速的简化模型。缝隙内无磁场、仅电场；进入 D 形盒后磁场使其做半圆运动。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</div>
-        </div>
-      </aside>
-    </section>
+          <p class="drawer-keys">空格：播放/暂停 · R：重置 · P：参数 · ?：本抽屉</p>
+        </section>
+
+      </div>
+    </div>
   </main>
+
 
   <script>
     const canvas = document.getElementById("cyclotronCanvas");
@@ -793,5 +797,60 @@
     render();
     animate();
   </script>
+<script>
+(function () {
+  var panel = document.getElementById("ctrlPanel");
+  var toggle = document.getElementById("ctrlToggle");
+  var drawer = document.getElementById("drawer");
+  var more = document.getElementById("moreBtn");
+  var closeBtn = document.getElementById("drawerClose");
+  var playBtn = document.getElementById("playBtn");
+  var resetBtn = document.getElementById("resetBtn");
+
+  function setPanel(open) {
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) setDrawer(false);
+  }
+
+  function setDrawer(open) {
+    drawer.hidden = !open;
+    more.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) setPanel(false);
+  }
+
+  toggle.addEventListener("click", function () { setPanel(panel.hidden); });
+  more.addEventListener("click", function () { setDrawer(drawer.hidden); });
+  closeBtn.addEventListener("click", function () { setDrawer(false); });
+
+  document.addEventListener("keydown", function (event) {
+    var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : "";
+    if (event.key === "Escape") {
+      setDrawer(false);
+      return;
+    }
+    if (event.key === "p" || event.key === "P") {
+      event.preventDefault();
+      setPanel(panel.hidden);
+      return;
+    }
+    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+      event.preventDefault();
+      setDrawer(drawer.hidden);
+      return;
+    }
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (event.key === " " || event.code === "Space") {
+      event.preventDefault();
+      playBtn.click();
+      return;
+    }
+    if (event.key === "r" || event.key === "R") {
+      event.preventDefault();
+      resetBtn.click();
+    }
+  });
+})();
+</script>
 </body>
 </html>

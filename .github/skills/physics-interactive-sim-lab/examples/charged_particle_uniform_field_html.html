@@ -3,220 +3,190 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>带电粒子在匀强电场中的运动可视化资源</title>
+  <title>带电粒子在匀强电场中的运动</title>
   <link rel="icon" href="data:," />
   <style>
-    :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
-      --stage: #080a0e;
-      --positive: #e73535;
-      --negative: #3558ff;
-      --accent: #0f766e;
-      --path: #ffd166;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
-    }
-
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
+
+    /* —— LAYOUT.md 必需样式 —— */
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; }
+
+    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 286px; }   /* 面板展开时让到面板左边 */
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .hud-toggle[aria-expanded="true"] { right: 232px; }
     }
 
-    .app { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 18px 0 24px; }
-    .topbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
-    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
+    /* —— 叠加层内部样式（只影响外观） —— */
+    .hud-readout > span { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; color: #9fb6bf; }
+    .hud-readout > span + span { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.16); }
+    .hud-readout b { font-weight: 800; }
+    .hud-readout .chip-status b { font-size: 12.5px; }
 
-    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 14px; align-items: start; }
-    .stage-panel, .side-panel, .control-panel, .inquiry-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-    .stage-panel { padding: 12px; }
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      min-height: 430px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
-    #motionCanvas { width: 100%; height: 100%; display: block; }
-    .stage-readout {
-      position: absolute;
-      left: 16px;
-      top: 14px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-    .readout-item {
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-    }
-    .side-panel { padding: 14px; }
-    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
-    .metric { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: #f8fafc; }
-    .metric-label { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
-    .metric-value { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.25; overflow-wrap: anywhere; }
-    .metric-value.positive { color: var(--positive); }
-    .metric-value.negative { color: var(--negative); }
-    .metric-value.neutral { color: var(--accent); }
-    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.55; }
-    .control-panel { margin-top: 14px; padding: 14px; }
-    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
-    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
-    .field { margin-top: 10px; }
-    .field label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-    .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    button {
-      min-height: 36px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    button:hover { background: #f1f5f9; }
-    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
-    button.active:hover, .primary-btn:hover { background: #0d665f; }
-    .toggles { display: grid; gap: 9px; }
-    .toggle { display: flex; align-items: center; gap: 9px; font-size: 15px; user-select: none; }
-    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
-    .inquiry-panel { margin-top: 14px; padding: 14px; }
-    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
-    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-    @media (max-width: 960px) {
-      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
-      .topbar { align-items: start; flex-direction: column; }
-      .formula { white-space: normal; }
-    }
+    .hud-legend { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; overflow: hidden; }
+    .lg-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .lg-line { width: 18px; height: 4px; border-radius: 999px; background: #ffd166; flex: 0 0 auto; }
+    .lg-arrow { width: 0; height: 0; border-left: 12px solid rgba(255,209,102,.85);
+                border-top: 4px solid transparent; border-bottom: 4px solid transparent; flex: 0 0 auto; }
+    .lg-plate { width: 14px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, #ff3030 50%, #5363ff 50%); flex: 0 0 auto; }
+
+    .hud-panel::-webkit-scrollbar, .drawer::-webkit-scrollbar { width: 6px; }
+    .hud-panel::-webkit-scrollbar-thumb, .drawer::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
+
+    .panel-title { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; color: #8aa2ac; }
+    .hud button { font-family: inherit; cursor: pointer; }
+    .hud-panel .field { margin-top: 10px; }
+    .hud-panel .field label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #cfe3e9; }
+    .hud-panel .field label b { color: #7fd6e4; font-weight: 700; }
+    .hud-panel input[type="range"] { width: 100%; margin: 4px 0 0; accent-color: #7fd6e4; }
+    .hud-panel .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .hud-panel .segmented button { min-height: 30px; padding: 0 4px; font-size: 12px; font-weight: 700; color: #dbe9ee;
+                                   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); border-radius: 7px; }
+    .hud-panel .segmented button:hover { background: rgba(255,255,255,.12); }
+    .hud-panel .segmented button.active { background: #0f766e; border-color: #0f766e; color: #fff; }
+    .hud-panel .toggles { display: grid; gap: 6px; margin-top: 10px; }
+    .hud-panel .toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #cfe3e9; user-select: none; }
+    .hud-panel .toggle input { width: 15px; height: 15px; accent-color: #7fd6e4; }
+    .hud-panel .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .hud-panel .btn-row button { min-height: 32px; border-radius: 8px; font-size: 12.5px; font-weight: 700;
+                                 border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #eaf2f5; }
+    .hud-panel .btn-row button:hover { background: rgba(255,255,255,.14); }
+    .hud-panel .btn-row button.primary-btn { background: #0f766e; border-color: #0f766e; color: #fff; }
+    .hud-panel .btn-row button.primary-btn:hover { background: #0d665f; }
+    .hud-panel .ctl-hint { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: #9fb6bf; }
+
+    .drawer .formula-line { margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px;
+                            background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; }
+    .drawer ul { margin: 4px 0 0; padding-left: 18px; }
+    .drawer .note { font-size: 12px; color: #9fb6bf; }
+    .metric-value { font-weight: 800; }
+    .metric-value.positive { color: #ff9a9a; }
+    .metric-value.negative { color: #9aa8ff; }
+    .metric-value.neutral { color: #7fd6e4; }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>带电粒子在匀强电场中的运动可视化资源</h1>
-        <p class="subtitle">观察粒子进入平行板电场后的受力、速度分解和偏转轨迹。</p>
-      </div>
-      <div class="formula">F = qE，a = qE / m，偏转量 y = 1/2 at²</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="motionCanvas" width="960" height="540"></canvas>
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="运动演示区">
-          <div class="stage-wrap">
-            <canvas id="motionCanvas" width="960" height="540"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">粒子：<span id="stageParticle">正电荷</span></div>
-              <div class="readout-item">偏转：<span id="stageDeflection">0.00</span></div>
-              <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
-            </div>
+        <div class="hud hud-readout">
+          <span>粒子 <b id="stageParticle">正电荷</b></span>
+          <span>偏转 <b id="stageDeflection">0.00（相对值）</b></span>
+          <span class="chip-status">状态 <b id="stageStatus">暂停</b></span>
+        </div>
+
+        <div class="hud hud-legend" id="legend" aria-hidden="true">
+          <span class="lg-item"><span class="lg-line"></span>轨迹</span>
+          <span class="lg-item"><span class="lg-arrow"></span>力 F = qE</span>
+          <span class="lg-item"><span class="lg-line" style="background:rgba(255,255,255,.8)"></span>速度 v₀</span>
+          <span class="lg-item"><span class="lg-plate"></span>极板</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
+          <p class="panel-title">参数</p>
+
+          <div class="field">
+            <label for="fieldSlider"><span>电场强度 E</span><b id="fieldValue">1.0</b></label>
+            <input id="fieldSlider" type="range" min="0.3" max="2.4" value="1" step="0.1" />
           </div>
-        </section>
-
-        <section class="control-panel" aria-label="参数控制">
-          <h2>参数调节</h2>
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">电场与粒子</div>
-              <div class="field">
-                <label for="fieldSlider"><span>电场强度 E</span><span id="fieldValue">1.0</span></label>
-                <input id="fieldSlider" type="range" min="0.3" max="2.4" value="1" step="0.1" />
-              </div>
-              <div class="field">
-                <label for="speedSlider"><span>初速度 v₀</span><span id="speedValue">1.4</span></label>
-                <input id="speedSlider" type="range" min="0.8" max="2.6" value="1.4" step="0.1" />
-              </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">粒子电性</div>
-              <div class="segmented">
-                <button type="button" class="charge-btn active" data-charge="1">正电荷</button>
-                <button type="button" class="charge-btn" data-charge="-1">负电荷</button>
-              </div>
-              <div class="field">
-                <label for="massSlider"><span>质量倍率 m</span><span id="massValue">1.0</span></label>
-                <input id="massSlider" type="range" min="0.6" max="2.4" value="1" step="0.1" />
-              </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">显示与播放</div>
-              <div class="toggles">
-                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示力和速度分解</span></label>
-                <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>显示运动分解参考</span></label>
-              </div>
-              <p class="hint">力箭头长度随 qE/m 单调增大，v₀ 箭头长度与 v₀ 成正比；箭头仅示意相对大小，精确量值见右侧读数。</p>
-              <div class="field">
-                <button type="button" class="primary-btn" id="playBtn">播放</button>
-                <button type="button" id="resetBtn">重置</button>
-              </div>
-            </div>
+          <div class="field">
+            <label for="speedSlider"><span>初速度 v₀</span><b id="speedValue">1.4</b></label>
+            <input id="speedSlider" type="range" min="0.8" max="2.6" value="1.4" step="0.1" />
           </div>
-        </section>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
+          <div class="segmented" role="group" aria-label="粒子电性">
+            <button type="button" class="charge-btn active" data-charge="1">正电荷</button>
+            <button type="button" class="charge-btn" data-charge="-1">负电荷</button>
+          </div>
+
+          <div class="field">
+            <label for="massSlider"><span>质量倍率 m</span><b id="massValue">1.0</b></label>
+            <input id="massSlider" type="range" min="0.6" max="2.4" value="1" step="0.1" />
+          </div>
+
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>力和速度分解</span></label>
+            <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>运动分解参考</span></label>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" class="primary-btn" id="playBtn">播放</button>
+            <button type="button" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂问题">
+          <h3>结论</h3>
+          <p>粒子在匀强电场中做类平抛运动：水平方向匀速，竖直方向匀加速，轨迹为抛物线。</p>
+          <p class="formula-line">F = qE，a = qE/m，y = ½at²</p>
+
+          <h3>实时量值</h3>
+          <p>受力方向：<span class="metric-value positive" id="forceDirection">向下</span></p>
+          <p><span id="deflectionLabel">离开电场时偏转</span>：<span class="metric-value neutral" id="deflectionValue">0.00</span></p>
+          <p class="note" id="deflectionNote"></p>
+          <p class="note" id="motionNote">水平方向匀速，竖直方向在电场力作用下做匀加速运动。</p>
+
+          <h3>模型假设与单位</h3>
+          <p class="note">本图上极板为正、下极板为负，电场竖直向下；水平方向匀速、竖直方向匀加速。偏转量 y 为相对值（半板间距 = 1.222 个相对单位）。力箭头长度随 qE/m 单调增大，v₀ 箭头长度与 v₀ 成正比；箭头仅示意相对大小，精确量值见左侧读数。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
             <li>改变粒子电性后，受力方向和轨迹偏转方向如何变化？</li>
             <li>增大电场强度时，偏转程度为什么会增大？</li>
             <li>增大初速度时，粒子在电场中的运动时间怎样变化？偏转怎样变化？</li>
           </ul>
+
+          <p class="note">快捷键：空格 播放/暂停 · R 重置 · P 折叠参数 · ? 打开/关闭本说明</p>
         </section>
       </div>
-
-      <aside class="side-panel" aria-label="资源说明">
-        <h2>资源说明</h2>
-        <div class="metric">
-          <div class="metric-label">受力方向</div>
-          <div class="metric-value" id="forceDirection">向下</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label" id="deflectionLabel">离开电场时偏转</div>
-          <div class="metric-value neutral" id="deflectionValue">0.00</div>
-          <div class="metric-note" id="deflectionNote"></div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">运动分解</div>
-          <div class="metric-note" id="motionNote">水平方向匀速，竖直方向在电场力作用下做匀加速运动。</div>
-        </div>
-      </aside>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -651,6 +621,59 @@
       state.playing = false;
       controls.playBtn.textContent = "播放";
       render();
+    });
+
+    // —— 外壳交互：参数折叠 / 「?」抽屉 / 快捷键（不改变物理与绘图逻辑）——
+    const panel = document.getElementById("ctrlPanel");
+    const ctrlToggle = document.getElementById("ctrlToggle");
+    const moreBtn = document.getElementById("moreBtn");
+    const drawer = document.getElementById("drawer");
+
+    function setPanel(open) {
+      panel.hidden = !open;
+      ctrlToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    // 打开「?」抽屉时收起参数面板，避免两块叠加层互相遮挡；关闭时恢复原状态。
+    let restorePanelOnDrawerClose = false;
+
+    function setDrawer(open) {
+      drawer.hidden = !open;
+      moreBtn.setAttribute("aria-expanded", String(open));
+      if (open && !panel.hidden) {
+        restorePanelOnDrawerClose = true;
+        setPanel(false);
+      } else if (!open && restorePanelOnDrawerClose) {
+        restorePanelOnDrawerClose = false;
+        setPanel(true);
+      }
+    }
+
+    ctrlToggle.addEventListener("click", () => setPanel(panel.hidden));
+    moreBtn.addEventListener("click", () => setDrawer(drawer.hidden));
+
+    document.addEventListener("keydown", (event) => {
+      const tag = event.target && event.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (event.code === "Space") {
+        if (tag === "BUTTON") return;
+        event.preventDefault();
+        controls.playBtn.click();
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "r") {
+        controls.resetBtn.click();
+        event.preventDefault();
+      } else if (key === "p") {
+        setPanel(panel.hidden);
+        event.preventDefault();
+      } else if (event.key === "?") {
+        setDrawer(drawer.hidden);
+        event.preventDefault();
+      } else if (key === "escape") {
+        setDrawer(false);
+      }
     });
 
     window.addEventListener("resize", render);

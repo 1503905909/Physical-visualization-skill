@@ -4,575 +4,231 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>交变电流与变压器可视化资源</title>
+  <link rel="icon" href="data:," />
   <style>
     :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
-      --stage: #080a0e;
-      --positive: #e73535;
-      --negative: #3558ff;
       --accent: #0f766e;
-      --warn: #c2410c;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+      --cyan: #7fd6e4;
     }
 
-    * { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：主动画 + 变压器示意同处一块画面，页面无滚动条 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #080a0e;
+                   display: flex; flex-direction: column; }
+
+    .scene-main { position: relative; flex: 0 0 73%; min-height: 0; overflow: hidden;
+                  display: flex; align-items: center; justify-content: flex-start; }
+    .scene-tf { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
+                display: flex; align-items: center; justify-content: flex-start; }
+
+    /* 画布按 16:9 / 2.125:1 等比缩放，内部坐标系不变；右侧留白给参数面板 */
+    .scene-main > canvas { display: block; height: 100%; width: auto; max-width: 100%;
+                           object-fit: contain; object-position: left center; }
+    .scene-tf > canvas { display: block; height: 100%; width: auto; max-width: 100%;
+                         object-fit: contain; object-position: left center; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: var(--cyan); }
+    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+    .hud-readout .chip + .chip { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.14); }
+    .hud-readout .k { font-size: 11px; color: #93aab4; }
+    .hud-readout b.ok { color: #4ade80; }
+    .hud-readout b.dim { font-size: 12.5px; font-weight: 600; color: #ffd166; }
+
+    .hud-legend { left: 12px; bottom: calc(27% + 10px); max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .hud-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .sw { display: inline-block; width: 16px; height: 4px; border-radius: 2px; flex: 0 0 auto; }
+    .sw-field { background: rgba(226,232,240,.72); }
+    .sw-neutral { width: 2px; height: 12px; border-left: 2px dashed #fb923c; border-radius: 0; }
+    .sw-current { background: #fbbf24; }
+
+    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-panel h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                    color: var(--cyan); }
+    .hud-panel h4:first-child { margin-top: 0; }
+
+    .field { margin-top: 7px; }
+    .field > label { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px;
+                     color: #b9cdd6; }
+    .field > label > span:last-child { color: var(--cyan); font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 2px 0 0;
+                          accent-color: #22d3ee; }
+
+    .hud-panel button { font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
+                        cursor: pointer; color: #eaf2f5; background: rgba(255,255,255,.08);
+                        border: 1px solid rgba(255,255,255,.22); }
+    .hud-panel button:hover { background: rgba(255,255,255,.16); }
+    .hud-panel button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+    .hud-panel button.primary:hover { background: #0d665f; }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
+    .toggles { display: grid; gap: 6px; margin-top: 7px; }
+    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #b9cdd6;
+              cursor: pointer; }
+    .toggle input { width: 15px; height: 15px; accent-color: #22d3ee; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 286px; }   /* 面板展开时让到面板左边 */
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-more:hover { background: rgba(255,255,255,.16); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px;
+              scrollbar-width: thin; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: var(--cyan); }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ol { margin: 4px 0; padding-left: 18px; }
+    .drawer .eq { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--cyan); }
+    .drawer .dim { color: #93aab4; font-size: 12px; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .hud-toggle[aria-expanded="true"] { right: 232px; }
     }
 
-    .app {
-      width: min(1256px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 16px 0 24px;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
-
-    .subtitle {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .symbol-note {
-      margin-top: 3px;
-      font-size: 12.5px;
-      color: #7b8794;
-    }
-
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 17px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 296px;
-      gap: 14px;
-      align-items: start;
-    }
-
-    .stage-panel,
-    .side-panel,
-    .control-panel,
-    .inquiry-panel,
-    .transformer-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-
-    .stage-panel { padding: 12px; }
-
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1000 / 562;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
-
-    #acCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .stage-readout {
-      position: absolute;
-      left: 14px;
-      top: 12px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .readout-item {
-      padding: 6px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-      white-space: nowrap;
-    }
-
-    .stage-legend {
-      position: absolute;
-      left: 14px;
-      bottom: 12px;
-      display: grid;
-      grid-template-columns: repeat(4, auto);
-      gap: 7px;
-      pointer-events: none;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 8px;
-      border-radius: 8px;
-      background: rgba(8, 10, 14, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: rgba(255, 255, 255, 0.92);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .swatch {
-      width: 18px;
-      height: 10px;
-      border-radius: 3px;
-      flex: 0 0 auto;
-    }
-
-    .swatch.field { background: rgba(226, 232, 240, 0.72); }
-    .swatch.neutral { background: transparent; border-left: 3px dashed #fb923c; border-radius: 0; }
-    .swatch.current { background: #fbbf24; }
-    .swatch.wave { background: #22c55e; }
-
-    .transformer-panel {
-      margin-top: 14px;
-      padding: 12px 14px 14px;
-    }
-
-    .panel-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 8px;
-    }
-
-    .panel-head h2 { margin: 0; font-size: 18px; }
-
-    .panel-head .note {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .tf-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 232px;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .tf-canvas-wrap {
-      background: var(--stage);
-      border: 1px solid #1e2430;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    #tfCanvas {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    .tf-readouts {
-      display: grid;
-      gap: 8px;
-    }
-
-    .readout-card {
-      padding: 8px 10px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f8fafc;
-    }
-
-    .readout-card .k {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .readout-card .v {
-      margin-top: 2px;
-      font-size: 17px;
-      font-weight: 800;
-      color: #0f172a;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .readout-card .v.accent { color: var(--accent); }
-    .readout-card .v.warn { color: var(--warn); }
-
-    .side-panel { padding: 14px; }
-    .side-panel h2 { margin: 0 0 12px; font-size: 18px; }
-
-    .metric {
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      margin-bottom: 9px;
-      background: #f8fafc;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 3px;
-    }
-
-    .metric-value {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      line-height: 1.25;
-      font-variant-numeric: tabular-nums;
-      overflow-wrap: anywhere;
-    }
-
-    .metric-value.wave { color: #15803d; }
-    .metric-value.peak { color: #b45309; }
-
-    .metric-note {
-      margin-top: 5px;
-      color: var(--muted);
-      font-size: 12.5px;
-      line-height: 1.55;
-    }
-
-    .control-panel { margin-top: 14px; padding: 14px; }
-    .control-panel h2 { margin: 0 0 12px; font-size: 18px; }
-
-    .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .control-block {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f8fafc;
-    }
-
-    .control-title {
-      margin-bottom: 8px;
-      font-size: 16px;
-      font-weight: 800;
-    }
-
-    .field { margin-top: 9px; }
-
-    .field label {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 5px;
-      color: #344054;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .field label span:last-child {
-      color: var(--accent);
-      font-variant-numeric: tabular-nums;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-      margin: 0;
-    }
-
-    .toggles {
-      display: grid;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .toggle {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      font-size: 14.5px;
-      user-select: none;
-    }
-
-    .toggle input {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--accent);
-    }
-
-    button {
-      min-height: 34px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-    }
-
-    button:hover { background: #f1f5f9; }
-
-    .btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .primary-btn {
-      border-color: #0f766e;
-      background: #0f766e;
-      color: #ffffff;
-    }
-
-    .primary-btn:hover { background: #0d665f; }
-
-    .inquiry-panel { margin-top: 14px; padding: 14px; }
-    .inquiry-panel h2 { margin: 0 0 10px; font-size: 18px; }
-
-    .inquiry-list {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .inquiry-list li {
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fbfdff;
-      color: #344054;
-      font-size: 14px;
-      line-height: 1.55;
-    }
-
-    .inquiry-list li b { color: var(--accent); }
-
-    .assumption {
-      margin: 10px 0 0;
-      padding: 9px 12px;
-      border: 1px solid #fed7aa;
-      border-left: 4px solid #f97316;
-      border-radius: 8px;
-      background: #fff7ed;
-      color: #7c2d12;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .hint {
-      margin: 8px 0 0;
-      color: var(--muted);
-      font-size: 12.5px;
-      line-height: 1.55;
-    }
-
-    @media (max-width: 1080px) {
-      .layout,
-      .controls-grid,
-      .inquiry-list,
-      .tf-grid { grid-template-columns: 1fr; }
-      .topbar { align-items: start; flex-direction: column; }
-      .formula { white-space: normal; }
-      .stage-legend { grid-template-columns: repeat(2, auto); }
+    /* 短屏（如 1024×768 的 4:3 投影）：面板内容略收紧，保证参数全部可见 */
+    @media (max-height: 800px) {
+      .hud-panel { padding: 10px 12px; font-size: 12px; }
+      .hud-panel h4 { margin: 8px 0 2px; }
+      .field { margin-top: 5px; }
+      .toggles { gap: 4px; margin-top: 6px; }
+      .btn-row { margin-top: 7px; }
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>交变电流与变压器</h1>
-        <p class="subtitle">矩形线圈在匀强磁场中绕垂直于磁场的轴匀速转动，产生正弦交变电流；理想变压器按匝数比改变电压。</p>
-        <p class="subtitle symbol-note">符号与角度：θ 为线圈法线 n 与磁感线 B 的夹角，从中性面（θ = 0°）起算；N<sub>r</sub> 为转速，N 为线圈匝数，n₁、n₂ 为变压器原、副线圈匝数。</p>
-      </div>
-      <div class="formula">e = E<sub>m</sub> sin&nbsp;ωt，&nbsp;E<sub>m</sub> = NBSω，&nbsp;E = E<sub>m</sub>/√2</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
+        <div class="scene-main">
+          <canvas id="acCanvas" width="1000" height="562"></canvas>
+        </div>
+        <div class="scene-tf">
+          <canvas id="tfCanvas" width="680" height="320" aria-label="理想变压器示意"></canvas>
+        </div>
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="交变电流产生过程演示区">
-          <div class="stage-wrap">
-            <canvas id="acCanvas" width="1000" height="562"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">θ = <span id="stageTheta">0.0°</span></div>
-              <div class="readout-item">e = <span id="stageE">0.00 V</span></div>
-              <div class="readout-item">Φ：<span id="stageFlux">最大（中性面）</span></div>
-            </div>
-            <div class="stage-legend" aria-hidden="true">
-              <div class="legend-item"><span class="swatch field"></span><span>磁感线 B</span></div>
-              <div class="legend-item"><span class="swatch neutral"></span><span>中性面</span></div>
-              <div class="legend-item"><span class="swatch current"></span><span>感应电流方向</span></div>
-              <div class="legend-item"><span class="swatch wave"></span><span>e–t 波形</span></div>
-            </div>
+        <!-- 读数：左上角 ≤4 chips -->
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip"><span class="k">θ</span><b id="stageTheta">0.0°</b></span>
+          <span class="chip"><span class="k">e</span><b class="ok" id="stageE">0.00 V</b></span>
+          <span class="chip"><span class="k">Φ</span><b class="dim" id="stageFlux">最大（中性面）</b></span>
+          <span class="chip"><span class="k">U₂</span><b id="tfU2">24.0 V</b></span>
+        </div>
+
+        <!-- 图例：主画面左下角一行 -->
+        <div class="hud hud-legend" id="legend" aria-label="图例">
+          <span><i class="sw sw-field"></i>磁感线 B</span>
+          <span><i class="sw sw-neutral"></i>中性面</span>
+          <span><i class="sw sw-current"></i>感应电流方向</span>
+        </div>
+
+        <!-- 参数：右上角可折叠，面板内分「发电机 / 变压器」两组 -->
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数调节">
+          <h4>交流发电机</h4>
+          <div class="field">
+            <label for="rpmSlider"><span>转速 N<sub>r</sub></span><span id="rpmValue">60 r/min</span></label>
+            <input id="rpmSlider" type="range" min="30" max="240" step="10" value="60" />
           </div>
-        </section>
-
-        <section class="transformer-panel" aria-label="理想变压器示意">
-          <div class="panel-head">
-            <h2>理想变压器</h2>
-            <span class="note">原线圈接交流电源，副线圈接负载电阻 R</span>
+          <div class="field">
+            <label for="turnsSlider"><span>线圈匝数 N</span><span id="turnsValue">100 匝</span></label>
+            <input id="turnsSlider" type="range" min="20" max="200" step="10" value="100" />
           </div>
-          <div class="tf-grid">
-            <div class="tf-canvas-wrap">
-              <canvas id="tfCanvas" width="680" height="320"></canvas>
-            </div>
-            <div class="tf-readouts">
-              <div class="readout-card">
-                <div class="k">副线圈电压 U₂</div>
-                <div class="v accent" id="tfU2">24.0 V</div>
-              </div>
-              <div class="readout-card">
-                <div class="k">副线圈电流 I₂</div>
-                <div class="v" id="tfI2">1.20 A</div>
-              </div>
-              <div class="readout-card">
-                <div class="k">原线圈电流 I₁</div>
-                <div class="v" id="tfI1">2.40 A</div>
-              </div>
-              <div class="readout-card">
-                <div class="k">输入功率 P₁ = 输出功率 P₂</div>
-                <div class="v" id="tfPower">28.8 W</div>
-              </div>
-              <div class="readout-card">
-                <div class="k">匝数比与类型</div>
-                <div class="v warn" id="tfRatio">1 : 2（升压）</div>
-              </div>
-            </div>
+          <div class="field">
+            <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">0.50 T</span></label>
+            <input id="bSlider" type="range" min="0.10" max="1.00" step="0.05" value="0.50" />
           </div>
-          <p class="assumption">模型假设：理想变压器，忽略漏磁、铁芯涡流损耗与线圈电阻；电压、电流均为有效值；发电机线圈为矩形、匀速转动，磁场为匀强磁场；从线圈经过中性面开始计时，故 e = E<sub>m</sub> sin&nbsp;ωt。</p>
-        </section>
-
-        <section class="control-panel" aria-label="参数控制">
-          <h2>参数调节</h2>
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">交流发电机</div>
-              <div class="field">
-                <label for="rpmSlider"><span>转速 N<sub>r</sub></span><span id="rpmValue">60 r/min</span></label>
-                <input id="rpmSlider" type="range" min="30" max="240" step="10" value="60" />
-              </div>
-              <div class="field">
-                <label for="turnsSlider"><span>线圈匝数 N</span><span id="turnsValue">100 匝</span></label>
-                <input id="turnsSlider" type="range" min="20" max="200" step="10" value="100" />
-              </div>
-              <div class="field">
-                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">0.50 T</span></label>
-                <input id="bSlider" type="range" min="0.10" max="1.00" step="0.05" value="0.50" />
-              </div>
-              <div class="field">
-                <label for="areaSlider"><span>线圈面积 S</span><span id="areaValue">0.020 m²</span></label>
-                <input id="areaSlider" type="range" min="0.005" max="0.050" step="0.005" value="0.020" />
-              </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">变压器</div>
-              <div class="field">
-                <label for="n1Slider"><span>原线圈匝数 n₁</span><span id="n1Value">200 匝</span></label>
-                <input id="n1Slider" type="range" min="50" max="500" step="10" value="200" />
-              </div>
-              <div class="field">
-                <label for="n2Slider"><span>副线圈匝数 n₂</span><span id="n2Value">400 匝</span></label>
-                <input id="n2Slider" type="range" min="50" max="1000" step="10" value="400" />
-              </div>
-              <div class="field">
-                <label for="u1Slider"><span>输入电压 U₁</span><span id="u1Value">12 V</span></label>
-                <input id="u1Slider" type="range" min="3" max="36" step="1" value="12" />
-              </div>
-              <div class="field">
-                <label for="rSlider"><span>负载电阻 R</span><span id="rValue">20 Ω</span></label>
-                <input id="rSlider" type="range" min="5" max="100" step="5" value="20" />
-              </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">显示与操作</div>
-              <div class="toggles">
-                <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示磁感线与中性面</span></label>
-                <label class="toggle"><input type="checkbox" id="showFlux" checked /><span>显示 Φ/Φ<sub>m</sub> 曲线（虚线）</span></label>
-              </div>
-              <div class="btn-row">
-                <button type="button" id="pauseBtn">暂停</button>
-                <button type="button" class="primary-btn" id="resetBtn">重置</button>
-              </div>
-              <p class="hint">转速改变时，注意观察波形周期与峰值的变化；变压器部分单独设置 U₁，与发电机解耦，便于分别观察两组规律。变压器两侧的黄色箭头表示电流方向，随交流每半周反向。</p>
-            </div>
+          <div class="field">
+            <label for="areaSlider"><span>线圈面积 S</span><span id="areaValue">0.020 m²</span></label>
+            <input id="areaSlider" type="range" min="0.005" max="0.050" step="0.005" value="0.020" />
           </div>
-        </section>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
-            <li><b>1.</b> 线圈经过中性面时，e 为什么等于 0？此时穿过线圈的磁通量是最大还是最小？</li>
-            <li><b>2.</b> 把转速提高到原来的 2 倍，峰值 E<sub>m</sub> 和有效值 E 各变为原来的几倍？波形周期怎样变化？</li>
-            <li><b>3.</b> 保持 U₁ 不变，只增大 n₂，U₂ 怎样变化？此时 I₂ 与 I₁ 哪个大？为什么？</li>
-          </ul>
+          <h4>变压器</h4>
+          <div class="field">
+            <label for="n1Slider"><span>原线圈匝数 n₁</span><span id="n1Value">200 匝</span></label>
+            <input id="n1Slider" type="range" min="50" max="500" step="10" value="200" />
+          </div>
+          <div class="field">
+            <label for="n2Slider"><span>副线圈匝数 n₂</span><span id="n2Value">400 匝</span></label>
+            <input id="n2Slider" type="range" min="50" max="1000" step="10" value="400" />
+          </div>
+          <div class="field">
+            <label for="u1Slider"><span>输入电压 U₁</span><span id="u1Value">12 V</span></label>
+            <input id="u1Slider" type="range" min="3" max="36" step="1" value="12" />
+          </div>
+          <div class="field">
+            <label for="rSlider"><span>负载电阻 R</span><span id="rValue">20 Ω</span></label>
+            <input id="rSlider" type="range" min="5" max="100" step="5" value="20" />
+          </div>
+
+          <h4>显示与操作</h4>
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showField" checked /><span>磁感线与中性面</span></label>
+            <label class="toggle"><input type="checkbox" id="showFlux" checked /><span>Φ/Φ<sub>m</sub> 曲线（虚线）</span></label>
+          </div>
+          <div class="btn-row">
+            <button type="button" id="pauseBtn">暂停</button>
+            <button type="button" class="primary" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数 ◂</button>
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="结论、假设与课堂问题">?</button>
+
+        <!-- 结论 / 实时数据 / 符号 / 模型假设 / 课堂问题：默认折叠 -->
+        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂观察">
+          <h3>结论</h3>
+          <p>线圈经过中性面时磁通量最大、感应电动势为零；正弦交变电流的峰值与有效值满足 E = E<sub>m</sub>/√2；理想变压器按匝数比变压、按反比变流。</p>
+          <p class="eq">e = E<sub>m</sub> sin ωt，E<sub>m</sub> = NBSω，E = E<sub>m</sub>/√2；U₁/U₂ = n₁/n₂，P₁ = P₂</p>
+
+          <h3>实时数据</h3>
+          <p>峰值 E<sub>m</sub> = <span id="mEm">6.28 V</span>；有效值 E = <span id="mErms">4.44 V</span></p>
+          <p><span id="mFreq">f = 1.00 Hz</span>；<span id="mOmega">ω = 2πf = 6.28 rad/s，T = 1.00 s</span></p>
+          <p><span id="mInst">e = 0.00 V</span> — <span id="mInstNote">线圈位于中性面，磁通量正向最大，感应电动势为零</span></p>
+          <p>变压器：<span id="mU2">U₂ = 24.0 V</span>，<span id="mI2">I₂ = 1.20 A，I₁ = 2.40 A</span></p>
+          <p>I₂ = <span id="tfI2">1.20 A</span>，I₁ = <span id="tfI1">2.40 A</span>，P₁ = P₂ = <span id="tfPower">28.8 W</span>，匝数比 <span id="tfRatio">200 : 400（升压）</span></p>
+
+          <h3>符号与角度</h3>
+          <p>θ 为线圈法线 n 与磁感线 B 的夹角，从中性面（θ = 0°）起算；N<sub>r</sub> 为转速，N 为线圈匝数，n₁、n₂ 为变压器原、副线圈匝数。变压器部分单独设置 U₁，与发电机解耦，便于分别观察两组规律。</p>
+
+          <h3>模型假设</h3>
+          <p>理想变压器，忽略漏磁、铁芯涡流损耗与线圈电阻；电压、电流均为有效值；发电机线圈为矩形、匀速转动，磁场为匀强磁场；从线圈经过中性面开始计时，故 e = E<sub>m</sub> sin ωt。</p>
+
+          <h3>课堂观察</h3>
+          <ol>
+            <li>线圈经过中性面时，e 为什么等于 0？此时穿过线圈的磁通量是最大还是最小？</li>
+            <li>把转速提高到原来的 2 倍，峰值 E<sub>m</sub> 和有效值 E 各变为原来的几倍？波形周期怎样变化？</li>
+            <li>保持 U₁ 不变，只增大 n₂，U₂ 怎样变化？此时 I₂ 与 I₁ 哪个大？为什么？</li>
+          </ol>
         </section>
       </div>
-
-      <aside class="side-panel" aria-label="实时数据">
-        <h2>实时数据</h2>
-        <div class="metric">
-          <div class="metric-label">峰值 E<sub>m</sub> = NBSω</div>
-          <div class="metric-value peak" id="mEm">6.28 V</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">有效值 E = E<sub>m</sub>/√2</div>
-          <div class="metric-value wave" id="mErms">4.44 V</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">频率 f 与角速度 ω</div>
-          <div class="metric-value" id="mFreq">f = 1.00 Hz</div>
-          <div class="metric-note" id="mOmega">ω = 2πf = 6.28 rad/s，T = 1.00 s</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">此刻的瞬时值</div>
-          <div class="metric-value" id="mInst">e = 0.00 V</div>
-          <div class="metric-note" id="mInstNote">线圈位于中性面，感应电动势为零</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">变压器输出</div>
-          <div class="metric-value" id="mU2">U₂ = 24.0 V</div>
-          <div class="metric-note" id="mI2">I₂ = 1.20 A，I₁ = 2.40 A</div>
-        </div>
-      </aside>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -1415,6 +1071,51 @@
         syncControls();
         renderAll();
       });
+
+      // ---------------- 外壳交互：面板折叠 / 抽屉 / 键盘 ----------------
+      var shell = {
+        panel: document.getElementById("ctrlPanel"),
+        toggle: document.getElementById("ctrlToggle"),
+        more: document.getElementById("moreBtn"),
+        drawer: document.getElementById("drawer")
+      };
+
+      function setPanelOpen(open) {
+        shell.panel.hidden = !open;
+        shell.toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        shell.toggle.textContent = open ? "参数 ◂" : "参数 ▸";
+      }
+
+      function setDrawerOpen(open) {
+        shell.drawer.hidden = !open;
+        shell.more.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      shell.toggle.addEventListener("click", function () { setPanelOpen(shell.panel.hidden); });
+      shell.more.addEventListener("click", function () { setDrawerOpen(shell.drawer.hidden); });
+
+      window.addEventListener("keydown", function (ev) {
+        var tag = ev.target && ev.target.tagName;
+        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON") { return; }
+        if (ev.code === "Space") {
+          ev.preventDefault();
+          ui.pauseBtn.click();
+        } else if (ev.key === "r" || ev.key === "R") {
+          ev.preventDefault();
+          ui.resetBtn.click();
+        } else if (ev.key === "p" || ev.key === "P") {
+          ev.preventDefault();
+          setPanelOpen(shell.panel.hidden);
+        } else if (ev.key === "?") {
+          ev.preventDefault();
+          setDrawerOpen(shell.drawer.hidden);
+        } else if (ev.key === "Escape") {
+          setDrawerOpen(false);
+        }
+      });
+
+      setPanelOpen(true);
+      setDrawerOpen(false);
 
       syncControls();
       renderAll();

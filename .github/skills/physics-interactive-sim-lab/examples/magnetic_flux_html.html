@@ -3,505 +3,213 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>磁通量与电磁感应现象可视化资源</title>
+  <title>磁通量与电磁感应现象</title>
   <style>
     :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
-      --stage: #080a0e;
-      --positive: #e73535;
-      --negative: #3558ff;
-      --accent: #0f766e;
-      --warning: #b45309;
-      --field: #f8fafc;
-      --force: #ffd166;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+      --accent: #2dd4bf;
+      --accent-deep: #0f766e;
+      --hud-w: 300px;
     }
 
-    * {
-      box-sizing: border-box;
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    * { box-sizing: border-box; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    #fluxCanvas { cursor: grab; touch-action: none; }
+    #fluxCanvas.dragging { cursor: grabbing; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+    .hud-readout .chip + .chip { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.16); }
+    .hud-readout .chip.on b { color: #ffd166; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; }
+    .hud-legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+    /* 面板压成两列短卡片：高度低于线圈上沿，任何时刻都不遮物理主体 */
+    .hud-panel { right: 12px; top: 12px; width: var(--hud-w); max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 8px 10px; font-size: 12px; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 324px; }   /* 面板展开时让到面板左边 */
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                font-family: inherit; font-size: 15px; line-height: 1; }
+    .hud-more[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ul { margin: 4px 0; padding-left: 18px; }
+    .drawer .dim { color: #93a6ae; font-size: 12px; }
+    .drawer .metric-value { font-size: 16px; font-weight: 700; }
+    .drawer .metric-value.active { color: #ffd166; }
+    .drawer .metric-value.neutral { color: #7fd6e4; }
+    .drawer .metric-value.idle { color: #94a3b8; }
+    .drawer #phiChart { display: block; width: 100%; height: auto; border-radius: 6px;
+                        background: #0a1018; margin: 8px 0 4px; }
+
+    /* ---- 面板内部：两列紧凑卡片 ---- */
+    .hud-panel .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+    .hud-panel .field { margin-top: 6px; }
+    .hud-panel .field:first-child { margin-top: 0; }
+    .field-label { margin-bottom: 3px; color: #cfe3e9; font-size: 11.5px; }
+    .field label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 2px;
+                   color: #cfe3e9; font-size: 11.5px; }
+    .field label b { color: #7fd6e4; font-weight: 700; white-space: nowrap; }
+    input[type="range"] { width: 100%; height: 16px; accent-color: var(--accent); display: block; }
+
+    .scene-buttons { display: grid; gap: 5px; }
+
+    .hud-panel button { min-height: 26px; padding: 2px 6px; border-radius: 7px; font-family: inherit;
+                        border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
+                        color: #eaf2f5; font-size: 11.5px; font-weight: 600; cursor: pointer;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hud-panel button:hover { background: rgba(255,255,255,.15); }
+    .hud-panel button:disabled { opacity: .45; cursor: not-allowed; }
+    .scene-btn.active, .hud-panel button.primary { background: var(--accent-deep); border-color: var(--accent); color: #ffffff; }
+
+    .toggles { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 8px; }
+    .toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .toggle input { width: 14px; height: 14px; accent-color: var(--accent); }
+
+    .row { display: flex; gap: 6px; margin-top: 8px; }
+    .row button { flex: 1; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    @media (max-width: 1100px) {
+      .hud-panel { width: 272px; }
+      .hud-toggle[aria-expanded="true"] { right: 296px; }
     }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-    }
-
-    .app {
-      width: min(1180px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 18px 0 24px;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 25px;
-      letter-spacing: 0;
-    }
-
-    .subtitle {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.55;
-    }
-
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 17px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 310px;
-      gap: 14px;
-      align-items: start;
-    }
-
-    .stage-panel,
-    .side-panel,
-    .control-panel,
-    .inquiry-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-
-    .stage-panel {
-      padding: 12px;
-    }
-
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      min-height: 430px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
-
-    #fluxCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      cursor: grab;
-      touch-action: none;
-    }
-
-    #fluxCanvas.dragging {
-      cursor: grabbing;
-    }
-
-    .stage-readout {
-      position: absolute;
-      left: 16px;
-      top: 14px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .readout-item {
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-      white-space: nowrap;
-    }
-
-    .side-panel {
-      padding: 14px;
-    }
-
-    .side-panel h2,
-    .control-panel h2,
-    .inquiry-panel h2 {
-      margin: 0 0 12px;
-      font-size: 18px;
-    }
-
-    .metric {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      margin-bottom: 10px;
-      background: #f8fafc;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-
-    .metric-value {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
-    }
-
-    .metric-value.positive {
-      color: var(--positive);
-    }
-
-    .metric-value.negative {
-      color: var(--negative);
-    }
-
-    .metric-value.neutral {
-      color: var(--accent);
-    }
-
-    .metric-value.active {
-      color: var(--warning);
-    }
-
-    .metric-value.idle {
-      color: #64748b;
-    }
-
-    .metric-note {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-    }
-
-    .chart-box {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      margin-bottom: 10px;
-      background: #f8fafc;
-    }
-
-    #phiChart {
-      display: block;
-      width: 100%;
-      height: auto;
-      border-radius: 6px;
-      background: #0a1018;
-    }
-
-    .scene-buttons {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    button {
-      min-height: 36px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #f1f5f9;
-    }
-
-    button:disabled {
-      color: #94a3b8;
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-      cursor: not-allowed;
-    }
-
-    .scene-btn.active,
-    .primary-btn {
-      border-color: #0f766e;
-      background: #0f766e;
-      color: #ffffff;
-    }
-
-    .scene-btn.active:hover,
-    .primary-btn:hover {
-      background: #0d665f;
-    }
-
-    .control-panel {
-      margin-top: 14px;
-      padding: 14px;
-    }
-
-    .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .control-block {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f8fafc;
-    }
-
-    .control-title {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 10px;
-      font-size: 16px;
-      font-weight: 800;
-    }
-
-    .field {
-      margin-top: 10px;
-    }
-
-    .field label {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 7px;
-      color: #344054;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
-
-    .toggles {
-      display: grid;
-      gap: 9px;
-    }
-
-    .toggle {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      font-size: 15px;
-      user-select: none;
-    }
-
-    .toggle input {
-      width: 20px;
-      height: 20px;
-      accent-color: var(--accent);
-    }
-
-    .reset-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .reset-row button {
-      flex: 1;
-    }
-
-    .inquiry-panel {
-      margin-top: 14px;
-      padding: 14px;
-    }
-
-    .inquiry-list {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .inquiry-list li {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fbfdff;
-      color: #344054;
-      font-size: 14px;
-      line-height: 1.55;
-    }
-
-    .hint {
-      margin: 10px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .assumption {
-      margin: 10px 0 0;
-      padding: 9px 11px;
-      border-left: 3px solid var(--warning);
-      background: #fffaf3;
-      color: #7c4a12;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    @media (max-width: 960px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-
-      .stage-readout,
-      .controls-grid,
-      .inquiry-list,
-      .scene-buttons {
-        grid-template-columns: 1fr;
-      }
-
-      .topbar {
-        align-items: start;
-        flex-direction: column;
-      }
-
-      .formula {
-        white-space: normal;
-      }
+    @media (max-width: 900px) {
+      .hud-panel { width: 250px; font-size: 11.5px; }
+      .hud-toggle[aria-expanded="true"] { right: 274px; }
+      .hud-legend { gap: 8px; font-size: 11px; }
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>磁通量与电磁感应现象</h1>
-        <p class="subtitle">改变磁感应强度 B、线圈面积 S 或线圈法线与 B 的夹角 θ，观察磁通量 Φ 是否变化，判断灯泡中是否出现感应电流。</p>
-      </div>
-      <div class="formula">Φ = B·S·cosθ（θ 为法线与 B 的夹角）</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="fluxCanvas" width="1600" height="900"></canvas>
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="磁通量演示区">
-          <div class="stage-wrap">
-            <canvas id="fluxCanvas" width="1600" height="900"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">场景：<span id="stageScene">线圈平移进出磁场</span></div>
-              <div class="readout-item">Φ = <span id="stageFlux">2.25 mWb →</span></div>
-              <div class="readout-item">θ = <span id="stageTheta">0°</span></div>
-            </div>
-          </div>
-        </section>
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip">场景 <b id="stageScene">线圈平移进出磁场</b></span>
+          <span class="chip">Φ <b id="stageFlux">2.25 mWb →</b></span>
+          <span class="chip">θ <b id="stageTheta">0°</b></span>
+          <span class="chip" id="currentChip">电流 <b id="stageCurrent">无感应电流</b></span>
+        </div>
 
-        <section class="control-panel" aria-label="场景与参数控制">
-          <h2>场景与参数</h2>
-          <div class="scene-buttons" role="group" aria-label="磁通量场景">
-            <button type="button" class="scene-btn active" data-scene="translate">线圈平移进出磁场</button>
-            <button type="button" class="scene-btn" data-scene="rotate">线圈绕轴转动</button>
-            <button type="button" class="scene-btn" data-scene="static">线圈静止在磁场中</button>
-          </div>
+        <div class="hud hud-legend" id="legend">
+          <span>Φ = B·S·cosθ</span>
+          <span><i class="swatch" style="background:#34d399"></i>线圈</span>
+          <span><i class="swatch" style="background:#ffd166"></i>有感应电流</span>
+          <span>×/⊙：B 向里/向外</span>
+          <span>θ：n 与 B 的夹角</span>
+        </div>
 
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">磁感应强度</div>
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
+          <div class="cols">
+            <div>
               <div class="field">
-                <label for="bSlider"><span>B（匀强磁场）</span><span id="bValue">150 mT</span></label>
+                <label for="bSlider">磁场 B <b id="bValue">150 mT</b></label>
                 <input id="bSlider" type="range" min="20" max="300" step="10" value="150" />
               </div>
               <div class="field">
-                <label for="sSlider"><span>线圈面积 S</span><span id="sValue">150 cm²</span></label>
+                <label for="sSlider">面积 S <b id="sValue">150 cm²</b></label>
                 <input id="sSlider" type="range" min="60" max="300" step="10" value="150" />
               </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">线圈方位</div>
               <div class="field">
-                <label for="thetaSlider"><span>法线与 B 的夹角 θ</span><span id="thetaValue">0°</span></label>
+                <label for="thetaSlider">夹角 θ <b id="thetaValue">0°</b></label>
                 <input id="thetaSlider" type="range" min="0" max="90" step="1" value="0" />
               </div>
-              <div class="toggles" style="margin-top: 12px;">
-                <label class="toggle">
-                  <input type="checkbox" id="bOutToggle" />
-                  <span>磁场取向外（⊙），默认向里（×）</span>
-                </label>
-                <label class="toggle">
-                  <input type="checkbox" id="showAxis" checked />
-                  <span>显示转轴与法线</span>
-                </label>
-              </div>
             </div>
-
-            <div class="control-block">
-              <div class="control-title">课堂操作</div>
-              <p class="hint">直接拖动线圈，观察它进出磁场边界时灯泡的变化。θ 拖动滑块即可改变。</p>
-              <div class="reset-row">
-                <button type="button" class="primary-btn" id="playBtn">暂停动画</button>
-                <button type="button" id="resetBtn">重置</button>
+            <div>
+              <div class="field-label">场景</div>
+              <div class="scene-buttons" role="group" aria-label="磁通量场景">
+                <button type="button" class="scene-btn active" data-scene="translate">线圈平移进出磁场</button>
+                <button type="button" class="scene-btn" data-scene="rotate">线圈绕轴转动</button>
+                <button type="button" class="scene-btn" data-scene="static">线圈静止在磁场中</button>
               </div>
             </div>
           </div>
-        </section>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="bOutToggle" /><span>B 取向外（⊙）</span></label>
+            <label class="toggle"><input type="checkbox" id="showAxis" checked /><span>显示转轴与法线</span></label>
+          </div>
+
+          <div class="row">
+            <button type="button" class="primary" id="playBtn">暂停动画</button>
+            <button type="button" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" aria-label="结论与课堂问题" hidden>
+          <h3>结论</h3>
+          <p><b>穿过回路的磁通量发生变化，回路中才有感应电流。</b> Φ = B·S·cosθ，B、S、θ 任一变化都可能改变 Φ。</p>
+
+          <h3>当前判定</h3>
+          <p><span id="currentValue" class="metric-value neutral">无感应电流</span></p>
+          <p id="currentNote">穿过回路的磁通量没有变化。</p>
+          <p class="dim">Φ = <span id="phiValue">2.25 mWb</span>　<span id="phiTrend">变化趋势：几乎不变 →</span>　S⊥ = Φ/B = <span id="areaValue">150 cm²</span></p>
+          <p class="dim" id="areaNote">线圈全部处于磁场中，S⊥ = S·cosθ。</p>
+
+          <h3>Φ–t 曲线（最近 6 s）</h3>
+          <canvas id="phiChart" width="600" height="220"></canvas>
+
+          <h3>模型假设</h3>
+          <p>匀强磁场；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；线圈电阻恒定，不讨论电流的定量大小，只判断感应电流的有无和相对强弱。本课不讨论感应电流的方向（楞次定律）。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
             <li>线圈整体在匀强磁场中平移时，Φ 变不变？灯泡亮不亮？</li>
             <li>把 θ 从 0° 慢慢转到 90°，Φ 怎样变化？灯泡在什么阶段最亮？</li>
             <li>线圈静止在场中，只改变 B 或 S，灯泡会不会亮？由此归纳产生感应电流的条件。</li>
           </ul>
-          <p class="assumption">简化假设：匀强磁场，磁场区域内各点 B 相同；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；线圈电阻恒定，不讨论电流的定量大小，只判断感应电流的有无和相对强弱。本课不讨论感应电流的方向（楞次定律）。</p>
+
+          <h3>当前场景</h3>
+          <p id="sceneTip">线圈在匀强磁场中水平平移：完全在磁场内时 Φ 不变，灯泡不亮；进入或离开边界时 Φ 变化，灯泡被点亮。</p>
+          <p class="dim">快捷键：空格 播放/暂停 · R 重置 · P 参数 · ? 说明</p>
         </section>
       </div>
-
-      <aside class="side-panel" aria-label="实时数据">
-        <h2>实时数据</h2>
-        <div class="metric">
-          <div class="metric-label">磁通量 Φ</div>
-          <div class="metric-value neutral" id="phiValue">2.25 mWb</div>
-          <div class="metric-note" id="phiTrend">变化趋势：几乎不变 →</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">场内有磁通量的有效面积 S⊥ = Φ / B</div>
-          <div class="metric-value" id="areaValue">150 cm²</div>
-          <div class="metric-note" id="areaNote">线圈完全在磁场中且 θ = 0° 时等于 S。</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">感应电流判定</div>
-          <div class="metric-value idle" id="currentValue">无感应电流</div>
-          <div class="metric-note" id="currentNote">穿过回路的磁通量没有变化。</div>
-        </div>
-        <div class="chart-box">
-          <div class="metric-label">Φ–t 曲线（最近 6 s）</div>
-          <canvas id="phiChart" width="600" height="220"></canvas>
-        </div>
-        <p class="hint" id="sceneTip">线圈在匀强磁场中水平平移：完全在磁场内时 Φ 不变，灯泡不亮；进入或离开边界时 Φ 变化，灯泡被点亮。</p>
-      </aside>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -587,7 +295,9 @@
         sceneTip: document.getElementById("sceneTip"),
         stageScene: document.getElementById("stageScene"),
         stageFlux: document.getElementById("stageFlux"),
-        stageTheta: document.getElementById("stageTheta")
+        stageTheta: document.getElementById("stageTheta"),
+        stageCurrent: document.getElementById("stageCurrent"),
+        currentChip: document.getElementById("currentChip")
       };
 
       var state = {
@@ -757,30 +467,6 @@
       }
 
       /* ---------- 绘图工具 ---------- */
-
-      function roundRectPath(x, y, w, h, r) {
-        var rr = Math.min(r, w / 2, h / 2);
-        ctx.beginPath();
-        ctx.moveTo(x + rr, y);
-        ctx.lineTo(x + w - rr, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
-        ctx.lineTo(x + w, y + h - rr);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
-        ctx.lineTo(x + rr, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
-        ctx.lineTo(x, y + rr);
-        ctx.quadraticCurveTo(x, y, x + rr, y);
-        ctx.closePath();
-      }
-
-      function panel(x, y, w, h) {
-        roundRectPath(x, y, w, h, 12);
-        ctx.fillStyle = "rgba(13, 18, 28, 0.90)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.32)";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
 
       function drawArrow(x1, y1, x2, y2, color, width, head) {
         var len = Math.hypot(x2 - x1, y2 - y1);
@@ -1020,120 +706,8 @@
         ctx.restore();
       }
 
-      function drawLegend() {
-        var w = 470;
-        var h = 152;
-        var x = CW - 32 - w;
-        var y = 24;
-        panel(x, y, w, h);
-
-        label("Φ = B·S·cosθ", x + 20, y + 40, { size: 27, color: C.ink, bold: true });
-        label("θ：法线 n 与 B 的夹角", x + 20, y + 76, { size: 20, color: C.muted });
-        label("× 向里、⊙ 向外（B 垂直纸面）", x + 20, y + 108, { size: 20, color: C.muted });
-        label("⊗/⊙ 与白箭头：n 的垂直/纸面内分量", x + 20, y + 138, { size: 20, color: C.muted });
-      }
-
-      function drawJudgment() {
-        var x = 32;
-        var y = 714;
-        var w = 520;
-        var h = 140;
-        panel(x, y, w, h);
-
-        label("感应电流判定", x + 22, y + 34, { size: 21, color: C.muted });
-
-        var on = state.hasCurrent;
-        label(on ? "有感应电流" : "无感应电流", x + 22, y + 82, {
-          size: 40,
-          bold: true,
-          color: on ? C.lamp : "#7c8aa0"
-        });
-
-        var reason;
-        var ct = Math.abs(Math.cos(state.theta));
-        if (on) {
-          reason = "穿过回路的磁通量正在" + (state.trend > 0 ? "增大" : state.trend < 0 ? "减小" : "变化");
-        } else if (ct < 0.01) {
-          reason = "线圈平面与 B 平行，有效面积为零";
-        } else if (coilPlacement() === "outside") {
-          reason = "线圈在磁场外，Φ = 0 且保持不变";
-        } else {
-          reason = "穿过回路的磁通量没有变化";
-        }
-        label(reason, x + 22, y + 118, { size: 21, color: on ? "#fde68a" : C.muted });
-      }
-
-      function drawInset() {
-        var w = 272;
-        var h = 186;
-        var x = CW - 32 - w;
-        var y = CH - 32 - h;
-        panel(x, y, w, h);
-
-        label("θ 的定义（n 取 B 一侧）", x + 16, y + 30, { size: 19, color: C.muted });
-
-        var th = state.theta;
-        var deg = Math.round(th / DEG);
-        label(deg + "°", x + w - 16, y + 30, {
-          size: 22,
-          color: C.normal,
-          bold: true,
-          align: "right"
-        });
-
-        var ox = x + 54;
-        var oy = y + h - 56;
-        var L = 86;
-        var nOff = 14 * Math.max(0, 1 - th / 0.25);
-
-        drawArrow(ox, oy, ox + L, oy, C.lamp, 4, 13);
-        label("B", ox + L + 8, oy + 7, { size: 21, color: C.lamp, bold: true });
-
-        var nx = ox + L * Math.cos(-th);
-        var ny = oy + L * Math.sin(-th);
-
-        ctx.save();
-        ctx.strokeStyle = "rgba(52, 211, 153, 0.9)";
-        ctx.lineWidth = 4;
-        ctx.lineCap = "round";
-        var half = 34;
-        ctx.beginPath();
-        ctx.moveTo(ox + half * Math.cos(-th + Math.PI / 2), oy + half * Math.sin(-th + Math.PI / 2));
-        ctx.lineTo(ox + half * Math.cos(-th - Math.PI / 2), oy + half * Math.sin(-th - Math.PI / 2));
-        ctx.stroke();
-        ctx.restore();
-
-        if (th > 0.12) {
-          ctx.save();
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([6, 5]);
-          ctx.beginPath();
-          ctx.arc(ox, oy, 44, -th, 0);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.restore();
-          label("θ", ox + 60 * Math.cos(-th / 2), oy + 60 * Math.sin(-th / 2) + 8, {
-            size: 21,
-            color: "#ffffff",
-            bold: true,
-            align: "center"
-          });
-        }
-
-        drawArrow(ox, oy - nOff, nx, ny - nOff, C.normal, 4, 13);
-        label("n", nx + 12, ny - nOff - 2, { size: 21, color: C.normal, bold: true });
-
-        label("绿线＝线圈侧视", x + 16, y + h - 12, { size: 17, color: C.dim });
-      }
-
-      function drawAssumption() {
-        label("简化模型：匀强磁场；线圈电阻恒定，不讨论电流的定量大小，只判断有无与相对强弱", CX0, 882, {
-          size: 20,
-          color: C.dim,
-          align: "center"
-        });
-      }
+      /* 原画布内的图例/判定/θ 示意图/假设文字已移入 HUD 与「?」抽屉，
+         画布只保留物理标注（磁场边界、线圈、法线、灯泡）。 */
 
       /* ---------- Φ–t 曲线 ---------- */
 
@@ -1178,7 +752,7 @@
         }
 
         cctx.textAlign = "left";
-        cctx.fillText("Φ/mWb", 6, padT + 4);
+        cctx.fillText("Φ/mWb", padL + 6, padT + 4);
         cctx.textAlign = "right";
         cctx.fillText("t/s", W - padR, H - 8);
 
@@ -1259,6 +833,8 @@
 
         ui.stageFlux.textContent = phiMWb.toFixed(2) + " mWb " + trend.charAt(trend.length - 1);
         ui.stageTheta.textContent = deg + "°";
+        ui.stageCurrent.textContent = state.hasCurrent ? "有感应电流" : "无感应电流";
+        ui.currentChip.classList.toggle("on", state.hasCurrent);
       }
 
       /* ---------- 主渲染 ---------- */
@@ -1272,10 +848,6 @@
         drawCoil();
         if (state.showAxis) drawNormal();
         drawLamp();
-        drawLegend();
-        drawJudgment();
-        drawInset();
-        drawAssumption();
         drawChart();
       }
 
@@ -1426,6 +998,58 @@
         ui.showAxis.checked = true;
         setScene(DEFAULTS.scene);
       });
+
+      /* ---------- 外壳：参数面板折叠 / 说明抽屉 / 快捷键 ---------- */
+
+      var ctrlPanel = document.getElementById("ctrlPanel");
+      var ctrlToggle = document.getElementById("ctrlToggle");
+      var drawer = document.getElementById("drawer");
+      var moreBtn = document.getElementById("moreBtn");
+
+      function setPanelOpen(open) {
+        ctrlPanel.hidden = !open;
+        ctrlToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        ctrlToggle.title = open ? "收起参数（P）" : "展开参数（P）";
+      }
+
+      function setDrawerOpen(open) {
+        drawer.hidden = !open;
+        moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        moreBtn.textContent = open ? "×" : "?";
+        moreBtn.title = open ? "收起说明" : "结论与课堂问题";
+      }
+
+      ctrlToggle.addEventListener("click", function () {
+        setPanelOpen(ctrlPanel.hidden);
+      });
+
+      moreBtn.addEventListener("click", function () {
+        setDrawerOpen(drawer.hidden);
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        var tag = event.target && event.target.tagName;
+        var onControl = tag === "INPUT" || tag === "BUTTON" || tag === "SELECT" || tag === "TEXTAREA";
+        if (event.key === " " && !onControl) {
+          event.preventDefault();
+          ui.playBtn.click();
+        } else if ((event.key === "r" || event.key === "R") && !onControl) {
+          event.preventDefault();
+          ui.resetBtn.click();
+        } else if (event.key === "p" || event.key === "P") {
+          event.preventDefault();
+          ctrlToggle.click();
+        } else if (event.key === "?") {
+          event.preventDefault();
+          moreBtn.click();
+        } else if (event.key === "Escape") {
+          setDrawerOpen(false);
+        }
+      });
+
+      setPanelOpen(true);
+      setDrawerOpen(false);
 
       /* ---------- 主循环 ---------- */
 

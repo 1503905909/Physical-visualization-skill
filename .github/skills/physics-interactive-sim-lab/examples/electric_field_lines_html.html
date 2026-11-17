@@ -3,455 +3,207 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>点电荷电场线可视化资源</title>
   <link rel="icon" href="data:," />
+  <title>点电荷电场线可视化资源</title>
   <style>
     :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
+      --accent: #0f766e;
       --stage: #080a0e;
       --positive: #e73535;
       --negative: #3558ff;
-      --accent: #0f766e;
-      --warning: #b45309;
-      --field: #f8fafc;
-      --force: #ffd166;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-    }
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
 
-    .app {
-      width: min(1180px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 18px 0 24px;
-    }
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
 
-    .topbar {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
 
-    h1 {
-      margin: 0;
-      font-size: 25px;
-      letter-spacing: 0;
-    }
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
 
-    .subtitle {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
 
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
+    #fieldCanvas { cursor: crosshair; touch-action: none; }
 
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 310px;
-      gap: 14px;
-      align-items: start;
-    }
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
 
-    .stage-panel,
-    .side-panel,
-    .control-panel,
-    .inquiry-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; align-items: center; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
 
-    .stage-panel {
-      padding: 12px;
-    }
+    .chip { display: inline-flex; align-items: baseline; gap: 4px;
+            padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,.06); }
 
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      min-height: 430px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; gap: 14px; align-items: center;
+                  white-space: nowrap; overflow: hidden; }
+    .hud-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
 
-    #fieldCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      cursor: crosshair;
-      touch-action: none;
-    }
+    .sw { display: inline-block; width: 18px; height: 2px; border-radius: 1px;
+          background: #ffffff; flex: 0 0 auto; }
+    .sw.yellow { background: #ffd166; height: 3px; }
+    .sw.dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3030;
+              border: 1px solid #ffffff; }
 
-    .stage-readout {
-      position: absolute;
-      left: 16px;
-      top: 14px;
-      display: grid;
-      grid-template-columns: repeat(2, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
+    .hud-panel { right: 12px; top: 12px; width: 300px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 10px 12px; font-size: 12.5px; }
+    .hud-panel[hidden] { display: none; }
 
-    .readout-item {
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-    }
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+                  font: inherit; font-size: 12.5px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 328px; }   /* 面板展开时让到面板左边 */
 
-    .side-panel {
-      padding: 14px;
-    }
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                font-size: 15px;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-more:hover { background: rgba(20,40,48,.9); }
 
-    .side-panel h2,
-    .control-panel h2,
-    .inquiry-panel h2 {
-      margin: 0 0 12px;
-      font-size: 18px;
-    }
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer h3:first-of-type { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ul { margin: 2px 0 6px; padding-left: 18px; }
+    .drawer-close { position: absolute; right: 8px; top: 6px; width: 26px; height: 26px;
+                    min-height: 0; padding: 0; border-radius: 6px; cursor: pointer;
+                    border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06);
+                    color: #cfe3e9; font-size: 16px; line-height: 1; }
+    .drawer .metric-value { font-weight: 700; font-size: 13px; color: #7fd6e4; }
+    .drawer .metric-value.positive { color: #ff8b8b; }
+    .drawer .metric-value.negative { color: #9aa8ff; }
+    .drawer .metric-value.neutral { color: #7fd6e4; }
+    .drawer .metric-note { color: #b9ccd3; font-size: 12.5px; line-height: 1.6; }
 
-    .metric {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      margin-bottom: 10px;
-      background: #f8fafc;
-    }
+    /* —— HUD 面板内部控件（深色） —— */
+    .scene-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .scene-btn { min-height: 28px; height: 28px; padding: 0 4px; border-radius: 6px; cursor: pointer;
+                 border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
+                 color: #d7e5ea; font: inherit; font-size: 12px; }
+    .scene-btn:hover { background: rgba(255,255,255,.14); }
+    .scene-btn.active { background: var(--accent); border-color: var(--accent); color: #ffffff; font-weight: 700; }
 
-    .metric-label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 6px; color: #b9ccd3; font-size: 11.5px; margin-top: 6px; }
+    .row b { color: #7fd6e4; font-size: 11.5px; }
+    input[type="range"] { width: 100%; height: 18px; margin: 2px 0 0;
+                          accent-color: var(--accent); background: transparent; }
+    input[type="range"]:disabled { opacity: .45; }
 
-    .metric-value {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
-    }
+    .toggles { display: grid; gap: 4px; margin-top: 8px; }
+    .toggle { display: flex; align-items: flex-start; gap: 6px; font-size: 12px;
+              color: #d7e5ea; user-select: none; line-height: 1.35; }
+    .toggle input { width: 14px; height: 14px; margin-top: 2px; accent-color: var(--accent); flex: 0 0 auto; }
 
-    .metric-value.positive {
-      color: var(--positive);
-    }
+    .reset-row { margin-top: 8px; }
+    .primary-btn { width: 100%; height: 28px; min-height: 28px; border-radius: 8px;
+                   border: 1px solid var(--accent); background: var(--accent); color: #ffffff;
+                   font-weight: 700; font-size: 12.5px; cursor: pointer; }
+    .primary-btn:hover { background: #0d665f; }
 
-    .metric-value.negative {
-      color: var(--negative);
-    }
-
-    .metric-value.neutral {
-      color: var(--accent);
-    }
-
-    .metric-note {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-    }
-
-    .scene-buttons {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    button {
-      min-height: 36px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #f1f5f9;
-    }
-
-    .scene-btn.active,
-    .primary-btn {
-      border-color: #0f766e;
-      background: #0f766e;
-      color: #ffffff;
-    }
-
-    .scene-btn.active:hover,
-    .primary-btn:hover {
-      background: #0d665f;
-    }
-
-    .control-panel {
-      margin-top: 14px;
-      padding: 14px;
-    }
-
-    .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .control-block {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f8fafc;
-    }
-
-    .control-title {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 10px;
-      font-size: 16px;
-      font-weight: 800;
-    }
-
-    .field {
-      margin-top: 10px;
-    }
-
-    .field label {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 7px;
-      color: #344054;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
-
-    .toggles {
-      display: grid;
-      gap: 9px;
-    }
-
-    .toggle {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      font-size: 15px;
-      user-select: none;
-    }
-
-    .toggle input {
-      width: 20px;
-      height: 20px;
-      accent-color: var(--accent);
-    }
-
-    .reset-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .reset-row button {
-      flex: 1;
-    }
-
-    .inquiry-panel {
-      margin-top: 14px;
-      padding: 14px;
-    }
-
-    .inquiry-list {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .inquiry-list li {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fbfdff;
-      color: #344054;
-      font-size: 14px;
-      line-height: 1.55;
-    }
-
-    .hint {
-      margin: 10px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    @media (max-width: 960px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-
-      .stage-readout,
-      .controls-grid,
-      .inquiry-list,
-      .scene-buttons {
-        grid-template-columns: 1fr;
-      }
-
-      .topbar {
-        align-items: start;
-        flex-direction: column;
-      }
-
-      .formula {
-        white-space: normal;
-      }
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .hud-toggle[aria-expanded="true"] { right: 232px; }
+      .scene-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>点电荷电场线可视化资源</h1>
-        <p class="subtitle">切换典型电荷情境，观察电场线方向、疏密和正试探电荷受力方向。</p>
-      </div>
-      <div class="formula">E = F / q，方向按正试探电荷受力方向规定</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="fieldCanvas" width="1600" height="900"></canvas>
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="电场线演示区">
-          <div class="stage-wrap">
-            <canvas id="fieldCanvas" width="1600" height="900"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">场景：<span id="stageScene">正点电荷</span></div>
-              <div class="readout-item">电场线：<span id="stageDirection">向外发散</span></div>
-              <div class="readout-item">线条总数：<span id="stageCount">14 条</span></div>
-              <div class="readout-item">试探电荷：<span id="stageTest">显示</span></div>
-            </div>
-          </div>
-        </section>
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip">场景 <b id="stageScene">正点电荷</b></span>
+          <span class="chip">电场线 <b id="stageDirection">向外发散</b></span>
+          <span class="chip">线条 <b id="stageCount">14 条</b></span>
+          <span class="chip">试探电荷 <b id="stageTest">显示</b></span>
+        </div>
 
-        <section class="control-panel" aria-label="参数控制">
-          <h2>场景与参数</h2>
-          <div class="scene-buttons" role="group" aria-label="电场线场景">
+        <div class="hud hud-legend" id="legend" aria-label="图例">
+          <span class="lg"><i class="sw"></i>电场线（箭头示方向）</span>
+          <span class="lg"><i class="sw dot"></i>正试探电荷</span>
+          <span class="lg"><i class="sw yellow"></i>F 箭头：长度固定，只表示受力方向</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
+          <div class="scene-row" role="group" aria-label="电场线场景">
             <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
             <button type="button" class="scene-btn" data-scene="singleNegative">负点电荷</button>
             <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
             <button type="button" class="scene-btn" data-scene="samePositive">等量同种</button>
           </div>
 
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">电场线</div>
-              <div class="field">
-                <label for="densitySlider"><span>每个电荷线条数</span><span id="densityValue">14 条/电荷</span></label>
-                <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" />
-              </div>
-              <div class="field">
-                <label for="distanceSlider"><span>两电荷距离</span><span id="distanceValue">3.0</span></label>
-                <input id="distanceSlider" type="range" min="2.0" max="4.8" value="3.0" step="0.2" />
-              </div>
-            </div>
+          <div class="row"><label for="densitySlider">每个电荷线条数</label><b id="densityValue">14 条/电荷</b></div>
+          <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" aria-label="每个电荷线条数" />
 
-            <div class="control-block">
-              <div class="control-title">显示选项</div>
-              <div class="toggles">
-                <label class="toggle">
-                  <input type="checkbox" id="showVectors" checked />
-                  <span>显示背景场方向（等长箭头）</span>
-                </label>
-                <label class="toggle">
-                  <input type="checkbox" id="showTestCharge" checked />
-                  <span>显示正试探电荷</span>
-                </label>
-                <label class="toggle">
-                  <input type="checkbox" id="animateArrows" checked />
-                  <span>箭头流动提示</span>
-                </label>
-              </div>
-              <p class="hint">背景短箭头等长，只表示该点电场方向，不表示场强大小。</p>
-            </div>
+          <div class="row"><label for="distanceSlider">两电荷距离</label><b id="distanceValue">3.0</b></div>
+          <input id="distanceSlider" type="range" min="2.0" max="4.8" value="3.0" step="0.2" aria-label="两电荷距离" />
 
-            <div class="control-block">
-              <div class="control-title">课堂操作</div>
-              <p class="hint">在画布中拖动黄色试探电荷，观察该点电场方向（黄色 F 箭头长度固定，只表示方向，不表示受力大小）。电场线表示模型，不是真实存在的线。</p>
-              <div class="reset-row">
-                <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
-              </div>
-            </div>
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示背景场方向（等长箭头）</span></label>
+            <label class="toggle"><input type="checkbox" id="showTestCharge" checked /><span>显示正试探电荷</span></label>
+            <label class="toggle"><input type="checkbox" id="animateArrows" checked /><span>箭头流动提示</span></label>
           </div>
-        </section>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
+          <div class="reset-row">
+            <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
+          </div>
+        </aside>
+
+        <button type="button" class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+
+        <button type="button" class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="说明与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="说明与课堂问题">
+          <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭">×</button>
+
+          <h3>结论</h3>
+          <p>电场线从正电荷出发、终止于负电荷（或伸向无穷远）；某点的场方向就是正试探电荷在该点的受力方向。</p>
+
+          <h3>当前情境</h3>
+          <p><b class="metric-value neutral" id="sceneName">正点电荷</b>　<span id="fieldDirection">由电荷向外发散</span></p>
+          <p>试探电荷受力：<span id="forceDirection">与该点电场方向一致</span></p>
+
+          <h3>教学提示</h3>
+          <p class="metric-note" id="teachingTip">电场线方向表示该点电场强度方向，也就是正试探电荷在该点所受电场力方向。</p>
+
+          <h3>模型假设</h3>
+          <ul>
+            <li>电场线是描述电场的模型，不是真实存在的线；线条密度只定性表示场强相对大小。</li>
+            <li>背景短箭头等长，只表示该点电场方向，不表示场强大小。</li>
+            <li>场线在画面外绕回时会被画布边缘截断，所以「线条总数」可能多于每电荷条数。</li>
+            <li>电场线不相交；等量同种电荷连线中点处合场强为 0。</li>
+          </ul>
+
+          <h3>操作</h3>
+          <p>在画布中拖动黄色正试探电荷，观察该点的电场方向（黄色 F 箭头长度固定，只表示方向，不表示受力大小）。</p>
+
+          <h3>单位说明</h3>
+          <p>画面为无量纲示意：两电荷距离以格（相对单位）计，电场线密度以条/电荷计，不涉及真实单位换算。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
             <li>比较正点电荷和负点电荷：箭头方向分别指向哪里？</li>
             <li>等量异种电荷中，电场线为什么从正电荷出发并指向负电荷？</li>
             <li>等量同种电荷之间的电场线为什么向外弯曲且不相交？</li>
           </ul>
         </section>
       </div>
-
-      <aside class="side-panel" aria-label="资源说明">
-        <h2>资源说明</h2>
-        <div class="metric">
-          <div class="metric-label">当前情境</div>
-          <div class="metric-value neutral" id="sceneName">正点电荷</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">电场线方向</div>
-          <div class="metric-value" id="fieldDirection">由电荷向外发散</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">试探电荷受力</div>
-          <div class="metric-value" id="forceDirection">与该点电场方向一致</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">教学提示</div>
-          <div class="metric-note" id="teachingTip">电场线方向表示该点电场强度方向，也就是正试探电荷在该点所受电场力方向。</div>
-        </div>
-      </aside>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -1134,6 +886,50 @@
     });
 
     window.addEventListener("resize", render);
+
+    // —— 外壳交互：参数面板折叠 / 「?」抽屉（不涉及物理与拖拽逻辑） ——
+    const ctrlToggle = document.getElementById("ctrlToggle");
+    const ctrlPanel = document.getElementById("ctrlPanel");
+    const moreBtn = document.getElementById("moreBtn");
+    const drawer = document.getElementById("drawer");
+    const drawerClose = document.getElementById("drawerClose");
+
+    function setPanelOpen(open) {
+      ctrlPanel.hidden = !open;
+      ctrlToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    function setDrawerOpen(open) {
+      drawer.hidden = !open;
+      moreBtn.setAttribute("aria-expanded", String(open));
+    }
+
+    ctrlToggle.addEventListener("click", () => setPanelOpen(ctrlPanel.hidden));
+    moreBtn.addEventListener("click", () => setDrawerOpen(drawer.hidden));
+    drawerClose.addEventListener("click", () => setDrawerOpen(false));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { setDrawerOpen(false); return; }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const el = event.target;
+      const tag = el && el.tagName;
+      if (event.key === " " || event.code === "Space") {
+        // 空格 = 播放/暂停箭头流动；焦点在控件上时让浏览器保留原生行为。
+        if (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A", "SUMMARY"].includes(tag)) return;
+        event.preventDefault();
+        controls.animateArrows.checked = !controls.animateArrows.checked;
+        render();
+        return;
+      }
+      const typing = tag === "TEXTAREA" || tag === "SELECT"
+        || (tag === "INPUT" && ["text", "number", "search", "email", "url", "password", "tel"].includes(el.type));
+      if (typing) return;
+      const key = event.key.toLowerCase();
+      if (key === "p") { event.preventDefault(); setPanelOpen(ctrlPanel.hidden); }
+      else if (key === "r") { event.preventDefault(); controls.resetBtn.click(); }
+      else if (event.key === "?") { event.preventDefault(); setDrawerOpen(drawer.hidden); }
+    });
+
     animate();
   </script>
 </body>

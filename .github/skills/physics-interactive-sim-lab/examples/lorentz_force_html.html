@@ -6,257 +6,217 @@
   <title>洛伦兹力与带电粒子在匀强磁场中的圆周运动</title>
   <style>
     :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
-      --stage: #080a0e;
-      --positive: #e73535;
-      --negative: #3558ff;
-      --accent: #0f766e;
-      --velocity: #22c55e;
-      --force: #d99b0b;
-      --warn: #d97706;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
+      --accent: #2dd4bf;
+      --accent-deep: #0f766e;
+      --hud-w: 300px;
     }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
 
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-    }
 
-    .app { width: min(1320px, calc(100vw - 32px)); margin: 0 auto; padding: 18px 0 24px; }
-    .topbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
-    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
 
-    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 306px; gap: 14px; align-items: start; }
-    .stage-panel, .side-panel, .control-panel, .inquiry-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-    .stage-panel { padding: 12px; }
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      min-height: 440px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
-    #lorentzCanvas { width: 100%; height: 100%; display: block; }
-    .stage-readout {
-      position: absolute;
-      left: 16px;
-      top: 12px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-    .readout-item {
-      padding: 6px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-    }
-    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 9px 2px 0; color: var(--muted); font-size: 13px; }
-    .legend span { display: inline-flex; align-items: center; }
-    .swatch { width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; display: inline-block; }
-    .side-panel { padding: 14px; }
-    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
-    .metric { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: #f8fafc; }
-    .metric-label { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
-    .metric-value { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.25; overflow-wrap: anywhere; }
-    .metric-value.positive { color: var(--positive); }
-    .metric-value.negative { color: var(--negative); }
-    .metric-value.neutral { color: var(--accent); }
-    .metric-note { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.55; }
-    .control-panel { margin-top: 14px; padding: 14px; }
-    .controls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-    .control-block { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
-    .control-title { margin-bottom: 10px; font-size: 16px; font-weight: 800; }
-    .field { margin-top: 10px; }
-    .field label, .field-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #344054; font-size: 13px; font-weight: 700; }
-    .field-label { justify-content: flex-start; }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-    .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    button {
-      min-height: 36px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      font-family: inherit;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    button:hover { background: #f1f5f9; }
-    button.active, .primary-btn { border-color: #0f766e; background: #0f766e; color: #ffffff; }
-    button.active:hover, .primary-btn:hover { background: #0d665f; }
-    .toggles { display: grid; gap: 9px; }
-    .toggle { display: flex; align-items: center; gap: 9px; font-size: 15px; user-select: none; }
-    .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
-    .inquiry-panel { margin-top: 14px; padding: 14px; }
-    .inquiry-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-    .inquiry-list li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; color: #344054; font-size: 14px; line-height: 1.55; }
-    .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+    .hud-readout .chip + .chip { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.16); }
+    .hud-readout .chip.pos b { color: #ff6b5e; }
+    .hud-readout .chip.neg b { color: #7f9bff; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; white-space: nowrap;
+                  overflow: hidden; }
+    .hud-legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+    .hud-panel { right: 12px; top: 12px; width: var(--hud-w); max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 8px 10px; font-size: 12px; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 324px; }   /* 面板展开时让到面板左边 */
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                font-family: inherit; font-size: 15px; line-height: 1; }
+    .hud-more[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ul { margin: 4px 0; padding-left: 18px; }
+    .drawer .dim { color: #93a6ae; font-size: 12px; }
+
+    /* ---- 面板内部：两列紧凑卡片 ---- */
+    .hud-panel .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+    .hud-panel .field { margin-top: 6px; }
+    .hud-panel .field:first-child { margin-top: 0; }
+    .field label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 2px;
+                   color: #cfe3e9; font-size: 11.5px; }
+    .field label b { color: #7fd6e4; font-weight: 700; white-space: nowrap; }
+    .field.stack label { display: block; }
+    .field.stack label b { display: block; margin-top: 1px; }
+    .field-label { margin-bottom: 3px; color: #cfe3e9; font-size: 11.5px; }
+    input[type="range"] { width: 100%; height: 16px; accent-color: var(--accent); display: block; }
+
+    .hud-panel button { min-height: 26px; padding: 2px 6px; border-radius: 7px; font-family: inherit;
+                        border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
+                        color: #eaf2f5; font-size: 11.5px; font-weight: 600; cursor: pointer;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hud-panel button:hover { background: rgba(255,255,255,.15); }
+    .hud-panel button.active, .hud-panel button.primary { background: var(--accent-deep); border-color: var(--accent); color: #ffffff; }
+
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+
+    .toggles { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 8px; }
+    .toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .toggle input { width: 14px; height: 14px; accent-color: var(--accent); }
+
+    .row { display: flex; gap: 6px; margin-top: 8px; }
+    .row button { flex: 1; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
     @media (max-width: 1100px) {
-      .layout, .controls-grid, .inquiry-list { grid-template-columns: 1fr; }
-      .topbar { align-items: start; flex-direction: column; }
-      .formula { white-space: normal; }
+      .hud-panel { width: 272px; }
+      .hud-toggle[aria-expanded="true"] { right: 296px; }
+    }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 250px; font-size: 11.5px; }
+      .hud-toggle[aria-expanded="true"] { right: 274px; }
+      .hud-legend { gap: 8px; font-size: 11px; }
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>洛伦兹力与带电粒子在匀强磁场中的圆周运动</h1>
-        <p class="subtitle">调节 B、v、q、m，观察受力方向、绕行方向以及半径 r、周期 T 的变化。</p>
-      </div>
-      <div class="formula">F = qvB·sinθ　r = mv / (qB)　T = 2πm / (qB)</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="lorentzCanvas" width="960" height="540"></canvas>
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="磁场运动演示区">
-          <div class="stage-wrap">
-            <canvas id="lorentzCanvas" width="960" height="540"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">粒子：<span id="stageParticle">正电荷</span></div>
-              <div class="readout-item">绕行：<span id="stageDirection">逆时针</span></div>
-              <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
-            </div>
-          </div>
-          <div class="legend">
-            <span><i class="swatch" style="background:#ff3b30"></i>正电荷</span>
-            <span><i class="swatch" style="background:#3558ff"></i>负电荷</span>
-            <span><i class="swatch" style="background:#22c55e"></i>速度 v 与轨迹</span>
-            <span><i class="swatch" style="background:#ffd166"></i>洛伦兹力 F</span>
-            <span><i class="swatch" style="background:#9aa7b8"></i>磁场符号 × / ·</span>
-          </div>
-        </section>
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip" id="particleChip">粒子 <b id="stageParticle">正电荷</b></span>
+          <span class="chip">绕行 <b id="stageDirection">逆时针</b></span>
+          <span class="chip">r <b id="radiusValue">10.42 cm</b></span>
+          <span class="chip">T <b id="periodValue">655.0 ns</b></span>
+        </div>
 
-        <section class="control-panel" aria-label="参数控制">
-          <h2>参数调节</h2>
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">磁场与速度</div>
+        <div class="hud hud-legend" id="legend">
+          <span><i class="swatch" style="background:#ff3b30"></i>正电荷</span>
+          <span><i class="swatch" style="background:#3558ff"></i>负电荷</span>
+          <span><i class="swatch" style="background:#22c55e"></i>速度 v 与轨迹</span>
+          <span><i class="swatch" style="background:#ffd166"></i>洛伦兹力 F</span>
+          <span><i class="swatch" style="background:#9aa7b8"></i>磁场 × / ·</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数控制">
+          <div class="cols">
+            <div>
               <div class="field">
-                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">100 mT</span></label>
+                <label for="bSlider">磁场 B <b id="bValue">100 mT</b></label>
                 <input id="bSlider" type="range" min="20" max="300" value="100" step="5" />
               </div>
               <div class="field">
-                <div class="field-label"><span>磁场方向（视角：垂直纸面）</span></div>
+                <div class="field-label">磁场方向</div>
                 <div class="segmented">
                   <button type="button" class="field-btn active" data-into="1">× 向里</button>
                   <button type="button" class="field-btn" data-into="0">· 向外</button>
                 </div>
               </div>
               <div class="field">
-                <label for="vSlider"><span>速率 v</span><span id="vValue">1.00×10⁶ m/s</span></label>
+                <label for="vSlider">速率 v <b id="vValue">1.00×10⁶ m/s</b></label>
                 <input id="vSlider" type="range" min="0.5" max="4" value="1" step="0.1" />
               </div>
             </div>
-
-            <div class="control-block">
-              <div class="control-title">电荷与质量</div>
+            <div>
               <div class="field">
-                <div class="field-label"><span>电荷电性</span></div>
+                <div class="field-label">电荷电性</div>
                 <div class="segmented">
                   <button type="button" class="charge-btn active" data-sign="1">正电荷 +</button>
                   <button type="button" class="charge-btn" data-sign="-1">负电荷 −</button>
                 </div>
               </div>
-              <div class="field">
-                <label for="qSlider"><span>电荷量 |q|</span><span id="qValue">1 e</span></label>
+              <div class="field stack">
+                <label for="qSlider">电荷量 |q| <b id="qValue">1 e</b></label>
                 <input id="qSlider" type="range" min="1" max="3" value="1" step="1" />
               </div>
               <div class="field">
-                <label for="mSlider"><span>质量 m</span><span id="mValue">1.67×10⁻²⁷ kg</span></label>
+                <label for="mSlider">质量 m <b id="mValue">1.67×10⁻²⁷ kg</b></label>
                 <input id="mSlider" type="range" min="0.5" max="6" value="1.67" step="0.01" />
               </div>
             </div>
-
-            <div class="control-block">
-              <div class="control-title">显示与播放</div>
-              <div class="toggles">
-                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示速度与洛伦兹力</span></label>
-                <label class="toggle"><input type="checkbox" id="showCircle" checked /><span>显示圆心与半径</span></label>
-              </div>
-              <div class="field">
-                <button type="button" class="primary-btn" id="playBtn">播放</button>
-                <button type="button" id="resetBtn">重置</button>
-              </div>
-              <p class="hint">播放速度按“一周期约 3 s”示意，真实周期见右侧读数。</p>
-            </div>
           </div>
-        </section>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示 v 与 F</span></label>
+            <label class="toggle"><input type="checkbox" id="showCircle" checked /><span>显示圆心与半径</span></label>
+          </div>
+
+          <div class="row">
+            <button type="button" class="primary" id="playBtn">播放</button>
+            <button type="button" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" aria-label="结论与课堂问题" hidden>
+          <h3>结论</h3>
+          <p>洛伦兹力始终指向圆心、不做功，粒子做匀速圆周运动：r = mv/(qB)，T = 2πm/(qB)。</p>
+
+          <h3>绕行判定</h3>
+          <p><b id="bendValue">逆时针</b></p>
+          <p id="bendNote">正电荷 + B 向里：v 向右时 F 向上，轨迹逆时针。</p>
+
+          <h3>读数与公式</h3>
+          <p id="radiusNote">r = mv/(qB)</p>
+          <p id="periodNote">T = 2πm/(qB)</p>
+          <p><span id="forceValue">1.60×10⁻¹⁴ N</span></p>
+          <p id="forceNote">F = qvB·sinθ，θ = 90°，v ⟂ B，方向始终指向圆心</p>
+          <p class="dim">状态：<span id="stageStatus">暂停</span></p>
+
+          <h3>模型假设</h3>
+          <p>匀强磁场充满整个区域，忽略重力与相对论效应，v 与 B 垂直（θ = 90°）。界面显示 m/s、mT、cm、ns/μs。质量范围 0.5~6.0×10⁻²⁷ kg，对应质子与常见离子（不含电子）。</p>
+          <p>画面上力箭头长度按 √F 缩放，只表示方向与相对大小，F 的数值以读数为准。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
             <li>只改变速率 v（保持其他不变），半径 r 怎样变化？周期 T 变不变？由此说明 T 与 v 是否有关。</li>
             <li>把 B 反向（× → ·）或把电荷换成负电荷，洛伦兹力方向和轨迹绕行方向怎样改变？两者为什么总是相反？</li>
             <li>若把 B 和 |q| 同时变为原来的 2 倍，先猜一猜 r 与 T 各变多少，再动手验证。</li>
           </ul>
-          <p class="hint">画面比例会随半径自动换挡，比较半径大小时请对照画面左上角标尺与右侧 r 读数；粒子始终做匀速圆周运动，洛伦兹力不做功。</p>
+
+          <h3>画面说明</h3>
+          <p>画面比例会随半径自动换挡，比较半径大小时请对照左上角标尺与 r 读数；粒子始终做匀速圆周运动，洛伦兹力不做功。</p>
+          <p class="dim">快捷键：空格 播放/暂停 · R 重置 · P 参数 · ? 说明</p>
         </section>
       </div>
-
-      <aside class="side-panel" aria-label="实时读数与说明">
-        <h2>实时读数</h2>
-        <div class="metric">
-          <div class="metric-label">轨道半径 r</div>
-          <div class="metric-value neutral" id="radiusValue">10.42 cm</div>
-          <div class="metric-note" id="radiusNote">r = mv/(qB)</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">回旋周期 T</div>
-          <div class="metric-value" id="periodValue">655.0 ns</div>
-          <div class="metric-note" id="periodNote">T = 2πm/(qB)</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">洛伦兹力 F</div>
-          <div class="metric-value" id="forceValue">1.60×10⁻¹⁴ N</div>
-          <div class="metric-note" id="forceNote">F = qvB·sinθ，θ = 90°，v ⟂ B</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">绕行方向</div>
-          <div class="metric-value" id="bendValue">逆时针</div>
-          <div class="metric-note" id="bendNote">正电荷 + B 向里 → 逆时针</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">模型假设</div>
-          <div class="metric-note">匀强磁场充满整个区域，忽略重力与相对论效应，v 与 B 垂直（θ = 90°）。内部按 SI 单位计算，界面显示 m/s、mT、cm、ns/μs。质量范围 0.5~6.0×10⁻²⁷ kg，对应质子与常见离子（不含电子 9.11×10⁻³¹ kg）。画面上力箭头长度按 √F 缩放，只表示方向与相对大小，F 的数值以本面板读数为准。</div>
-        </div>
-      </aside>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -291,6 +251,7 @@
         vValue: document.getElementById("vValue"),
         qValue: document.getElementById("qValue"),
         mValue: document.getElementById("mValue"),
+        particleChip: document.getElementById("particleChip"),
         stageParticle: document.getElementById("stageParticle"),
         stageDirection: document.getElementById("stageDirection"),
         stageStatus: document.getElementById("stageStatus"),
@@ -609,25 +570,11 @@
         ctx.restore();
       }
 
+      // 画布内的说明文字已移入 HUD 与「?」抽屉：这里只留时间/圈数标注与标尺。
       function drawHud(g) {
-        const d = g.d;
-        const intoText = state.intoPage ? "方向为 × 垂直纸面向里" : "方向为 · 垂直纸面向外";
-        chip("B = " + state.bmT + " mT，" + intoText, canvas.width - 20, 34, "#e2e8f0", "right");
-
-        const tPhys = state.phase / Math.abs(d.omega);
+        const tPhys = state.phase / Math.abs(g.d.omega);
         const laps = Math.floor(state.phase / (Math.PI * 2));
-        chip("t = " + fmtTime(tPhys) + "，已绕 " + laps + " 圈", 22, canvas.height - 24, "#cbd5e1", "left");
-
-        chip("匀强磁场 · 忽略重力 · 非相对论", canvas.width / 2, canvas.height - 24, "#f59f00", "center");
-
-        ctx.save();
-        ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
-        ctx.font = "15px \"Microsoft YaHei\", Arial";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
-        ctx.fillText("力箭头长度示意（非等比），F 数值见右侧读数", canvas.width - 22, canvas.height - 24);
-        ctx.restore();
-
+        chip("t = " + fmtTime(tPhys) + " · 已绕 " + laps + " 圈", canvas.width / 2, 34, "#cbd5e1", "center");
         drawScaleBar(g.pxPerM);
       }
 
@@ -640,6 +587,8 @@
         output.mValue.innerHTML = state.mU.toFixed(2) + "×10<sup>-27</sup> kg";
 
         output.stageParticle.textContent = state.sign > 0 ? "正电荷" : "负电荷";
+        output.particleChip.classList.toggle("pos", state.sign > 0);
+        output.particleChip.classList.toggle("neg", state.sign < 0);
         output.stageDirection.textContent = g.dir > 0 ? "逆时针" : "顺时针";
         output.stageStatus.textContent = state.playing ? "播放" : "暂停";
 
@@ -754,6 +703,58 @@
       });
 
       window.addEventListener("resize", render);
+
+      /* ---------- 外壳：参数面板折叠 / 说明抽屉 / 快捷键 ---------- */
+
+      const ctrlPanel = document.getElementById("ctrlPanel");
+      const ctrlToggle = document.getElementById("ctrlToggle");
+      const drawer = document.getElementById("drawer");
+      const moreBtn = document.getElementById("moreBtn");
+
+      function setPanelOpen(open) {
+        ctrlPanel.hidden = !open;
+        ctrlToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        ctrlToggle.title = open ? "收起参数（P）" : "展开参数（P）";
+      }
+
+      function setDrawerOpen(open) {
+        drawer.hidden = !open;
+        moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        moreBtn.textContent = open ? "×" : "?";
+        moreBtn.title = open ? "收起说明" : "结论与课堂问题";
+      }
+
+      ctrlToggle.addEventListener("click", function () {
+        setPanelOpen(ctrlPanel.hidden);
+      });
+
+      moreBtn.addEventListener("click", function () {
+        setDrawerOpen(drawer.hidden);
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const tag = event.target && event.target.tagName;
+        const onControl = tag === "INPUT" || tag === "BUTTON" || tag === "SELECT" || tag === "TEXTAREA";
+        if (event.key === " " && !onControl) {
+          event.preventDefault();
+          controls.playBtn.click();
+        } else if ((event.key === "r" || event.key === "R") && !onControl) {
+          event.preventDefault();
+          controls.resetBtn.click();
+        } else if (event.key === "p" || event.key === "P") {
+          event.preventDefault();
+          ctrlToggle.click();
+        } else if (event.key === "?") {
+          event.preventDefault();
+          moreBtn.click();
+        } else if (event.key === "Escape") {
+          setDrawerOpen(false);
+        }
+      });
+
+      setPanelOpen(true);
+      setDrawerOpen(false);
 
       // 初值来自 HTML，保证滑杆与状态一致
       state.bmT = Number(controls.bSlider.value);

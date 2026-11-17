@@ -3,444 +3,193 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>电势与等势面可视化资源</title>
+  <title>电势与等势面</title>
+  <link rel="icon" href="data:," />
   <style>
-    :root {
-      --bg: #eef2f6;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #c9d2df;
-      --stage: #080a0e;
-      --positive: #e73535;
-      --negative: #3558ff;
-      --accent: #0f766e;
-      --probe: #ffd166;
-      --shadow: 0 10px 28px rgba(25, 33, 61, 0.12);
-    }
-
     * { box-sizing: border-box; }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
+    /* —— LAYOUT.md 必需样式 —— */
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; }
+
+    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 286px; }   /* 面板展开时让到面板左边 */
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .hud-toggle[aria-expanded="true"] { right: 232px; }
     }
 
-    .app {
-      width: min(1180px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 18px 0 24px;
-    }
+    /* —— 叠加层内部样式（只影响外观） —— */
+    .stage-frame > canvas { cursor: crosshair; touch-action: none; }
 
-    .topbar {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
+    .hud-readout > span { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; color: #9fb6bf; }
+    .hud-readout > span + span { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.16); }
+    .hud-readout b { font-weight: 800; }
 
-    h1 { margin: 0; font-size: 25px; letter-spacing: 0; }
+    .hud-legend { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; overflow: hidden; }
+    .lg-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .lg-swatch { width: 18px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
+    .lg-swatch.high { background: #d62456; }
+    .lg-swatch.low { background: #1d4ed8; }
+    .lg-line { width: 16px; height: 10px; border-left: 2px solid rgba(255,255,255,.85); flex: 0 0 auto; }
+    .lg-arrow { width: 0; height: 0; border-left: 12px solid rgba(255,255,255,.78);
+                border-top: 4px solid transparent; border-bottom: 4px solid transparent; flex: 0 0 auto; }
 
-    .subtitle {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
+    .hud-panel::-webkit-scrollbar, .drawer::-webkit-scrollbar { width: 6px; }
+    .hud-panel::-webkit-scrollbar-thumb, .drawer::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
 
-    .formula {
-      padding: 9px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 3px 12px rgba(25, 33, 61, 0.08);
-    }
+    .panel-title { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; color: #8aa2ac; }
+    .hud button { font-family: inherit; cursor: pointer; }
+    .hud-panel .scene-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .hud-panel .scene-btn { min-height: 30px; padding: 0 2px; font-size: 12px; font-weight: 700; color: #dbe9ee;
+                            background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); border-radius: 7px; }
+    .hud-panel .scene-btn:hover { background: rgba(255,255,255,.12); }
+    .hud-panel .scene-btn.active { background: #0f766e; border-color: #0f766e; color: #fff; }
+    .hud-panel .field { margin-top: 10px; }
+    .hud-panel .field label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #cfe3e9; }
+    .hud-panel .field label b { color: #7fd6e4; font-weight: 700; }
+    .hud-panel input[type="range"] { width: 100%; margin: 4px 0 0; accent-color: #7fd6e4; }
+    .hud-panel .toggles { display: grid; gap: 6px; margin-top: 10px; }
+    .hud-panel .toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #cfe3e9; user-select: none; }
+    .hud-panel .toggle input { width: 15px; height: 15px; accent-color: #7fd6e4; }
+    .hud-panel .btn-row { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 10px; }
+    .hud-panel .btn-row button { min-height: 32px; border-radius: 8px; font-size: 12.5px; font-weight: 700;
+                                 border: 1px solid #0f766e; background: #0f766e; color: #fff; }
+    .hud-panel .btn-row button:hover { background: #0d665f; }
+    .hud-panel .ctl-hint { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: #9fb6bf; }
 
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 310px;
-      gap: 14px;
-      align-items: start;
-    }
-
-    .stage-panel,
-    .side-panel,
-    .control-panel,
-    .inquiry-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-
-    .stage-panel { padding: 12px; }
-
-    .stage-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      min-height: 430px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--stage);
-      border: 1px solid #1e2430;
-    }
-
-    #potentialCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      cursor: crosshair;
-      touch-action: none;
-    }
-
-    .stage-readout {
-      position: absolute;
-      left: 16px;
-      top: 14px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .readout-item {
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 700;
-      color: #111827;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-    }
-
-    .stage-legend {
-      position: absolute;
-      left: 16px;
-      bottom: 14px;
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 7px 9px;
-      border-radius: 8px;
-      background: rgba(8, 10, 14, 0.68);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: rgba(255, 255, 255, 0.92);
-      font-size: 13px;
-      font-weight: 700;
-      backdrop-filter: blur(4px);
-    }
-
-    .legend-swatch {
-      width: 24px;
-      height: 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      flex: 0 0 auto;
-    }
-
-    .legend-swatch.high {
-      background: #d62456;
-    }
-
-    .legend-swatch.low {
-      background: #1d4ed8;
-    }
-
-    .legend-line {
-      width: 24px;
-      height: 12px;
-      border-left: 3px solid rgba(255, 255, 255, 0.86);
-      flex: 0 0 auto;
-    }
-
-    .legend-arrow {
-      width: 0;
-      height: 0;
-      border-left: 18px solid rgba(255, 255, 255, 0.78);
-      border-top: 5px solid transparent;
-      border-bottom: 5px solid transparent;
-      flex: 0 0 auto;
-    }
-
-    .side-panel { padding: 14px; }
-    .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
-
-    .metric {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      margin-bottom: 10px;
-      background: #f8fafc;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-
-    .metric-value {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
-    }
-
-    .metric-value.positive { color: var(--positive); }
-    .metric-value.negative { color: var(--negative); }
-    .metric-value.neutral { color: var(--accent); }
-
-    .metric-note {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-    }
-
-    .scene-buttons {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    button {
-      min-height: 36px;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #172033;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    button:hover { background: #f1f5f9; }
-
-    .scene-btn.active,
-    .primary-btn {
-      border-color: #0f766e;
-      background: #0f766e;
-      color: #ffffff;
-    }
-
-    .scene-btn.active:hover,
-    .primary-btn:hover { background: #0d665f; }
-
-    .control-panel { margin-top: 14px; padding: 14px; }
-
-    .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .control-block {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f8fafc;
-    }
-
-    .control-title {
-      margin-bottom: 10px;
-      font-size: 16px;
-      font-weight: 800;
-    }
-
-    .field { margin-top: 10px; }
-
-    .field label {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 7px;
-      color: #344054;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
-
-    .toggles {
-      display: grid;
-      gap: 9px;
-    }
-
-    .toggle {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      font-size: 15px;
-      user-select: none;
-    }
-
-    .toggle input {
-      width: 20px;
-      height: 20px;
-      accent-color: var(--accent);
-    }
-
-    .inquiry-panel { margin-top: 14px; padding: 14px; }
-
-    .inquiry-list {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .inquiry-list li {
-      padding: 11px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fbfdff;
-      color: #344054;
-      font-size: 14px;
-      line-height: 1.55;
-    }
-
-    .hint {
-      margin: 10px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    @media (max-width: 960px) {
-      .layout,
-      .controls-grid,
-      .inquiry-list,
-      .scene-buttons,
-      .stage-legend { grid-template-columns: 1fr; }
-      .topbar { align-items: start; flex-direction: column; }
-      .formula { white-space: normal; }
-    }
+    .drawer .formula-line { margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px;
+                            background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; }
+    .drawer ul { margin: 4px 0 0; padding-left: 18px; }
+    .drawer .note { font-size: 12px; color: #9fb6bf; }
+    .metric-value { font-weight: 800; }
+    .metric-value.positive { color: #ff9a9a; }
+    .metric-value.negative { color: #9aa8ff; }
+    .metric-value.neutral { color: #7fd6e4; }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>电势与等势面可视化资源</h1>
-        <p class="subtitle">红色表示电势较高，蓝色表示电势较低；白色线是等势线，白色箭头表示电场方向（箭头长度固定，只表示方向，不表示场强大小）。</p>
-      </div>
-      <div class="formula">φ = E<sub>p</sub> / q，等势线 ⟂ 电场线</div>
-    </header>
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="potentialCanvas" width="960" height="540"></canvas>
 
-    <section class="layout">
-      <div>
-        <section class="stage-panel" aria-label="电势与等势面演示区">
-          <div class="stage-wrap">
-            <canvas id="potentialCanvas" width="960" height="540"></canvas>
-            <div class="stage-readout">
-              <div class="readout-item">场景：<span id="stageScene">正点电荷</span></div>
-              <div class="readout-item">当前位置：<span id="stageV">中等电势</span></div>
-              <div class="readout-item">电场方向：<span id="stageE">--</span></div>
-            </div>
-            <div class="stage-legend" aria-hidden="true">
-              <div class="legend-item"><span class="legend-swatch high"></span><span>高电势</span></div>
-              <div class="legend-item"><span class="legend-swatch low"></span><span>低电势</span></div>
-              <div class="legend-item"><span class="legend-line"></span><span>等势线</span></div>
-              <div class="legend-item"><span class="legend-arrow"></span><span>电场方向·等长</span></div>
-            </div>
-          </div>
-        </section>
+        <div class="hud hud-readout">
+          <span>场景 <b id="stageScene">正点电荷</b></span>
+          <span>探针 <b id="stageV">中等电势区</b></span>
+          <span>电场 <b id="stageE">--</b></span>
+          <span>φ <b id="probePhi">--</b> kQ₀/R₀</span>
+        </div>
 
-        <section class="control-panel" aria-label="参数控制">
-          <h2>场景与参数</h2>
+        <div class="hud hud-legend" id="legend" aria-hidden="true">
+          <span class="lg-item"><span class="lg-swatch high"></span>高电势</span>
+          <span class="lg-item"><span class="lg-swatch low"></span>低电势</span>
+          <span class="lg-item"><span class="lg-line"></span>等势线</span>
+          <span class="lg-item"><span class="lg-arrow"></span>电场方向·等长</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
+          <p class="panel-title">场景</p>
           <div class="scene-buttons" role="group" aria-label="电势场景">
             <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
             <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
             <button type="button" class="scene-btn" data-scene="uniform">匀强电场</button>
           </div>
 
-          <div class="controls-grid">
-            <div class="control-block">
-              <div class="control-title">等势线</div>
-              <div class="field">
-                <label for="levelSlider"><span>等势线条数</span><span id="levelValue">共 9 条</span></label>
-                <input id="levelSlider" type="range" min="5" max="13" value="9" step="2" />
-                <div class="hint" id="levelNote">电平按归一化单位 φ/(kQ₀/R₀) 取值（kQ₀/R₀ = 8.99 V）</div>
-              </div>
-              <div class="field">
-                <label for="scaleSlider"><span>电势色阶</span><span id="scaleValue">1.0</span></label>
-                <input id="scaleSlider" type="range" min="0.5" max="2.5" value="1" step="0.1" />
-              </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">显示选项</div>
-              <div class="toggles">
-                <label class="toggle"><input type="checkbox" id="showHeat" checked /><span>显示电势颜色图</span></label>
-                <label class="toggle"><input type="checkbox" id="showEquipotential" checked /><span>显示等势线</span></label>
-                <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示电场方向</span></label>
-              </div>
-            </div>
-
-            <div class="control-block">
-              <div class="control-title">课堂操作</div>
-              <p class="hint">拖动黄色探针，观察同一条等势线上的电势是否相同，以及电场方向是否与等势线垂直。</p>
-              <button type="button" class="primary-btn" id="resetBtn">重置探针</button>
-            </div>
+          <div class="field">
+            <label for="levelSlider"><span>等势线条数</span><b id="levelValue">共 9 条</b></label>
+            <input id="levelSlider" type="range" min="5" max="13" value="9" step="2" />
           </div>
-        </section>
+          <div class="field">
+            <label for="scaleSlider"><span>电势色阶</span><b id="scaleValue">1.0</b></label>
+            <input id="scaleSlider" type="range" min="0.5" max="2.5" value="1" step="0.1" />
+          </div>
 
-        <section class="inquiry-panel" aria-label="课堂观察问题">
-          <h2>课堂观察</h2>
-          <ul class="inquiry-list">
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showHeat" checked /><span>电势颜色图</span></label>
+            <label class="toggle"><input type="checkbox" id="showEquipotential" checked /><span>等势线</span></label>
+            <label class="toggle"><input type="checkbox" id="showField" checked /><span>电场方向</span></label>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" class="primary-btn" id="resetBtn">重置探针</button>
+          </div>
+          <p class="ctl-hint">拖动黄色探针 V 测电势</p>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂问题">
+          <h3>结论</h3>
+          <p>等势线是等势面的剖面图；电场线与等势线垂直，并由电势高处指向电势低处。</p>
+          <p class="formula-line">φ = E<sub>p</sub> / q，等势线 ⟂ 电场线</p>
+
+          <h3>实时量值</h3>
+          <p>场景：<span class="metric-value neutral" id="sceneName">正点电荷</span></p>
+          <p>探针电势：<span class="metric-value neutral" id="probeV">中等电势区</span></p>
+          <p class="note" id="probeVNote">—</p>
+          <p>电场方向：<span id="probeE">从高电势指向低电势</span></p>
+
+          <h3>等势线量级</h3>
+          <p class="note" id="levelNote">—</p>
+
+          <h3>模型假设与单位</h3>
+          <p class="note">电势一律按归一化单位显示：φ/(kQ₀/R₀)。取 Q₀ = 1 nC、R₀ = 1 m（1 世界单位 = 1 m），k = 8.99×10⁹ N·m²/C²，则 kQ₀/R₀ = 8.99 V，读数乘 8.99 即伏特；场强归一化为 E/(kQ₀/R₀²)，乘 8.99 V/m 即 SI 值。点电荷电势按 φ = Σ k·Q_i/√(r_i² + a²) 计算（a = 0.283 m，用于避免电荷中心发散；+Q = 1 nC，−Q = −1 nC）。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
             <li>沿同一条等势线移动探针，电势读数是否明显变化？</li>
             <li>等势线密的地方，电场方向箭头和颜色变化有什么特点？</li>
             <li>匀强电场中，相邻等势线间距改变时，E 与 U/d 的关系如何理解？</li>
           </ul>
+
+          <h3>教学提示</h3>
+          <p id="teachingTip">等势线是等势面的剖面图。电场线与等势线垂直，并由电势高处指向电势低处。</p>
+          <p class="note">拖动黄色探针 V 移动测点。快捷键：R 重置探针 · P 折叠参数 · ? 打开/关闭本说明</p>
         </section>
       </div>
-
-      <aside class="side-panel" aria-label="资源说明">
-        <h2>资源说明</h2>
-        <div class="metric">
-          <div class="metric-label">当前情境</div>
-          <div class="metric-value neutral" id="sceneName">正点电荷</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">探针位置</div>
-          <div class="metric-value" id="probeV">中等电势区</div>
-          <div class="metric-note" id="probeVNote">φ = …·(kQ₀/R₀) ≈ … V</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">电场方向</div>
-          <div class="metric-value" id="probeE">从高电势指向低电势</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">单位说明</div>
-          <div class="metric-note">电势一律按归一化单位显示：φ/(kQ₀/R₀)。取 Q₀ = 1 nC、R₀ = 1 m（1 世界单位 = 1 m），k = 8.99×10⁹ N·m²/C²，则 kQ₀/R₀ = 8.99 V，读数乘 8.99 即伏特；场强归一化为 E/(kQ₀/R₀²)，乘 8.99 V/m 即 SI 值。点电荷电势按 φ = Σ k·Q_i/√(r_i² + a²) 计算（a = 0.283 m，用于避免电荷中心发散；+Q = 1 nC，−Q = −1 nC）。</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">教学提示</div>
-          <div class="metric-note" id="teachingTip">等势线是等势面的剖面图。电场线与等势线垂直，并由电势高处指向电势低处。</div>
-        </div>
-      </aside>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -472,6 +221,7 @@
       stageScene: document.getElementById("stageScene"),
       stageV: document.getElementById("stageV"),
       stageE: document.getElementById("stageE"),
+      probePhi: document.getElementById("probePhi"),
       levelValue: document.getElementById("levelValue"),
       levelNote: document.getElementById("levelNote"),
       scaleValue: document.getElementById("scaleValue"),
@@ -866,6 +616,7 @@
       output.stageScene.textContent = scene.name;
       output.stageV.textContent = potentialText;
       output.stageE.textContent = direction;
+      output.probePhi.textContent = v.toFixed(3);
       output.levelValue.textContent = contour.text;
       output.levelNote.textContent = contour.note;
       output.scaleValue.textContent = state.scale.toFixed(1);
@@ -963,6 +714,53 @@
     controls.resetBtn.addEventListener("click", () => {
       state.probe = state.scene === "uniform" ? { x: 1.4, y: 1.0 } : { x: 1.7, y: 1.0 };
       render();
+    });
+
+    // —— 外壳交互：参数折叠 / 「?」抽屉 / 快捷键（不改变物理与绘图逻辑）——
+    const panel = document.getElementById("ctrlPanel");
+    const ctrlToggle = document.getElementById("ctrlToggle");
+    const moreBtn = document.getElementById("moreBtn");
+    const drawer = document.getElementById("drawer");
+
+    function setPanel(open) {
+      panel.hidden = !open;
+      ctrlToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    // 打开「?」抽屉时收起参数面板，避免两块叠加层互相遮挡；关闭时恢复原状态。
+    let restorePanelOnDrawerClose = false;
+
+    function setDrawer(open) {
+      drawer.hidden = !open;
+      moreBtn.setAttribute("aria-expanded", String(open));
+      if (open && !panel.hidden) {
+        restorePanelOnDrawerClose = true;
+        setPanel(false);
+      } else if (!open && restorePanelOnDrawerClose) {
+        restorePanelOnDrawerClose = false;
+        setPanel(true);
+      }
+    }
+
+    ctrlToggle.addEventListener("click", () => setPanel(panel.hidden));
+    moreBtn.addEventListener("click", () => setDrawer(drawer.hidden));
+
+    document.addEventListener("keydown", (event) => {
+      const tag = event.target && event.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const key = event.key.toLowerCase();
+      if (key === "p") {
+        setPanel(panel.hidden);
+        event.preventDefault();
+      } else if (event.key === "?") {
+        setDrawer(drawer.hidden);
+        event.preventDefault();
+      } else if (key === "escape") {
+        setDrawer(false);
+      } else if (key === "r") {
+        controls.resetBtn.click();
+        event.preventDefault();
+      }
     });
 
     window.addEventListener("resize", render);

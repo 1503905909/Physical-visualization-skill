@@ -166,7 +166,7 @@ input[type=search]:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--tea
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
   box-shadow:var(--shadow);display:flex;flex-direction:column;transition:.18s}
 .card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,42,52,.12)}
-.thumb{position:relative;display:block;aspect-ratio:16/10;background:#0d1b21;overflow:hidden}
+.thumb{position:relative;display:block;aspect-ratio:16/9;background:#0d1b21;overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb.vid video{width:100%;height:100%;object-fit:cover;display:block}
 .thumb.poster{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;
