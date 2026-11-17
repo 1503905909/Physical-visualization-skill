@@ -85,8 +85,8 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "回旋加速器",
-      "tags": ["螺旋轨迹", "√n", "周期"],
-      "desc": "D 形盒、缝隙加速与螺旋轨迹；半径严格按 √n 增长，周期与速率无关，改变 B、U 或粒子种类可对比。",
+      "tags": ["直线过缝", "√n", "周期"],
+      "desc": "D 形盒内做半圆偏转、缝隙内沿直线加速（轨迹是半圆 + 直线交替，不是同心圆）；半径严格按 √n 增长，周期与速率无关，改变 B、U 或粒子种类可对比。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/cyclotron_html.html",
       "thumb": "gallery/thumbs/cyclotron_html.png"
     },
@@ -169,8 +169,8 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "带电粒子的运动",
-      "tags": ["受力方向", "运动分解", "抛物线"],
-      "desc": "受力方向、运动分解与抛物线轨迹，配合课堂推导 y = qUL²/(2mdv₀²)。",
+      "tags": ["分步解题", "类平抛", "E = 2E₀tanθ"],
+      "desc": "30 秒分步解题：读图 → 判断受力 → 建立模型（加速段匀加速、偏转段类平抛）→ 推导 tanθ = qEL/(mv₀²) → 代入 v₀² 得 E = 2E₀tanθ（θ=30° 时约 1.15E₀）→ 量纲与极限检验。",
       "path": ".github/skills/manim-physics-animator/examples/charged_particle_uniform_field.py",
       "scene": "ChargedParticleUniformFieldScene"
     },
@@ -205,8 +205,8 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "回旋加速器",
-      "tags": ["D 形盒", "缝隙加速", "周期"],
-      "desc": "D 形盒结构、磁场偏转、缝隙加速与半径增大，落到 r = mv/(qB) 与 T = 2πm/(qB)。",
+      "tags": ["D 形盒", "缝隙直线加速", "30 秒"],
+      "desc": "30 秒带字幕讲解：缝内直线加速、盒内半圆偏转，半径 r ∝ √n 与周期 T = 2πm/(qB) 一屏一个知识点。",
       "path": ".github/skills/manim-physics-animator/examples/cyclotron.py",
       "scene": "CyclotronScene"
     },

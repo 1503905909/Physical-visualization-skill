@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -155,7 +155,7 @@
         </div>
 
         <div class="hud hud-legend" id="legend" aria-label="图例">
-          <span class="lg"><i class="sw"></i>白色箭头：静电力方向，长度 ∝ F（0.20 px/N）</span>
+          <span class="lg"><i class="sw"></i>白色箭头：静电力方向，长度 ∝ F（0.15 px/N）</span>
           <span class="lg"><i class="sw green"></i>绿色：两电荷间距 r</span>
           <span class="lg">底部标尺：cm</span>
         </div>
@@ -224,7 +224,7 @@
           <h3>模型假设</h3>
           <ul>
             <li>两个点电荷放在水平无摩擦轨道上，只考虑彼此之间的静电力，忽略重力与空气阻力。</li>
-            <li>箭头长度按固定比例 0.20 px/N 绘制（F_ref = 850 N），不随参数重新归一化；F &lt; 60 N 时取最小 12 px，F &gt; 850 N 时封顶 170 px。</li>
+            <li>箭头长度按固定比例 0.15 px/N 绘制（F_ref = 850 N），不随参数重新归一化；F &lt; 60 N 时取最小 12 px，F &gt; 850 N 时封顶 170 px。</li>
             <li>拖动时两电荷中心最近 0.6 cm，画面间距、读数与按 r 计算的力三者一致。</li>
             <li>画面为 2D 示意，未表示电荷自身的大小与内部结构。</li>
           </ul>
@@ -248,10 +248,10 @@
     const MIN_DISTANCE_CM = 0.6;
     const MIN_POSITION_CM = 0.5;
     const MAX_POSITION_CM = 9.5;
-    const CHARGE_RADIUS = 20;
+    const CHARGE_RADIUS = 15;
     // 箭头长度按 F 线性映射（不用对数）：length(px) = F(N) × 0.2。
     // 全页固定，不做动态归一化；只保留视觉上必要的最小长度与画布上限。
-    const ARROW_PX_PER_NEWTON = 0.2;
+    const ARROW_PX_PER_NEWTON = 0.15;
     const ARROW_MIN_PX = 12;   // 对应 60 N
     const ARROW_MAX_PX = 170;  // 对应 850 N，即图例中的 F_ref
     const ARROW_LANE_OFFSET = 26;
@@ -404,8 +404,8 @@
       return {
         w,
         h,
-        rulerLeft: 120,
-        rulerRight: w - 120,
+        rulerLeft: 200,
+        rulerRight: w - 200,
         rulerY: h - 110,
         chargeY: h - 210,
         arrowY: h - 330

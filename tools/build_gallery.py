@@ -291,6 +291,18 @@ def build_page(reg: dict) -> str:
         if r["chapter"] not in chapters:
             chapters.append(r["chapter"])
 
+    books = []
+    for c in chapters:
+        book = c.split("·")[0].strip()
+        if book and book not in books:
+            books.append(book)
+
+    book_map: dict[str, list[str]] = {}
+    for c in chapters:
+        book, _, chap = c.partition("·")
+        book_map.setdefault(book.strip(), []).append(chap.strip())
+    coverage = "；".join(f"{b}（{'、'.join(cs)}）" for b, cs in book_map.items())
+
     n_html = sum(1 for r in res if r["type"] == "html")
     n_manim = len(res) - n_html
 
@@ -325,7 +337,7 @@ def build_page(reg: dict) -> str:
       <span class="stat">共 {len(res)} 个资源</span>
       <span class="stat">交互仿真 {n_html}</span>
       <span class="stat">讲解动画 {n_manim}</span>
-      <span class="stat">覆盖 6 个教材章节</span>
+      <span class="stat">覆盖 {len(books)} 册 · {len(chapters)} 章</span>
     </div>
   </div>
 </header>
@@ -349,6 +361,7 @@ def build_page(reg: dict) -> str:
 <footer>
   <div class="wrap">
     <p>{esc(site['intro'])}</p>
+    <p class="coverage">当前覆盖：{coverage}。人教版其余教材（必修第一册、必修第二册、选择性必修第一册、选择性必修第三册）暂无资源。</p>
     <p>本页由 <code>tools/build_gallery.py</code> 依据 <code>gallery/resources.json</code> 生成。
        新增资源：在 JSON 中登记一条，然后重跑 <code>python tools/build_gallery.py</code>。
        Manim 动画渲染到 <code>build/videos/manim/&lt;id&gt;.mp4</code> 后会自动出现播放器。</p>

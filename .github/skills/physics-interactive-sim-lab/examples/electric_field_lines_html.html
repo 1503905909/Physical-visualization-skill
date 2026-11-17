@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -326,7 +326,7 @@
       const b = worldBounds();
       const sx = LW / (b.xmax - b.xmin);
       const sy = LH / (b.ymax - b.ymin);
-      const s = Math.min(sx, sy) * 0.92;
+      const s = Math.min(sx, sy) * 0.78;
       const ox = LW / 2;
       const oy = LH / 2;
       return {
@@ -339,7 +339,7 @@
       const b = worldBounds();
       const sx = LW / (b.xmax - b.xmin);
       const sy = LH / (b.ymax - b.ymin);
-      const s = Math.min(sx, sy) * 0.92;
+      const s = Math.min(sx, sy) * 0.78;
       return {
         x: clamp((point.x - LW / 2) / s, b.xmin + 0.2, b.xmax - 0.2),
         y: clamp((LH / 2 - point.y) / s, b.ymin + 0.25, b.ymax - 0.25)
@@ -392,7 +392,9 @@
     }
 
     function inIntegrationBounds(x, y) {
-      return x > -13 && x < 13 && y > -8 && y < 8;
+      /* 与 worldBounds 保持一致：电场线画到世界边框就停，画面四周才留得出白边 */
+      const b = worldBounds();
+      return x > b.xmin - 0.15 && x < b.xmax + 0.15 && y > b.ymin - 0.15 && y < b.ymax + 0.15;
     }
 
     function angleDifference(a, b) {
@@ -613,14 +615,14 @@
       const b = worldBounds();
       const sx = LW / (b.xmax - b.xmin);
       const sy = LH / (b.ymax - b.ymin);
-      const s = Math.min(sx, sy) * 0.92;
+      const s = Math.min(sx, sy) * 0.78;
       return { s, halfWidth: LW / (2 * s), halfHeight: LH / (2 * s) };
     }
 
     function singleFieldLines(charges) {
       const charge = charges[0];
       const count = state.density;
-      const innerRadius = 0.42;
+      const innerRadius = 0.34;
       const { halfWidth, halfHeight } = canvasHalfExtent();
       const paths = [];
       const segments = 96;
@@ -719,7 +721,7 @@
 
     function drawCharge(c) {
       const p = worldToCanvas(c);
-      const radius = 32;
+      const radius = 22;
       const gradient = ctx.createRadialGradient(p.x - 12, p.y - 12, 5, p.x, p.y, radius);
       gradient.addColorStop(0, "rgba(255,255,255,0.95)");
       gradient.addColorStop(0.23, chargeColor(c.q));

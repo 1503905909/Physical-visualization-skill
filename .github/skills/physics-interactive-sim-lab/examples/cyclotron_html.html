@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -258,8 +258,10 @@
         <!-- 左下角图例：一行 -->
         <div class="hud hud-legend" aria-label="图例">
           <span class="lg"><i class="sw" style="background:#ffd166"></i>轨道</span>
+          <span class="lg"><i class="sw" style="background:#f59e0b"></i>缝隙加速段</span>
           <span class="lg"><i class="sw" style="background:#ffffff"></i>速度 v</span>
           <span class="lg"><i class="sw" style="background:#7dd3fc"></i>洛伦兹力 F</span>
+          <span class="lg"><i class="sw" style="background:#34d399"></i>电场 E</span>
           <span class="lg">· 磁场垂直屏面向外</span>
         </div>
 
@@ -333,11 +335,11 @@
           <p class="conclusion-formula">r = mv / qB　　T = 2πm / qB　　ΔE_k = qU　　r ∝ √n</p>
 
           <h3>模型假设</h3>
-          <p class="conclusion-note">非相对论、匀强磁场、薄缝瞬时加速的简化模型。缝隙内无磁场、仅电场；进入 D 形盒后磁场使其做半圆运动。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</p>
+          <p class="conclusion-note">非相对论、匀强磁场、理想薄缝的简化模型。缝隙内无磁场、只有电场，粒子沿垂直缝边的直线被加速（每次 +qU，首段由缝口静止出发）；进入 D 形盒后只受洛伦兹力，做半圆运动，半圆的直径落在缝边线上——所以轨迹是“半圆 + 直线过缝”交替，而不是同心圆。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</p>
 
           <h3>课堂观察</h3>
           <ul class="q-list">
-            <li>粒子在哪一段受到电场力做功？在 D 形盒内部能量是否增加？</li>
+            <li>缝隙里粒子的轨迹为什么是直线段？它在哪里被加速、在哪里只是偏转？</li>
             <li>增大 B 后轨道为什么更紧？回旋周期 T 与速率有没有直接关系？</li>
             <li>换成 α 粒子后，同样 B、U 下半径和周期为什么会改变？</li>
           </ul>
@@ -410,30 +412,37 @@
     };
 
     /* 舞台几何：D 形盒中心、半径与缝隙宽度（画布坐标 960×540） */
-    const GEOM = { cx: 480, cy: 276, radius: 214, gap: 46 };
+    const GEOM = { cx: 480, cy: 264, radius: 176, gap: 39 };
+
+    /* 两条缝边线 = D 形盒的直边。盒内半圆的直径必须落在这两条线上，
+       缝内的加速段才能是“垂直缝边”的直线。 */
+    const EDGE_L = GEOM.cx - GEOM.gap / 2;
+    const EDGE_R = GEOM.cx + GEOM.gap / 2;
 
     /* 轨道允许到达的“D 形盒可用半径”：留 14 px 安全边距，防止轨道压到盒壁 */
-    const R_AVAIL = GEOM.radius - 14;      // = 200 px
+    const R_AVAIL = GEOM.radius - 14;      // = 192 px
     const TARGET_PASSES = 10;              // 期望最多显示的加速次数
 
     /* 显示比例系数：r_px = R_SCALE · √(n·U·m/q) / B。
        只允许整体缩放 —— 不含任何固定偏置，保证 r_n ∝ √n、∝√U、∝√(m/q)、∝1/B。
        取值由默认质子（B=1.2、U=1.5、m/q=1）第 10 次加速后半径 = 190 px 定标：
        R_SCALE = 190 × 1.2 / √(10 × 1.5) ≈ 58.87 */
-    const R_SCALE = (190 * 1.2) / Math.sqrt(10 * 1.5);
+    const R_SCALE = ((190 * 1.2) / Math.sqrt(10 * 1.5)) * 0.85;   // 装置缩到 85%，r 同比缩放
 
     /* v 箭头长度 = V_SCALE · √(2nqU/m) ∝ v，同样只整体缩放、无偏置 */
     const V_SCALE = 12.8;
 
-    /* 动画：每半圈用时 ∝ m/(qB)，即角速度 ∝ qB/m（默认质子 B=1.2 时约 1.44 半圈/秒） */
-    const ANIM_K = 1.2;
+    /* 动画：半圈用时 ∝ m/(qB)，即角速度 ∝ qB/m。
+       相位以弧度计，每半圈推进 π，故相位速率 = ANIM_K·(qB/m)·π。
+       默认质子 B = 1.2 时一个半圈约 1.7 s，全程约 20 s —— 过缝的直线加速看得清。 */
+    const ANIM_K = 0.5;
 
     const state = {
       B: 1.2,
       U: 1.5,
       particle: "proton",
       playing: false,
-      pass: 0            // 已完成的半圈数（浮点，半圈为单位）
+      phase: 0           // 沿轨迹的时间相位（弧度）：盒内半圆恰好 π，缝内直线另计
     };
 
     function clamp(value, min, max) {
@@ -448,7 +457,13 @@
       return PARTICLES[state.particle];
     }
 
-    /* 物理模型：r_n = R_SCALE·√(n·U·m/q)/B，n = 过缝隙次数（每次 +qU）。
+    /* 物理模型（教材层次）：
+       1. D 形盒内只有匀强磁场，粒子做匀速圆周运动；半圆的直径落在缝边线上，
+          绕行半圈后回到同一条缝边线，只是沿缝边线平移了 2r。
+       2. 缝隙内没有磁场、只有匀强电场，粒子沿“垂直缝边”的方向走直线并被加速，
+          每穿过一次动能增加 qU；缝内速度由 v_n 匀加速到 v_{n+1}。
+       3. 于是 r_n = R_SCALE·√(n·U·m/q)/B，n 为穿缝次数。轨迹 = 半圆 + 直线交替衔接，
+          直线段与半圆在缝边线处相切（速度方向都垂直于缝边），不会出现折角或跳变。
        半径一旦会超过可用半径就不再加速，而不是把多个半径 clamp 成同一个值。 */
     function buildScene() {
       const p = particleDef();
@@ -463,60 +478,140 @@
       const radii = [];
       for (let n = 1; n <= passCount; n += 1) radii.push(radiusOf(n));
 
-      /* 半圆逐段首尾相接：第 k 段从缝线上 y_k 处以水平速度出发，
-         圆心在速度方向右侧 90°（屏幕坐标 y 向下，正电荷 + B 出屏 → 顺时针），
-         半径 r_k，走过半圈后回到缝线 y_k ± 2r_k；下一段从同一点继续。
-         于是相邻两段端点严格重合，缝隙处不会再出现竖直跳变。 */
-      const arcs = [];
-      let y = 0;
+      /* 逐段构造：缝内直线（加速）→ 盒内半圆（偏转）→ 缝内直线 → …… */
+      const pieces = [];
+      const gapW = GEOM.gap;
+      let phase = 0;
+      let y = 0;          // 相对中心线的纵向位置
+      let side = 1;       // +1：此刻在左盒一侧，准备向右穿缝
+
       for (let k = 0; k < passCount; k += 1) {
-        const r = radii[k];
-        const isRight = k % 2 === 0;
-        const centerY = isRight ? y + r : y - r;
-        const endY = isRight ? y + 2 * r : y - 2 * r;
-        arcs.push({ r, isRight, centerY, startY: y, endY });
-        y = endY;
+        const rPrev = k === 0 ? 0 : radii[k - 1];   // 第 1 次从静止出发
+        const rNext = radii[k];
+
+        /* —— 缝内：匀加速直线段。速度按 r 等比例放大，故用 r 作“显示速率” —— */
+        const gapDur = (2 * gapW) / (rPrev + rNext);
+        pieces.push({
+          type: "gap",
+          y,
+          phase0: phase,
+          dur: gapDur,
+          x0: side > 0 ? EDGE_L : EDGE_R,
+          x1: side > 0 ? EDGE_R : EDGE_L,
+          dir: side,
+          rPrev,
+          rNext,
+          n0: k,
+          n1: k + 1
+        });
+        phase += gapDur;
+
+        /* —— 盒内：半圆，直径落在刚离开的那条缝边线上 —— */
+        const isRight = side > 0;
+        const arcCx = isRight ? EDGE_R : EDGE_L;
+        const arcCy = isRight ? y + rNext : y - rNext;
+        pieces.push({
+          type: "arc",
+          r: rNext,
+          isRight,
+          cx: arcCx,
+          cy: arcCy,
+          y0: y,
+          y1: y + (isRight ? 2 : -2) * rNext,
+          base: isRight ? -Math.PI / 2 : Math.PI / 2,
+          phase0: phase,
+          dur: Math.PI,
+          n: k + 1
+        });
+        phase += Math.PI;
+
+        y = isRight ? y + 2 * rNext : y - 2 * rNext;
+        side = -side;
       }
 
+      /* 纵向居中：只整体平移，不改任何半径，保证 r_n ∝ √n */
       let minY = 0;
       let maxY = 0;
-      arcs.forEach(arc => {
-        minY = Math.min(minY, arc.endY);
-        maxY = Math.max(maxY, arc.endY);
+      pieces.forEach(piece => {
+        const lo = piece.type === "gap" ? piece.y : Math.min(piece.y0, piece.y1);
+        const hi = piece.type === "gap" ? piece.y : Math.max(piece.y0, piece.y1);
+        minY = Math.min(minY, lo);
+        maxY = Math.max(maxY, hi);
       });
-      const midY = (minY + maxY) / 2;   // 整体平移量（只平移，不改变任何半径）
+      const midY = (minY + maxY) / 2;
+
+      pieces.forEach(piece => {
+        if (piece.type === "gap") {
+          piece.y -= midY;
+        } else {
+          piece.cy -= midY;
+          piece.y0 -= midY;
+          piece.y1 -= midY;
+        }
+      });
 
       return {
         p,
         passCount,
         radii,
-        arcs,
+        pieces,
         midY,
+        total: phase,
         hitLimit: passCount < TARGET_PASSES,
         minRadius: radii[0],
         maxRadius: radii[passCount - 1]
       };
     }
 
-    /* 半圈连续的参数化：passFloat∈[0, passCount]，k 为段号，t 为该段内进度 */
-    function arcPoint(scene, passFloat) {
-      const total = scene.passCount;
-      const pass = clamp(passFloat, 0, total);
-      const k = Math.min(Math.floor(pass), total - 1);
-      const t = pass - k;
-      const arc = scene.arcs[k];
-      const baseAngle = arc.isRight ? -Math.PI / 2 : Math.PI / 2;
-      const angle = baseAngle + t * Math.PI;
-      const acy = GEOM.cy + (arc.centerY - scene.midY);
+    /* 沿轨迹取点：t ∈ [0, scene.total]。
+       缝内用匀加速运动学（v² 随位移线性增加、位移随时间二次增长），
+       盒内用匀速圆周运动（速率与半径成正比，角速度恒定）。
+       返回位置、速率、以及粒子当前处在缝内还是盒内。 */
+    function pointAt(scene, t) {
+      const time = clamp(t, 0, scene.total);
+      let piece = scene.pieces[scene.pieces.length - 1];
+      for (let i = 0; i < scene.pieces.length; i += 1) {
+        const cand = scene.pieces[i];
+        if (time < cand.phase0 + cand.dur) { piece = cand; break; }
+      }
+      const p = scene.p;
+      const s = Math.max(0, time - piece.phase0);
+
+      if (piece.type === "gap") {
+        const gapW = GEOM.gap;
+        /* 匀加速：a = (v_{n+1}² − v_n²) / 2d，显示速率用 r 等比表示 */
+        const a = (piece.rNext * piece.rNext - piece.rPrev * piece.rPrev) / (2 * gapW);
+        const travel = clamp(piece.rPrev * s + 0.5 * a * s * s, 0, gapW);
+        const u = travel / gapW;
+        const vIn2 = (2 * piece.n0 * p.q * state.U) / p.m;
+        const vOut2 = (2 * piece.n1 * p.q * state.U) / p.m;
+        return {
+          x: piece.x0 + piece.dir * travel,
+          y: GEOM.cy + piece.y,
+          inGap: true,
+          dir: piece.dir,
+          u,
+          vPhys: Math.sqrt(vIn2 + u * (vOut2 - vIn2)),
+          crossings: piece.n0
+        };
+      }
+
+      const u = clamp(s / piece.dur, 0, 1);
+      const angle = piece.base + u * Math.PI;
+      const acx = piece.cx;
+      const acy = GEOM.cy + piece.cy;
       return {
-        x: GEOM.cx + arc.r * Math.cos(angle),
-        y: acy + arc.r * Math.sin(angle),
-        r: arc.r,
-        k,
-        t,
+        x: acx + piece.r * Math.cos(angle),
+        y: acy + piece.r * Math.sin(angle),
+        inGap: false,
+        isRight: piece.isRight,
         angle,
-        acx: GEOM.cx,
-        acy
+        r: piece.r,
+        u,
+        acx,
+        acy,
+        vPhys: Math.sqrt((2 * piece.n * p.q * state.U) / p.m),
+        crossings: piece.n
       };
     }
 
@@ -546,26 +641,6 @@
       ctx.save();
       ctx.fillStyle = "#080a0e";
       ctx.fillRect(0, 0, LW, LH);
-
-      if (controls.showBField.checked) {
-        ctx.font = "bold 16px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        for (let y = cy - 180; y <= cy + 180; y += 46) {
-          for (let x = cx - 240; x <= cx + 240; x += 52) {
-            /* 缝隙内不画磁场点：缝隙内无磁场，只有电场 */
-            if (Math.hypot(x - cx, y - cy) < radius - 10 && Math.abs(x - cx) > gap / 2 + 6) {
-              ctx.beginPath();
-              ctx.arc(x, y, 7, 0, Math.PI * 2);
-              ctx.strokeStyle = "rgba(255,255,255,0.22)";
-              ctx.lineWidth = 1.4;
-              ctx.stroke();
-              ctx.fillStyle = "rgba(255,255,255,0.28)";
-              ctx.fillText("·", x, y - 1);
-            }
-          }
-        }
-      }
 
       const leftGradient = ctx.createLinearGradient(cx - radius, cy, cx, cy);
       leftGradient.addColorStop(0, "rgba(35,51,79,0.95)");
@@ -601,12 +676,28 @@
       ctx.lineTo(cx + gap / 2, cy - radius);
       ctx.stroke();
 
-      ctx.fillStyle = "rgba(255,209,102,0.13)";
+      ctx.fillStyle = "rgba(255,209,102,0.09)";
       ctx.fillRect(cx - gap / 2, cy - radius + 18, gap, radius * 2 - 36);
-      ctx.strokeStyle = "rgba(255,209,102,0.75)";
-      ctx.setLineDash([8, 8]);
+      ctx.strokeStyle = "rgba(255,209,102,0.28)";
+      ctx.lineWidth = 1.4;
       ctx.strokeRect(cx - gap / 2, cy - radius + 18, gap, radius * 2 - 36);
-      ctx.setLineDash([]);
+
+      /* 磁场符号：B 垂直屏面向外 → 就画一个实心点「·」（向里才画 ×）。
+         必须画在 D 形盒填充之后，否则会被盒子的底色整片盖住（旧版就是这个问题）。 */
+      if (controls.showBField.checked) {
+        ctx.save();
+        ctx.fillStyle = "rgba(232,238,246,0.82)";
+        for (let y = cy - 174; y <= cy + 174; y += 48) {
+          for (let x = cx - 228; x <= cx + 228; x += 54) {
+            if (Math.hypot(x - cx, y - cy) > radius - 18) continue;   // 盒外不画
+            if (Math.abs(x - cx) < gap / 2 + 10) continue;            // 缝隙内无磁场
+            ctx.beginPath();
+            ctx.arc(x, y, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 20px Microsoft YaHei, Arial";
@@ -615,93 +706,103 @@
       ctx.fillText("D₁", cx - 128, cy - 180);
       ctx.fillText("D₂", cx + 128, cy - 180);
       ctx.font = "bold 18px Microsoft YaHei, Arial";
-      ctx.fillText("匀强磁场 B 垂直屏面向外", cx, 58);
+      ctx.fillText("匀强磁场 B 垂直屏面向外", cx, 44);
       ctx.restore();
     }
 
-    /* 缝隙内标注：无磁场，仅电场（竖排放在缝隙带中央） */
+    /* 缝隙说明：放在 D 形盒下沿与图例之间（不再竖排在缝隙带中央，
+       避免遮住过缝的直线段；这个高度在 1024×768 下也不会被图例压住） */
     function drawGapLabel() {
       ctx.save();
-      ctx.translate(GEOM.cx, GEOM.cy + 118);
-      ctx.rotate(-Math.PI / 2);
-      const w = 136;
-      const h = 24;
-      ctx.fillStyle = "rgba(8,10,14,0.9)";
-      ctx.fillRect(-w / 2, -h / 2, w, h);
-      ctx.strokeStyle = "rgba(255,209,102,0.7)";
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
       ctx.fillStyle = "#ffd166";
-      ctx.font = "bold 14px Microsoft YaHei, Arial";
+      ctx.font = "bold 12px Microsoft YaHei, Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("缝隙内：无磁场，仅电场", 0, 1);
+      ctx.fillText("缝隙内：无磁场，仅电场 → 粒子沿直线加速", GEOM.cx, GEOM.cy + GEOM.radius + 12);
       ctx.restore();
     }
 
     function drawGapField(scene) {
-      const point = arcPoint(scene, state.pass);
-      /* 电场每半圈反向：半圈前半段与“进入本段时的加速方向”一致，
-         半圈中点反向，正好为下一次过缝加速 */
-      const isRightArc = point.k % 2 === 0;
-      const flipped = point.t > 0.5;
-      const toRight = isRightArc ? !flipped : flipped;
-      const nearGapCrossing = point.t < 0.1 || point.t > 0.9;
+      const point = pointAt(scene, state.phase);
+      /* 电场总是指向“粒子的对面”：粒子在 D₂ 一侧（或正向左过缝）时电场向左，
+         在 D₁ 一侧（或正向右过缝）时电场向右 —— 粒子每次到达缝边都恰好被加速。
+         缝内（正在做功）高亮，盒内（被 D 形盒屏蔽）稍暗。 */
+      const toRight = point.inGap ? point.dir > 0 : !point.isRight;
 
       ctx.save();
-      ctx.globalAlpha = nearGapCrossing ? 1 : 0.5;
+      ctx.globalAlpha = point.inGap ? 0.95 : 0.5;
       for (let y = GEOM.cy - 110; y <= GEOM.cy + 110; y += 55) {
-        if (toRight) drawArrow(GEOM.cx - 20, y, GEOM.cx + 20, y, "#ffd166", 4, 12);
-        else drawArrow(GEOM.cx + 20, y, GEOM.cx - 20, y, "#ffd166", 4, 12);
+        /* 绿色短箭头 = 缝隙里的电场 E（与“轨道”的亮黄、“加速段”的橙分开，
+           免得缝隙里的横线糊成一片） */
+        if (toRight) drawArrow(GEOM.cx - 15, y, GEOM.cx + 15, y, "#34d399", 3, 8);
+        else drawArrow(GEOM.cx + 15, y, GEOM.cx - 15, y, "#34d399", 3, 8);
       }
       ctx.restore();
     }
 
     function drawPath(scene) {
-      const stepsPerHalf = 48;
+      const now = clamp(state.phase, 0, scene.total);
+      const step = 0.04;
+
+      /* 沿相位采样成折线：半圆段自然成为弧线，缝内段因为 x 只随相位单调变化，
+         采样点落在同一条水平线上 —— 缝隙里画出来必然是直线。 */
+      const trace = (from, to) => {
+        ctx.beginPath();
+        let started = false;
+        const put = tt => {
+          const q = pointAt(scene, tt);
+          if (!started) { ctx.moveTo(q.x, q.y); started = true; }
+          else ctx.lineTo(q.x, q.y);
+        };
+        put(from);
+        for (let tt = from + step; tt < to - 1e-6; tt += step) put(tt);
+        put(to);
+      };
+
       ctx.save();
-      ctx.lineWidth = 3.2;
-      ctx.strokeStyle = "#ffd166";
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.beginPath();
-      let started = false;
-      for (let k = 0; k < scene.passCount; k += 1) {
-        for (let i = 0; i <= stepsPerHalf; i += 1) {
-          const p = arcPoint(scene, k + i / stepsPerHalf);
-          if (!started) {
-            ctx.moveTo(p.x, p.y);
-            started = true;
-          } else {
-            ctx.lineTo(p.x, p.y);
-          }
-        }
-      }
-      ctx.stroke();
 
-      /* 过缝点：相邻两段半圆的公共端点 */
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      for (let k = 0; k <= scene.passCount; k += 1) {
-        const p = arcPoint(scene, k);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
-        ctx.fill();
+      /* 只画已经走过的轨迹：一段实线，跟着粒子长出来。
+         不做“未来路线”预览 —— 虚线会随粒子推进不断改起点，看起来像虚线自己在转。 */
+      if (now > 1e-6) {
+        trace(0, now);
+        ctx.strokeStyle = "#ffd166";
+        ctx.lineWidth = 3.4;
+        ctx.stroke();
       }
+
+      /* 已走过的缝内加速段：单独用橙色描一遍，和盒内的半圆（亮黄）区分开 —— 
+         橙色短线 = 在缝里被电场加速的直线；黄色半圆 = 在盒里被磁场偏转 */
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 4;
+      scene.pieces.forEach(piece => {
+        if (piece.type !== "gap" || now <= piece.phase0) return;
+        const from = pointAt(scene, piece.phase0);
+        const to = pointAt(scene, Math.min(now, piece.phase0 + piece.dur));
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+      });
       ctx.restore();
     }
 
     function drawParticleAndVectors(scene) {
       const pInfo = particleDef();
-      const point = arcPoint(scene, state.pass);
-      const passIndex = Math.min(scene.passCount, point.k + 1);
-      /* v = √(2nqU/m)：箭头长度严格 ∝ v（无固定偏置） */
-      const speedPhys = Math.sqrt((2 * passIndex * pInfo.q * state.U) / pInfo.m);
-      const vLen = V_SCALE * speedPhys;
-      const vx = -Math.sin(point.angle);
-      const vy = Math.cos(point.angle);
-      const fx = (point.acx - point.x) / point.r;   // 洛伦兹力指向本段圆心
-      const fy = (point.acy - point.y) / point.r;
-      const fLen = vLen * 0.62;                     // F = qvB ∝ v（同一 B 下比例固定）
+      const point = pointAt(scene, state.phase);
+      /* v = √(2nqU/m)：箭头长度严格 ∝ v（无固定偏置）；缝内 v 从 v_n 增到 v_{n+1} */
+      const vLen = V_SCALE * point.vPhys;
+
+      let vx;
+      let vy;
+      if (point.inGap) {
+        vx = point.dir;                 // 缝内：速度垂直于缝边，沿直线
+        vy = 0;
+      } else {
+        vx = -Math.sin(point.angle);    // 盒内：速度与半圆相切
+        vy = Math.cos(point.angle);
+      }
 
       ctx.save();
       ctx.shadowColor = "rgba(255,209,102,0.45)";
@@ -721,37 +822,61 @@
       ctx.fillText(pInfo.label, point.x, point.y);
       ctx.restore();
 
-      if (controls.showVectors.checked) {
+      if (!controls.showVectors.checked) return;
+
+      /* 静止出发时 v = 0，就不画箭头和标签 */
+      if (vLen > 4) {
         drawArrow(point.x, point.y, point.x + vx * vLen, point.y + vy * vLen, "rgba(255,255,255,0.92)", 4, 11);
-        drawArrow(point.x, point.y, point.x + fx * fLen, point.y + fy * fLen, "#7dd3fc", 4, 11);
-        ctx.save();
-        ctx.font = "bold 16px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+      }
+
+      ctx.save();
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      if (vLen > 4) {
         const labelV = Math.max(vLen, 26) + 12;
-        const labelF = Math.max(fLen, 26) + 12;
         ctx.fillStyle = "#ffffff";
         ctx.fillText("v", point.x + vx * labelV, point.y + vy * labelV);
+      }
+
+      if (point.inGap) {
+        /* 缝内没有磁场 → 没有洛伦兹力；此时加速靠电场力 qE，方向与 v 相同，
+           大小 ∝ qU/d（与速率无关），因此箭头长度不随 r 变化。 */
+        const fLen = clamp((26 * pInfo.q * state.U) / 1.5, 16, 64);
+        /* 与 v 箭头错开；靠近画面下沿时改画在上方，别压住底部的缝隙说明 */
+        const below = point.y <= GEOM.cy + 90;
+        const oy = below ? 22 : -22;
+        drawArrow(point.x, point.y + oy, point.x + point.dir * fLen, point.y + oy, "#f59e0b", 4, 10);
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillText("F电", point.x + point.dir * (fLen + 16), point.y + oy + (below ? 14 : -16));
+      } else {
+        /* 盒内：洛伦兹力指向本段半圆的圆心，F = qvB ∝ v */
+        const fx = (point.acx - point.x) / point.r;
+        const fy = (point.acy - point.y) / point.r;
+        const fLen = vLen * 0.62;
+        drawArrow(point.x, point.y, point.x + fx * fLen, point.y + fy * fLen, "#7dd3fc", 4, 11);
+        const labelF = Math.max(fLen, 26) + 12;
         ctx.fillStyle = "#7dd3fc";
         ctx.fillText("F洛", point.x + fx * labelF, point.y + fy * labelF);
-        ctx.restore();
       }
+      ctx.restore();
     }
 
     function updateReadouts(scene) {
       const p = particleDef();
-      const boosts = clamp(Math.ceil(state.pass - 1e-9), 0, scene.passCount);
+      const point = pointAt(scene, state.phase);
+      const boosts = point.crossings;      // 已完整穿过的缝隙次数
       const r1 = scene.minRadius;
       const rEnd = scene.maxRadius;
       const ratio = rEnd / r1;
-      const finished = state.pass >= scene.passCount - 1e-9;
+      const finished = state.phase >= scene.total - 1e-9;
 
       output.bValue.textContent = state.B.toFixed(1);
       output.uValue.textContent = state.U.toFixed(1);
       output.stageParticle.textContent = p.name;
       output.stageBoosts.textContent = `${boosts} / ${scene.passCount}`;
       output.stageStatus.textContent = state.playing
-        ? "播放"
+        ? (point.inGap ? "过缝加速" : "盒内偏转")
         : (finished ? (scene.hitLimit ? "已达最大半径" : "加速完成") : "暂停");
 
       /* 半径：比值只用实际画出的最大半径（第 passCount 段），并给出 √n 参照 */
@@ -795,7 +920,7 @@
 
     function render() {
       const scene = buildScene();
-      if (state.pass > scene.passCount) state.pass = scene.passCount;
+      if (state.phase > scene.total) state.phase = scene.total;
       updateReadouts(scene);
       drawCyclotronBody();
       drawGapField(scene);
@@ -814,9 +939,10 @@
         const scene = buildScene();
         const p = particleDef();
         const omegaScale = (p.q * state.B) / p.m;    // ∝ 1/T = qB/(2πm)
-        state.pass += ANIM_K * omegaScale * dt;
-        if (state.pass >= scene.passCount) {
-          state.pass = scene.passCount;
+        /* 相位以弧度计：盒内半圈推进 π，缝内直线按同一时间尺度推进 */
+        state.phase += ANIM_K * omegaScale * Math.PI * dt;
+        if (state.phase >= scene.total) {
+          state.phase = scene.total;
           state.playing = false;
           controls.playBtn.textContent = "播放";
         }
@@ -848,14 +974,14 @@
 
     controls.playBtn.addEventListener("click", () => {
       const scene = buildScene();
-      if (!state.playing && state.pass >= scene.passCount - 1e-9) state.pass = 0;
+      if (!state.playing && state.phase >= scene.total - 1e-9) state.phase = 0;
       state.playing = !state.playing;
       controls.playBtn.textContent = state.playing ? "暂停" : "播放";
       render();
     });
 
     controls.resetBtn.addEventListener("click", () => {
-      state.pass = 0;
+      state.phase = 0;
       state.playing = false;
       controls.playBtn.textContent = "播放";
       render();

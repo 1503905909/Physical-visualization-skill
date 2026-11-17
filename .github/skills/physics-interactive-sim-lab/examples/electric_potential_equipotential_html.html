@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -319,7 +319,7 @@
       const b = worldBounds();
       const sx = LW / (b.xmax - b.xmin);
       const sy = LH / (b.ymax - b.ymin);
-      const s = Math.min(sx, sy) * 0.92;
+      const s = Math.min(sx, sy) * 0.78;
       return { x: LW / 2 + point.x * s, y: LH / 2 - point.y * s };
     }
 
@@ -327,7 +327,7 @@
       const b = worldBounds();
       const sx = LW / (b.xmax - b.xmin);
       const sy = LH / (b.ymax - b.ymin);
-      const s = Math.min(sx, sy) * 0.92;
+      const s = Math.min(sx, sy) * 0.78;
       return {
         x: clamp((point.x - LW / 2) / s, b.xmin + 0.1, b.xmax - 0.1),
         y: clamp((LH / 2 - point.y) / s, b.ymin + 0.1, b.ymax - 0.1)

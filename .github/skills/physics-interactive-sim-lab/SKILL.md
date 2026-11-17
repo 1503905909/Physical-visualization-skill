@@ -166,7 +166,7 @@ rcParams["axes.unicode_minus"] = False
 - `examples/electric_field_lines_html.html`：点电荷和两点电荷电场线网页资源，包含场景切换和可拖拽正试探电荷。
 - `examples/electric_potential_equipotential_html.html`：电势与等势面网页资源，包含电势颜色图、等势线、电场方向箭头和可拖拽电势探针。
 - `examples/charged_particle_uniform_field_html.html`：带电粒子在匀强电场中偏转的网页资源，包含平行板电场、轨迹、矢量、播放和参数控制。
-- `examples/cyclotron_html.html`：回旋加速器网页资源，包含 D 形盒、磁场符号、缝隙加速、螺旋轨迹以及 B、U、粒子类型调节。
+- `examples/cyclotron_html.html`：回旋加速器网页资源，包含 D 形盒、磁场符号、缝隙内直线加速（轨迹为“半圆 + 直线过缝”交替）、B、U、粒子类型调节。
 - `examples/capacitor_html.html`：平行板电容器网页资源，包含 S、d、εr、U 调节，"接通电源 U 不变/断开电源 Q 不变"两种情形对比，以及 C、Q、E、W 实时读数。
 - `examples/magnetic_flux_html.html`：磁场与磁通量网页资源，包含线圈平移、转动、静止三种场景切换，Φ = BS·cosθ 实时数值与感应电流判定。
 - `examples/lorentz_force_html.html`：洛伦兹力网页资源，包含 B、v、q、m 调节，正负电荷与磁场方向切换，圆形轨迹、圆心半径和 r、T、F 实时读数。

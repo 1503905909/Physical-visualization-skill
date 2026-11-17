@@ -1,189 +1,341 @@
+﻿# -*- coding: utf-8 -*-
+"""带电粒子的加速与偏转 · 45 秒分步解题动画（16:9 / 1280×720）
+
+题目（参考短视频里那道）：
+  A、B 两板间有加速电场 E₀，板距 L，粒子由静止从 A 出发；
+  出来后水平进入 C、D 两板间的偏转电场 E（板长也是 L），
+  飞出时速度与水平方向成 θ = 30°。求偏转场强 E。
+
+分镜（读图 → 判断受力 → 建立模型 → 推导 → 检验）：
+  01 读图    画两段场：左边加速（A、B），右边偏转（C、D），标 E₀、E、L、θ
+  02 受力    加速段只有 qE₀ 做功；偏转段只有 qE，方向与 v₀ 垂直
+  03 建模    加速段匀加速直线；偏转段类平抛（水平匀速 + 竖直匀加速）
+  04 加速    qE₀L = ½mv₀²  →  v₀² = 2qE₀L/m
+  05 偏转    v_y = at = (qE/m)(L/v₀)
+  06 出射角  tanθ = v_y/v₀ = qEL/(mv₀²)
+  07 代入    把 v₀² 代进去：tanθ = E/(2E₀)  →  E = 2E₀tanθ
+  08 检验    tan30° = √3/3  →  E = (2√3/3)E₀（精确值，不取近似）；量纲、极限都对
+
+渲染：manim -qm charged_particle_uniform_field.py ChargedParticleUniformFieldScene
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
 import numpy as np
 from manim import *
 
-
+ROOT = Path(__file__).resolve().parents[4]
+config.media_dir = str(ROOT / "build" / "videos" / "manim")
 config.frame_width = 14.222
 config.frame_height = 8.0
 config.pixel_width = 1280
 config.pixel_height = 720
-config.background_color = "#f7f8fb"
-config.media_dir = r"d:\PycharmProjects1\Physical-visualization-skill\build\videos\manim"
-
+config.background_color = "#0a0f15"
 
 FONT = "Microsoft YaHei"
-INK = "#172033"
-MUTED = "#667085"
-LINE = "#c9d2df"
-PANEL = "#ffffff"
-POSITIVE = "#d9480f"
-NEGATIVE = "#2563eb"
-FIELD = "#0f766e"
-PATH = "#f59f00"
-ACCENT = "#7c3aed"
+MATH_FONT = "Cambria"
 
-# 纯绘图参数：抛物线在画面里的弯曲幅度系数，不对应任何物理量
-# （它既不是电场强度 E，也不是偏转量 y）。本片所有物理关系都由 MathTex 符号给出，
-# 屏幕上不出现不带单位的数值读数。
-SCREEN_BEND = 9.0
+INK = "#e8eef7"
+MUTED = "#8ea3bd"
+POS = "#e0566a"
+NEG = "#5b8def"
+PLATE = "#8d959e"
+FIELD = "#34d399"
+PATH_C = "#ffd166"
+HOT = "#f472b6"
 
+# ---------------- 版面（示意图坐标）
+ACC_X0, ACC_X1 = -6.35, -5.15      # 加速区两板
+ACC_H = 1.30                       # 加速板半高
+DEF_X0, DEF_X1 = -4.55, -0.55      # 偏转板起止（板长 = DEF_X1-DEF_X0）
+DEF_Y = 0.88                       # 偏转板半距
+THETA = 30 * DEGREES
 
-def cn(text, font_size=30, color=INK, weight="NORMAL"):
-    return Text(text, font=FONT, font_size=font_size, color=color, weight=weight)
-
-
-def title(text, subtitle=None):
-    top = cn(text, 34, INK, "BOLD").to_edge(UP, buff=0.28)
-    bar = Line(LEFT * 6.45, RIGHT * 6.45, color=LINE, stroke_width=2).next_to(top, DOWN, buff=0.16)
-    group = VGroup(top, bar)
-    if subtitle:
-        sub = cn(subtitle, 22, MUTED).next_to(bar, DOWN, buff=0.16)
-        group.add(sub)
-    return group
+FX = 3.55                          # 右栏公式中心
 
 
-def arrow(start, end, color=FIELD, width=3):
-    return Arrow(start, end, buff=0, stroke_width=width, color=color, max_tip_length_to_length_ratio=0.35)
+def cn(text, size=30, color=INK, weight=NORMAL):
+    return Text(text, font=FONT, font_size=size, color=color, weight=weight)
 
 
-def particle(label="+", radius=0.19, color=POSITIVE):
-    dot = Circle(radius=radius, stroke_color="#ffffff", stroke_width=2, fill_color=color, fill_opacity=1)
-    sign = cn(label, 18, "#ffffff", "BOLD").move_to(dot)
-    return VGroup(dot, sign)
+def mth(markup, size=40, color=INK):
+    return MarkupText(markup, font=MATH_FONT, font_size=size, color=color)
 
 
-def trajectory_points(x0=-4.4, x1=4.1, y0=0.85, curvature=0.18, samples=90):
-    """生成屏幕坐标下的抛物线采样点。
-
-    curvature 是“画面弯曲系数”（绘图用的无量纲系数），只决定抛物线在画面里
-    弯多少；它与电场强度 E、偏转量 y 之间没有换算关系，不能当作物理读数。
-    真实物理关系见各页的 MathTex 公式（y = qE x² / (2m v₀²) 等）。
-    """
-    pts = []
-    for i in range(samples + 1):
-        t = i / samples
-        x = x0 + (x1 - x0) * t
-        y = y0 - curvature * (t ** 2) * SCREEN_BEND
-        pts.append(np.array([x, y, 0]))
-    return pts
+def frac(num, den, size=36, color=INK, pad=0.20, buff=0.08):
+    a, b = mth(num, size, color), mth(den, size, color)
+    w = max(a.width, b.width) + pad
+    bar = Line(LEFT * w / 2, RIGHT * w / 2, color=color, stroke_width=2.2)
+    a.next_to(bar, UP, buff=buff)
+    b.next_to(bar, DOWN, buff=buff)
+    return VGroup(a, bar, b)
 
 
+def sqrt_of(inner, color=INK):
+    w, hh = inner.width, inner.height
+    H = hh + 0.16
+    surd = VMobject(color=color, stroke_width=2.2)
+    surd.set_points_as_corners([
+        np.array([0.00, 0.10, 0]),
+        np.array([0.07, 0.00, 0]),
+        np.array([0.17, H, 0]),
+        np.array([0.21 + w + 0.08, H, 0]),
+    ])
+    inner.move_to([0.21 + w / 2 + 0.04, H - hh / 2 - 0.05, 0])
+    return VGroup(surd, inner)
+
+
+# ---------------------------------------------------------------- 场景
 class ChargedParticleUniformFieldScene(Scene):
-    """带电粒子垂直进入匀强电场后的偏转。"""
+    # 播放速度：0.4 = 原速的 0.4 倍（所有 play / wait 的时长统一 ×2.5）
+    SPEED = 0.56
+
+    def play(self, *args, **kwargs):
+        kwargs["run_time"] = kwargs.get("run_time", 1.0) / self.SPEED
+        return super().play(*args, **kwargs)
 
     def construct(self):
-        self.field_and_force()
-        self.decompose_motion()
-        self.parameter_comparison()
-        self.summary()
+        self.cap = None
+        self.cues = []
 
-    def field_and_force(self):
-        header = title("带电粒子在匀强电场中的运动", "初速度垂直于电场时，轨迹发生偏转")
-        self.play(FadeIn(header, shift=DOWN), run_time=0.7)
+        self.beat_read()
+        self.beat_force()
+        self.beat_model()
+        self.beat_accel()
+        self.beat_deflect()
+        self.beat_angle()
+        self.beat_substitute()
+        self.beat_check()
+        self.write_srt()
 
-        top_plate = Rectangle(width=9.4, height=0.22, color=POSITIVE, fill_color=POSITIVE, fill_opacity=0.18).shift(UP * 2.05)
-        bottom_plate = Rectangle(width=9.4, height=0.22, color=NEGATIVE, fill_color=NEGATIVE, fill_opacity=0.18).shift(DOWN * 2.05)
-        plus = cn("+ 极板", 24, POSITIVE, "BOLD").next_to(top_plate, LEFT, buff=0.18)
-        minus = cn("- 极板", 24, NEGATIVE, "BOLD").next_to(bottom_plate, LEFT, buff=0.18)
-        field_arrows = VGroup(*[
-            arrow(np.array([x, 1.72, 0]), np.array([x, -1.72, 0]), FIELD, 3)
-            for x in np.linspace(-3.7, 3.7, 7)
-        ])
-        p = particle("+").move_to(np.array([-4.15, 0.95, 0]))
-        v0 = arrow(p.get_center(), p.get_center() + RIGHT * 1.05, "#64748b", 4)
-        force = arrow(p.get_center(), p.get_center() + DOWN * 0.95, PATH, 4.5)
-        labels = VGroup(
-            cn("正电荷：F = qE，方向与电场方向相同", 25, INK, "BOLD"),
-            cn("水平方向没有电场力，竖直方向受恒力", 24, MUTED),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.22).to_edge(DOWN, buff=0.55)
+    # ------------------------------------------------------------ 字幕
+    def caption_box(self, text, size=30):
+        label = cn(text, size, "#f4f8fc")
+        bg = RoundedRectangle(width=label.width + 0.7, height=label.height + 0.32,
+                              corner_radius=0.14, fill_color="#070c12", fill_opacity=0.86,
+                              stroke_width=0)
+        return VGroup(bg, label).move_to([0.0, -3.42, 0.0])
 
-        self.play(FadeIn(VGroup(top_plate, bottom_plate, plus, minus)), run_time=0.6)
-        self.play(LaggedStart(*[Create(a) for a in field_arrows], lag_ratio=0.06), run_time=0.8)
-        self.play(FadeIn(p, scale=0.8), Create(v0), Create(force), FadeIn(labels, shift=UP), run_time=0.9)
-        self.wait(0.8)
-        self.play(FadeOut(VGroup(header, top_plate, bottom_plate, plus, minus, field_arrows, p, v0, force, labels)), run_time=0.8)
+    def say(self, text, hold=0.4):
+        box = self.caption_box(text)
+        if self.cap is not None:
+            self.play(FadeOut(self.cap), run_time=0.1)
+            self.remove(self.cap)
+        self.play(FadeIn(box, shift=UP * 0.08), run_time=0.18)
+        self.cap = box
+        self.cues.append((self.renderer.time, text))
+        self.wait(hold)
 
-    def decompose_motion(self):
-        header = title("运动分解", "水平方向匀速，竖直方向匀加速")
-        self.play(FadeIn(header, shift=DOWN), run_time=0.6)
+    # ------------------------------------------------------------ 01 读图
+    def beat_read(self):
+        self.say("先把图读清楚：两段场，一段加速、一段偏转", 0.3)
 
-        # 本页轨迹由屏幕弯曲系数生成，坐标刻度没有单位也没有物理含义，
-        # 所以显式关掉刻度数字（Manim 默认本就不显示），只保留轴线与刻度线。
-        axes = Axes(
-            x_range=[0, 8, 1],
-            y_range=[-3, 1.5, 1],
-            x_length=8.8,
-            y_length=4.6,
-            tips=False,
-            axis_config={"color": LINE, "stroke_width": 2, "include_numbers": False},
-        ).shift(DOWN * 0.2)
-        x_label = cn("水平位移 x（示意）", 22, MUTED).next_to(axes.x_axis, RIGHT, buff=0.12)
-        y_label = cn("竖直位移 y（示意）", 22, MUTED).next_to(axes.y_axis, UP, buff=0.12)
-        pts = trajectory_points(x0=-4.4, x1=4.1, y0=0.85, curvature=0.18)
-        path = VMobject(color=PATH, stroke_width=4)
-        path.set_points_smoothly(pts)
-        mover = particle("+").move_to(pts[0])
-        guide_x = DashedLine(pts[0], np.array([pts[-1][0], pts[0][1], 0]), color="#94a3b8", stroke_width=2)
-        guide_y = DashedLine(np.array([pts[-1][0], pts[0][1], 0]), pts[-1], color=ACCENT, stroke_width=2)
-        formula = VGroup(
-            MathTex(r"x=v_0t", font_size=42, color=INK),
-            MathTex(r"y=\frac12at^2,\quad a=\frac{qE}{m}", font_size=42, color=INK),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.24).to_edge(RIGHT, buff=0.7).shift(UP * 0.45)
-        units = VGroup(
-            cn("各量取 SI 单位：E→V/m，q→C", 20, MUTED),
-            cn("m→kg，v₀→m/s，x、y→m", 20, MUTED),
-            cn("坐标轴为示意，未按实际长度标度", 20, MUTED),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.10).to_corner(DR, buff=0.35)
-
-        self.play(Create(axes), FadeIn(VGroup(x_label, y_label)), FadeIn(mover, scale=0.8), run_time=0.7)
-        self.play(Create(path), MoveAlongPath(mover, path), run_time=2.2, rate_func=linear)
-        self.play(Create(guide_x), Create(guide_y), FadeIn(formula, shift=LEFT), FadeIn(units), run_time=1.0)
-        self.wait(1.0)
-        self.play(FadeOut(VGroup(header, axes, x_label, y_label, path, mover, guide_x, guide_y, formula, units)), run_time=0.8)
-
-    def parameter_comparison(self):
-        header = title("参数改变时，偏转怎样变化？")
-        self.play(FadeIn(header, shift=DOWN), run_time=0.6)
-
-        labels = VGroup(
-            cn("E 较小", 24, FIELD, "BOLD").shift(LEFT * 4.35 + UP * 1.65),
-            cn("E 较大", 24, POSITIVE, "BOLD").shift(LEFT * 4.35 + UP * 0.35),
-            cn("v₀ 较大", 24, ACCENT, "BOLD").shift(LEFT * 4.35 + DOWN * 0.95),
+        acc = VGroup(
+            Rectangle(width=0.16, height=2 * ACC_H, fill_color=PLATE, fill_opacity=0.6,
+                      stroke_color="#0b0f14", stroke_width=2).move_to([ACC_X0, 0, 0]),
+            Rectangle(width=0.16, height=2 * ACC_H, fill_color=PLATE, fill_opacity=0.6,
+                      stroke_color="#0b0f14", stroke_width=2).move_to([ACC_X1, 0, 0]),
         )
-        curves = VGroup()
-        # (屏幕弯曲系数, 颜色, 入射高度)：第一个数只表示“相对弯曲程度”，
-        # 不是 E 的数值；E、v₀ 与偏转量的定量关系由下方 MathTex 公式给出。
-        settings = [(0.10, FIELD, 1.75), (0.22, POSITIVE, 0.45), (0.08, ACCENT, -0.85)]
-        for bend, color, offset in settings:
-            pts = trajectory_points(x0=-3.6, x1=4.5, y0=offset, curvature=bend)
-            vm = VMobject(color=color, stroke_width=4)
-            vm.set_points_smoothly(pts)
-            curves.add(vm)
-        formula = MathTex(r"y=\frac{qE}{2m}\left(\frac{x}{v_0}\right)^2", font_size=52, color=INK)
-        formula.to_edge(DOWN, buff=0.65)
-        note = cn("偏转量随 E 增大而增大，随 v₀ 增大而减小。", 27, INK, "BOLD").next_to(formula, UP, buff=0.24)
-        scale_note = cn("曲线为相对趋势示意（SI 单位制），未按同一长度尺度绘制", 20, MUTED).to_edge(DOWN, buff=0.16)
+        acc_marks = VGroup(
+            cn("+", 26, POS, BOLD).move_to([ACC_X0, ACC_H + 0.28, 0]),
+            cn("−", 26, NEG, BOLD).move_to([ACC_X1, ACC_H + 0.28, 0]),
+            cn("A", 22, MUTED).move_to([ACC_X0, -ACC_H - 0.32, 0]),
+            cn("B", 22, MUTED).move_to([ACC_X1, -ACC_H - 0.32, 0]),
+        )
+        e0 = VGroup(*[
+            Arrow([ACC_X0 + 0.16, y, 0], [ACC_X1 - 0.16, y, 0], buff=0, color=FIELD,
+                  stroke_width=3, max_tip_length_to_length_ratio=0.35)
+            for y in (-0.8, -0.25, 0.3, 0.85)
+        ])
+        lab_e0 = mth("<i>E</i><sub>0</sub>", 28, FIELD).move_to([(ACC_X0 + ACC_X1) / 2, -1.78, 0])
 
-        self.play(FadeIn(labels), run_time=0.5)
-        self.play(LaggedStart(*[Create(c) for c in curves], lag_ratio=0.25), run_time=1.8)
-        self.play(FadeIn(note, shift=UP), Write(formula), FadeIn(scale_note), run_time=1.0)
-        self.wait(1.1)
-        self.play(FadeOut(VGroup(header, labels, curves, note, formula, scale_note)), run_time=0.8)
+        dfl = VGroup(
+            Rectangle(width=DEF_X1 - DEF_X0, height=0.14, fill_color=PLATE, fill_opacity=0.6,
+                      stroke_color="#0b0f14", stroke_width=2).move_to([(DEF_X0 + DEF_X1) / 2, DEF_Y, 0]),
+            Rectangle(width=DEF_X1 - DEF_X0, height=0.14, fill_color=PLATE, fill_opacity=0.6,
+                      stroke_color="#0b0f14", stroke_width=2).move_to([(DEF_X0 + DEF_X1) / 2, -DEF_Y, 0]),
+        )
+        dfl_marks = VGroup(
+            cn("C", 22, MUTED).move_to([DEF_X0 - 0.25, DEF_Y, 0]),
+            cn("D", 22, MUTED).move_to([DEF_X0 - 0.25, -DEF_Y, 0]),
+            cn("+", 24, POS, BOLD).move_to([DEF_X1 - 0.2, DEF_Y + 0.28, 0]),
+            cn("−", 24, NEG, BOLD).move_to([DEF_X1 - 0.2, -DEF_Y - 0.28, 0]),
+        )
+        e_arrows = VGroup(*[
+            Arrow([x, DEF_Y - 0.12, 0], [x, -DEF_Y + 0.12, 0], buff=0, color=FIELD,
+                  stroke_width=3, max_tip_length_to_length_ratio=0.25)
+            for x in np.linspace(DEF_X0 + 0.55, DEF_X1 - 0.55, 5)
+        ])
+        lab_e = mth("<i>E</i>", 28, FIELD).move_to([DEF_X1 + 0.42, 0, 0])
 
-    def summary(self):
-        header = cn("课堂归纳", 38, INK, "BOLD").to_edge(UP, buff=0.75)
-        items = VGroup(
-            cn("1  电场力 F = qE，方向由电荷正负决定。", 29, INK),
-            cn("2  垂直进入匀强电场时，可按平抛运动类比分析。", 29, INK),
-            cn("3  偏转轨迹为抛物线；E 越大、m 越小、v₀ 越小，偏转越明显。", 29, FIELD, "BOLD"),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.32).move_to(ORIGIN)
-        panel = RoundedRectangle(width=11.0, height=3.2, corner_radius=0.22, stroke_color=LINE, stroke_width=2, fill_color=PANEL, fill_opacity=1).move_to(items)
-        self.play(FadeIn(header, shift=DOWN), FadeIn(panel), run_time=0.7)
-        for item in items:
-            self.play(FadeIn(item, shift=RIGHT), run_time=0.35)
-        self.wait(1.0)
-        self.play(FadeOut(VGroup(header, panel, items)), run_time=0.8)
+        # 轨迹：加速直线 → 漂移 → 抛物线
+        exit_y = -DEF_Y + 0.2
+        pts = [np.array([ACC_X0, 0.0, 0]), np.array([ACC_X1, 0.0, 0]),
+               np.array([DEF_X0, 0.0, 0])]
+        for k in range(1, 25):
+            t = k / 24
+            pts.append(np.array([DEF_X0 + (DEF_X1 - DEF_X0) * t, exit_y * (t ** 2), 0]))
+        path = VMobject(color=PATH_C, stroke_width=4).set_points_smoothly(pts)
 
+        self.play(FadeIn(acc), FadeIn(acc_marks), run_time=0.6)
+        self.play(FadeIn(e0), FadeIn(lab_e0), run_time=0.5)
+        self.say("左边 A、B 两板：加速电场 E₀，粒子由静止出发", 0.4)
+        self.play(FadeIn(dfl), FadeIn(dfl_marks), FadeIn(e_arrows), FadeIn(lab_e), run_time=0.6)
+        self.say("右边 C、D 两板：偏转电场 E，粒子水平射入", 0.3)
 
-if __name__ == "__main__":
-    # manim -pql charged_particle_uniform_field.py ChargedParticleUniformFieldScene
-    pass
+        l1 = DoubleArrow([ACC_X0, ACC_H + 0.62, 0], [ACC_X1, ACC_H + 0.62, 0], buff=0,
+                         color=MUTED, stroke_width=2, max_tip_length_to_length_ratio=0.22)
+        l2 = DoubleArrow([DEF_X0, -DEF_Y - 0.45, 0], [DEF_X1, -DEF_Y - 0.45, 0], buff=0,
+                         color=MUTED, stroke_width=2, max_tip_length_to_length_ratio=0.05)
+        lab_l1 = mth("<i>L</i>", 24, MUTED).next_to(l1, UP, buff=0.06)
+        lab_l2 = mth("<i>L</i>", 24, MUTED).next_to(l2, DOWN, buff=0.06)
+        self.play(GrowArrow(l1), FadeIn(lab_l1), GrowArrow(l2), FadeIn(lab_l2), run_time=0.6)
+
+        p_exit = np.array([DEF_X1, exit_y, 0])
+        v_dir = np.array([np.cos(-THETA), np.sin(-THETA), 0])
+        v_out = Arrow(p_exit, p_exit + v_dir * 1.15, buff=0, color=INK, stroke_width=3.5,
+                      max_tip_length_to_length_ratio=0.22)
+        ang = Arc(radius=0.62, start_angle=0, angle=-THETA, color=INK,
+                  stroke_width=2).move_to(p_exit)
+        th_lab = mth("θ", 24, INK).move_to(p_exit + v_dir * 0.95)
+        self.play(Create(path), run_time=1.1)
+        self.play(GrowArrow(v_out), Create(ang), FadeIn(th_lab), run_time=0.5)
+        self.say("飞出时速度方向偏了 θ = 30° —— 要求的就是 E", 0.4)
+
+        self.wait(0.8)
+        self.diagram = VGroup(acc, acc_marks, e0, lab_e0, dfl, dfl_marks, e_arrows, lab_e,
+                              l1, lab_l1, l2, lab_l2, path, v_out, ang, th_lab)
+
+    # ------------------------------------------------------------ 02 受力
+    def beat_force(self):
+        self.say("判断受力：加速段只有 qE₀，偏转段只有 qE", 0.2)
+
+        f0 = Arrow([ACC_X0 + 0.28, 0.75, 0], [ACC_X0 + 0.88, 0.75, 0], buff=0,
+                   color=HOT, stroke_width=4, max_tip_length_to_length_ratio=0.3)
+        lab_f0 = mth("<i>qE</i><sub>0</sub>", 24, HOT).next_to(f0, UP, buff=0.06)
+
+        p_in = np.array([DEF_X0 + 0.7, 0.0, 0])
+        f1 = Arrow(p_in, p_in + DOWN * 0.6, buff=0, color=HOT, stroke_width=4,
+                   max_tip_length_to_length_ratio=0.3)
+        lab_f1 = mth("<i>qE</i>", 24, HOT).next_to(f1, RIGHT, buff=0.08)
+
+        self.play(GrowArrow(f0), FadeIn(lab_f0), run_time=0.5)
+        self.play(GrowArrow(f1), FadeIn(lab_f1), run_time=0.5)
+        self.say("qE₀ 与运动方向相同 → 一直加速；qE 与 v₀ 垂直 → 只改方向", 0.6)
+
+        self.forces = VGroup(f0, lab_f0, f1, lab_f1)
+        self.wait(0.6)
+
+    # ------------------------------------------------------------ 03 建模
+    def beat_model(self):
+        self.say("建立模型：一段匀加速直线，一段类平抛", 0.2)
+
+        m1 = cn("加速段：匀加速直线", 22, PATH_C, BOLD).move_to([ACC_X0 + 0.95, -2.35, 0])
+        m2 = cn("偏转段：类平抛", 22, PATH_C, BOLD).move_to([(DEF_X0 + DEF_X1) / 2, -2.35, 0])
+        self.play(FadeIn(m1), FadeIn(m2), run_time=0.5)
+        self.say("类平抛 = 水平匀速 + 竖直匀加速，两段互不影响", 0.5)
+        self.models = VGroup(m1, m2)
+        self.wait(0.6)
+
+    # ------------------------------------------------------------ 04 加速
+    def beat_accel(self):
+        self.say("第一步：加速段用动能定理", 0.2)
+
+        f1 = mth("<i>qE</i><sub>0</sub><i>L</i> = ½<i>mv</i><sub>0</sub>²", 38).move_to([FX, 2.0, 0])
+        f2 = VGroup(mth("<i>v</i><sub>0</sub>² =", 38),
+                    frac("2<i>qE</i><sub>0</sub><i>L</i>", "<i>m</i>", 32)) \
+            .arrange(RIGHT, buff=0.16).move_to([FX, 1.05, 0])
+        self.play(FadeIn(f1, shift=LEFT * 0.15), run_time=0.5)
+        self.play(FadeIn(f2, shift=LEFT * 0.15), run_time=0.5)
+        self.say("v₀² = 2qE₀L/m —— 先存着，后面要用", 0.5)
+        self.f_acc = VGroup(f1, f2)
+        self.wait(0.9)
+
+    # ------------------------------------------------------------ 05 偏转
+    def beat_deflect(self):
+        self.say("第二步：偏转段，竖直方向 v_y = at", 0.2)
+
+        f3 = VGroup(mth("<i>v</i><sub>y</sub> = <i>at</i> =", 36),
+                    frac("<i>qE</i>", "<i>m</i>", 30), mth("·", 36),
+                    frac("<i>L</i>", "<i>v</i><sub>0</sub>", 30)) \
+            .arrange(RIGHT, buff=0.14).move_to([FX, 0.05, 0])
+        self.play(FadeIn(f3, shift=LEFT * 0.15), run_time=0.5)
+        self.say("水平方向走完板长要用 L/v₀，这就是时间 t", 0.5)
+        self.f_def = f3
+        self.wait(0.9)
+
+    # ------------------------------------------------------------ 06 出射角
+    def beat_angle(self):
+        self.say("第三步：出射角 tanθ = v_y / v₀", 0.2)
+
+        f4 = VGroup(mth("tan<i>θ</i> =", 36),
+                    frac("<i>v</i><sub>y</sub>", "<i>v</i><sub>0</sub>", 32),
+                    mth("=", 36), frac("<i>qEL</i>", "<i>mv</i><sub>0</sub>²", 32)) \
+            .arrange(RIGHT, buff=0.12).move_to([FX, -1.15, 0])
+        self.play(FadeIn(f4, shift=LEFT * 0.15), run_time=0.5)
+        self.say("分母是 v₀² —— 正好和第 4 步那条接上", 0.6)
+        self.f_tan = f4
+        self.wait(0.9)
+
+    # ------------------------------------------------------------ 07 代入
+    def beat_substitute(self):
+        self.say("第四步：把 v₀² 代进去，q、L、m 全部约掉", 0.2)
+
+        self.play(FadeOut(self.f_def), FadeOut(self.f_tan), run_time=0.3)
+        f5 = mth("tan<i>θ</i> = <i>qEL</i> / (2<i>qE</i><sub>0</sub><i>L</i>) = <i>E</i> / (2<i>E</i><sub>0</sub>)", 34) \
+            .move_to([FX, -0.15, 0])
+        f6 = mth("<i>E</i> = 2<i>E</i><sub>0</sub> tan<i>θ</i>", 40, HOT).move_to([FX, -1.15, 0])
+        self.play(FadeIn(f5, shift=LEFT * 0.15), run_time=0.6)
+        self.play(FadeIn(f6, shift=LEFT * 0.15), run_time=0.5)
+        self.say("只剩两段场强和角度 —— 与粒子的 q、m 完全无关", 0.7)
+        self.f_sub = VGroup(f5, f6)
+        self.wait(1.2)
+
+    # ------------------------------------------------------------ 08 检验
+    def beat_check(self):
+        self.say("最后代数据、做检验", 0.2)
+        self.play(FadeOut(self.f_acc), FadeOut(self.f_sub), run_time=0.3)
+
+        tan30 = VGroup(mth("tan30° =", 32), sqrt_of(mth("3", 28), INK),
+                       mth("/ 3", 32)).arrange(RIGHT, buff=0.10).move_to([FX, 1.25, 0])
+
+        num = VGroup(mth("2", 34), sqrt_of(mth("3", 28), INK)).arrange(RIGHT, buff=0.05)
+        den = mth("3", 34)
+        barW = max(num.width, den.width) + 0.20
+        bar = Line(LEFT * barW / 2, RIGHT * barW / 2, color=HOT, stroke_width=2.4)
+        num.next_to(bar, UP, buff=0.07)
+        den.next_to(bar, DOWN, buff=0.07)
+        result = VGroup(mth("<i>E</i> =", 40, HOT), VGroup(num, bar, den),
+                        mth("<i>E</i><sub>0</sub>", 40, HOT)) \
+            .arrange(RIGHT, buff=0.14).move_to([FX, 0.25, 0])
+        self.play(FadeIn(tan30, shift=LEFT * 0.15), run_time=0.5)
+        self.play(FadeIn(result, shift=LEFT * 0.15), run_time=0.5)
+        self.say("检验：两边单位都是 V/m；θ→0 时 E→0，极限也对", 0.8)
+
+        bar = VGroup(
+            cn("加速 qE₀L = ½mv₀²", 22, MUTED),
+            mth("<i>E</i> = 2<i>E</i><sub>0</sub>tan<i>θ</i>", 32, HOT),
+            cn("与 q、m 无关", 22, FIELD),
+        ).arrange(RIGHT, buff=0.42).move_to([0, 2.75, 0])
+        self.play(FadeIn(bar, shift=DOWN * 0.1), run_time=0.6)
+
+        self.say("一句话：加速定 v₀²，偏转定 tanθ，两式一联立就解出 E", 1.0)
+
+    # ------------------------------------------------------------ SRT
+    def write_srt(self):
+        def ts(sec):
+            ms = int(round(sec * 1000))
+            h, ms = divmod(ms, 3600_000)
+            m, ms = divmod(ms, 60_000)
+            s, ms = divmod(ms, 1000)
+            return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+        path = ROOT / "build" / "videos" / "manim" / "charged_particle_uniform_field.srt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        blocks = []
+        for i, (t0, text) in enumerate(self.cues):
+            t1 = self.cues[i + 1][0] if i + 1 < len(self.cues) else self.renderer.time
+            blocks.append(f"{i + 1}\n{ts(t0)} --> {ts(t1)}\n{text}\n")
+        path.write_text("\n".join(blocks), encoding="utf-8")

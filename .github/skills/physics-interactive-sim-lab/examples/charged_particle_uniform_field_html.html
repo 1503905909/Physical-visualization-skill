@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -145,7 +145,7 @@
         <div class="hud hud-legend" id="legend" aria-hidden="true">
           <span class="lg-item"><span class="lg-line"></span>轨迹</span>
           <span class="lg-item"><span class="lg-arrow"></span>F = qE</span>
-          <span class="lg-item"><span class="lg-line" style="background:rgba(255,255,255,.8)"></span>v₀</span>
+          <span class="lg-item"><span class="lg-line" style="background:rgba(255,255,255,.8)"></span>vₓ</span><span class="lg-item"><span class="lg-line" style="background:#ff8fb0"></span>v_y</span>
           <span class="lg-item"><span class="lg-plate"></span>极板</span>
           <span class="lg-item"><span class="lg-dim"></span>L / d 标尺</span>
         </div>
@@ -246,7 +246,7 @@
        960×540 逻辑坐标；极板左缘 196、最长 490px（L = 10 cm），右缘 686；
        右侧 686~960 留给参数面板列与右下读数，互不遮挡。 */
     const LW = 960, LH = 540;
-    const VIEW = { left: 196, midY: 246, pxPerM: 4900, plateThick: 22, textRight: 700 };
+    const VIEW = { left: 252, midY: 252, pxPerM: 3600, plateThick: 20, textRight: 700 };
 
     const PARTICLES = {
       electron: { label: "电子",   m: 9.109e-31, q: -1.602e-19 },
@@ -489,6 +489,7 @@
       drawParticle(g, m);
       if (m.hits) drawImpact(g, m);
       drawReadout(g, m);
+      drawFormulaStrip(g, m);
     }
 
     function drawField(g, m) {
@@ -701,20 +702,47 @@
       // 力箭头不得穿过极板：按粒子到板内沿的余量截断；贴板时只剩箭头本身
       const room = dir > 0 ? (g.bottomInner - 2 - p.y) : (p.y - (g.topInner + 2));
       const fLen = Math.min(room, clamp(32 + 15 * Math.log10(1 + force / 1e-16), 32, 96));
-      const vLen = clamp(26 + 14 * Math.log10(1 + m.v0 / 1e5), 26, 96);
+      const tNow = clamp(state.progress, 0, 1) * m.tEnd;
+      const vLen = clamp(96 + 18 * Math.log10(1 + m.v0 / 1e6), 96, 150);
       const tipX = clamp(p.x + vLen, 8, VIEW.textRight);
 
       if (fLen >= 10) {
         drawArrow(p.x, p.y, p.x, p.y + dir * fLen, "#ffd166", 4, 11);
       }
-      drawArrow(p.x, p.y, tipX, p.y, "rgba(255,255,255,0.85)", 3.2, 10);
+
+      // —— 速度分解：vₓ 恒定、v_y 随 t 线性变大，虚线补成平行四边形 ——
+      const vyNow = Math.abs(m.a) * tNow;
+      const vyLen = Math.max(18, clamp(vLen * (vyNow / Math.max(m.v0, 1)), 0, vLen * 1.15));
+      const cornerX = tipX;
+      const cornerY = p.y + dir * vyLen;
+
+      drawArrow(p.x, p.y, tipX, p.y, "rgba(255,255,255,0.88)", 3.2, 10);          // vₓ
+      if (vyLen > 4) {
+        drawArrow(p.x, p.y, p.x, cornerY, "#ff8fb0", 3.2, 10);                      // v_y
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(tipX, p.y); ctx.lineTo(cornerX, cornerY);
+        ctx.moveTo(p.x, cornerY); ctx.lineTo(cornerX, cornerY);
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y); ctx.lineTo(cornerX, cornerY);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // 标签加描边，压在轨迹或极板上也清晰
       ctx.save();
       ctx.lineJoin = "round";
       ctx.lineWidth = 4;
       ctx.strokeStyle = "rgba(6,10,14,0.92)";
-      ctx.font = "bold 15px Arial";
+      ctx.font = "bold 14px Arial";
       ctx.textBaseline = "middle";
       if (fLen >= 10) {
         const fx = p.x - 11;
@@ -724,12 +752,26 @@
         ctx.fillStyle = "#ffd166";
         ctx.fillText("F", fx, fy);
       }
-      const vx = (p.x + tipX) / 2;
-      const vy = p.y - 15;
       ctx.textAlign = "center";
-      ctx.strokeText("v₀", vx, vy);
+      const vxLabel = (p.x + tipX) / 2;
+      const vyLabel = p.y - 22;
+      ctx.strokeText("vₓ", vxLabel, vyLabel);
       ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.fillText("v₀", vx, vy);
+      ctx.fillText("vₓ", vxLabel, vyLabel);
+      if (vyLen > 18) {
+        ctx.textAlign = "left";
+        const vyx = p.x - 16;
+        const vyy = p.y + dir * vyLen * 0.55;
+        ctx.strokeText("v_y", vyx, vyy);
+        ctx.fillStyle = "#ff8fb0";
+        ctx.fillText("v_y", vyx, vyy);
+        if (vyLen > 30) {
+          ctx.textAlign = "center";
+          ctx.strokeText("v", cornerX + 14, cornerY + dir * 12);
+          ctx.fillStyle = "rgba(255,255,255,0.8)";
+          ctx.fillText("v", cornerX + 14, cornerY + dir * 12);
+        }
+      }
       ctx.restore();
     }
 
@@ -759,6 +801,54 @@
       ], p.x + 30, dir > 0 ? p.y - 46 : p.y + 10, "#ff8a8a", VIEW.textRight);
     }
 
+    /* 底部公式链：把“怎么算出来的”留在画面上，别只给一个结果 */
+    function drawFormulaStrip(g, m) {
+      const U = Math.abs(Math.round(state.U));
+      const U0 = Math.max(1, Math.round(state.U0));
+      const Lm = state.Lcm / 100;
+      const dm = state.dcm / 100;
+      const den = 4 * dm * U0;
+      const mm = den > 0 ? (U * Lm * Lm / den) * 1000 : 0;
+
+      const x = VIEW.left - 84;
+      const y1 = 396;
+      const y2 = 422;
+
+      ctx.save();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+
+      ctx.font = "12.5px Microsoft YaHei, Arial";
+      ctx.fillStyle = "rgba(143,163,189,0.8)";
+      ctx.fillText("推导", x, y1);
+
+      ctx.font = "14.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(127,214,228,0.92)";
+      ctx.fillText("y = ½at²", x + 36, y1);
+      ctx.font = "12.5px Microsoft YaHei, Arial";
+      ctx.fillStyle = "rgba(143,163,189,0.7)";
+      ctx.fillText("→", x + 116, y1);
+      ctx.font = "14.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(127,214,228,0.92)";
+      ctx.fillText("a = qU/(md)", x + 138, y1);
+      ctx.font = "12.5px Microsoft YaHei, Arial";
+      ctx.fillStyle = "rgba(143,163,189,0.7)";
+      ctx.fillText("→", x + 236, y1);
+      ctx.font = "14.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(255,209,102,0.95)";
+      ctx.fillText("y = UL²/(4dU₀)", x + 258, y1);
+
+      // 第二行：把当前参数代进去，滑动条一动数字就跟着变
+      ctx.font = "13.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(143,163,189,0.85)";
+      ctx.fillText("代入：", x + 36, y2);
+      ctx.fillStyle = "rgba(255,209,102,0.95)";
+      ctx.fillText(
+        `y = ${U}×${Lm.toFixed(2)}² / (4×${dm.toFixed(2)}×${U0}) ≈ ${mm.toFixed(1)} mm`,
+        x + 84, y2);
+      ctx.restore();
+    }
+
     function drawReadout(g, m) {
       // 抽屉展开时它正好盖住右下角，画布读数让位（抽屉里有一模一样的数值）
       if (!drawer.hidden) return;
@@ -776,10 +866,10 @@
       ctx.shadowBlur = 10;
       ctx.fillStyle = "#ffd166";
       ctx.font = "bold 21px Microsoft YaHei, Arial";
-      ctx.fillText(`偏转量 y = ${fmtMm(yMm)} mm`, VIEW.textRight, 470);
+      ctx.fillText(`偏转量 y = ${fmtMm(yMm)} mm`, VIEW.textRight, 318);
       ctx.fillStyle = "#cfe3e9";
       ctx.font = "14.5px Microsoft YaHei, Arial";
-      ctx.fillText(`占半板距 ${pct} · ${stateText}`, VIEW.textRight, 496);
+      ctx.fillText(`占半板距 ${pct} · ${stateText}`, VIEW.textRight, 344);
       ctx.restore();
     }
 
