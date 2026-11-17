@@ -119,6 +119,11 @@
                             background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; line-height: 1.6; }
     .drawer ul { margin: 4px 0 0; padding-left: 18px; }
     .drawer .note { font-size: 12px; color: #9fb6bf; }
+    .drawer .formula-note { color: #93acb6; font-size: 11.5px; }
+    .drawer .formula-live { background: rgba(255,196,84,.10); color: #ffd98a; }
+    .drawer details.derive { margin: 2px 0 8px; font-size: 12px; color: #9fb6bf; }
+    .drawer details.derive summary { cursor: pointer; color: #7fd6e4; outline: none; }
+    .drawer details.derive p { margin: 6px 0 0; line-height: 1.7; }
     .metric-value { font-weight: 800; color: #7fd6e4; font-variant-numeric: tabular-nums; }
     .metric-value.warm { color: #ffb0b0; }
     .metric-value.cool { color: #a8b4ff; }
@@ -194,7 +199,13 @@
         <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂问题">
           <h3>结论</h3>
           <p>同一加速电压 U₀ 下，电子、质子、α 粒子进入同一偏转电场后<strong>偏转量完全相同</strong>：轻粒子 v₀ 大、穿越时间 t 短，重粒子 v₀ 小、t 长，两者恰好抵消。</p>
-          <p class="formula-line">a = qU/(md)&nbsp;&nbsp;t = L/v₀&nbsp;&nbsp;v₀ = √(2|q|U₀/m)&nbsp;&nbsp;y = ½at²<br>⟹ y = U·L² / (4·d·U₀)（与粒子种类无关，方向由 q、U 的符号共同决定）</p>
+          <p class="formula-line">y = U·L² / (4·d·U₀)　<span class="formula-note">与粒子种类、电荷量无关，方向由 q 与 U 的符号共同决定</span></p>
+          <p class="formula-line formula-live" id="substLine">代入当前参数：—</p>
+          <details class="derive">
+            <summary>推导</summary>
+            <p>v₀ = √(2|q|U₀/m)，E = U/d，a = |q|U/(md)，t = L/v₀；<br>
+               y = ½·a·t² = |q|U·L²/(2m·d·v₀²)；把 v₀² = 2|q|U₀/m 代入，得 y = U·L²/(4·d·U₀)。</p>
+          </details>
           <p>打板判据：|y| ≥ d/2。此时 t_hit = √(2·(d/2)/|a|)，y 停在 d/2，轨迹在撞板处截断。</p>
 
           <h3>实时量值</h3>
@@ -282,7 +293,8 @@
       deflectionValue: document.getElementById("deflectionValue"),
       deflectionPct: document.getElementById("deflectionPct"),
       deflectionNote: document.getElementById("deflectionNote"),
-      motionNote: document.getElementById("motionNote")
+      motionNote: document.getElementById("motionNote"),
+      substLine: document.getElementById("substLine")
     };
 
     /* —— 高清渲染（HiDPI）—— */
@@ -814,6 +826,25 @@
         : "电场力与 E 同向";
       output.motionNote.textContent =
         `水平方向匀速（v₀ 恒定），竖直方向匀加速（a 恒定），合成为抛物线；${dirText}。`;
+
+      /* 结论式代入当前参数：y = U·L²/(4·d·U₀) */
+      const Lu = state.Lcm / 100;
+      const du = state.dcm / 100;
+      const yFormula = Math.abs(state.U) * Lu * Lu / (4 * du * state.U0);
+      const head =
+        `y = ${Math.abs(Math.round(state.U))} V × (${state.Lcm.toFixed(1)} cm)² ÷ ` +
+        `(4 × ${state.dcm.toFixed(1)} cm × ${Math.round(state.U0)} V)`;
+      let tail;
+      if (Math.round(state.U) === 0) {
+        tail = "= 0（偏转电压为 0，无偏转）";
+      } else if (m.hits) {
+        const halfMm = m.halfGap * 1000;
+        tail = `= ${fmtMm(yFormula * 1000)} mm ＞ d/2 = ${fmtMm(halfMm)} mm，已打板，` +
+               `实际停在 ${fmtMm(halfMm)} mm`;
+      } else {
+        tail = `= ${fmtMm(yFormula * 1000)} mm`;
+      }
+      output.substLine.textContent = `代入当前参数：${head} ${tail}`;
 
       controls.particleButtons.forEach(btn => {
         btn.classList.toggle("active", btn.dataset.particle === state.particle);
