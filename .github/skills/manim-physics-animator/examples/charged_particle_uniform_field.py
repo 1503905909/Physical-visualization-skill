@@ -21,6 +21,11 @@ FIELD = "#0f766e"
 PATH = "#f59f00"
 ACCENT = "#7c3aed"
 
+# 纯绘图参数：抛物线在画面里的弯曲幅度系数，不对应任何物理量
+# （它既不是电场强度 E，也不是偏转量 y）。本片所有物理关系都由 MathTex 符号给出，
+# 屏幕上不出现不带单位的数值读数。
+SCREEN_BEND = 9.0
+
 
 def cn(text, font_size=30, color=INK, weight="NORMAL"):
     return Text(text, font=FONT, font_size=font_size, color=color, weight=weight)
@@ -47,11 +52,17 @@ def particle(label="+", radius=0.19, color=POSITIVE):
 
 
 def trajectory_points(x0=-4.4, x1=4.1, y0=0.85, curvature=0.18, samples=90):
+    """生成屏幕坐标下的抛物线采样点。
+
+    curvature 是“画面弯曲系数”（绘图用的无量纲系数），只决定抛物线在画面里
+    弯多少；它与电场强度 E、偏转量 y 之间没有换算关系，不能当作物理读数。
+    真实物理关系见各页的 MathTex 公式（y = qE x² / (2m v₀²) 等）。
+    """
     pts = []
     for i in range(samples + 1):
         t = i / samples
         x = x0 + (x1 - x0) * t
-        y = y0 - curvature * (t ** 2) * 9.0
+        y = y0 - curvature * (t ** 2) * SCREEN_BEND
         pts.append(np.array([x, y, 0]))
     return pts
 
@@ -95,16 +106,18 @@ class ChargedParticleUniformFieldScene(Scene):
         header = title("运动分解", "水平方向匀速，竖直方向匀加速")
         self.play(FadeIn(header, shift=DOWN), run_time=0.6)
 
+        # 本页轨迹由屏幕弯曲系数生成，坐标刻度没有单位也没有物理含义，
+        # 所以显式关掉刻度数字（Manim 默认本就不显示），只保留轴线与刻度线。
         axes = Axes(
             x_range=[0, 8, 1],
             y_range=[-3, 1.5, 1],
             x_length=8.8,
             y_length=4.6,
             tips=False,
-            axis_config={"color": LINE, "stroke_width": 2},
+            axis_config={"color": LINE, "stroke_width": 2, "include_numbers": False},
         ).shift(DOWN * 0.2)
-        x_label = cn("x", 22, MUTED).next_to(axes.x_axis, RIGHT, buff=0.1)
-        y_label = cn("y", 22, MUTED).next_to(axes.y_axis, UP, buff=0.1)
+        x_label = cn("水平位移 x（示意）", 22, MUTED).next_to(axes.x_axis, RIGHT, buff=0.12)
+        y_label = cn("竖直位移 y（示意）", 22, MUTED).next_to(axes.y_axis, UP, buff=0.12)
         pts = trajectory_points(x0=-4.4, x1=4.1, y0=0.85, curvature=0.18)
         path = VMobject(color=PATH, stroke_width=4)
         path.set_points_smoothly(pts)
@@ -115,12 +128,17 @@ class ChargedParticleUniformFieldScene(Scene):
             MathTex(r"x=v_0t", font_size=42, color=INK),
             MathTex(r"y=\frac12at^2,\quad a=\frac{qE}{m}", font_size=42, color=INK),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.24).to_edge(RIGHT, buff=0.7).shift(UP * 0.45)
+        units = VGroup(
+            cn("各量取 SI 单位：E→V/m，q→C", 20, MUTED),
+            cn("m→kg，v₀→m/s，x、y→m", 20, MUTED),
+            cn("坐标轴为示意，未按实际长度标度", 20, MUTED),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.10).to_corner(DR, buff=0.35)
 
         self.play(Create(axes), FadeIn(VGroup(x_label, y_label)), FadeIn(mover, scale=0.8), run_time=0.7)
         self.play(Create(path), MoveAlongPath(mover, path), run_time=2.2, rate_func=linear)
-        self.play(Create(guide_x), Create(guide_y), FadeIn(formula, shift=LEFT), run_time=1.0)
+        self.play(Create(guide_x), Create(guide_y), FadeIn(formula, shift=LEFT), FadeIn(units), run_time=1.0)
         self.wait(1.0)
-        self.play(FadeOut(VGroup(header, axes, x_label, y_label, path, mover, guide_x, guide_y, formula)), run_time=0.8)
+        self.play(FadeOut(VGroup(header, axes, x_label, y_label, path, mover, guide_x, guide_y, formula, units)), run_time=0.8)
 
     def parameter_comparison(self):
         header = title("参数改变时，偏转怎样变化？")
@@ -132,21 +150,24 @@ class ChargedParticleUniformFieldScene(Scene):
             cn("v₀ 较大", 24, ACCENT, "BOLD").shift(LEFT * 4.35 + DOWN * 0.95),
         )
         curves = VGroup()
+        # (屏幕弯曲系数, 颜色, 入射高度)：第一个数只表示“相对弯曲程度”，
+        # 不是 E 的数值；E、v₀ 与偏转量的定量关系由下方 MathTex 公式给出。
         settings = [(0.10, FIELD, 1.75), (0.22, POSITIVE, 0.45), (0.08, ACCENT, -0.85)]
-        for curvature, color, offset in settings:
-            pts = trajectory_points(x0=-3.6, x1=4.5, y0=offset, curvature=curvature)
+        for bend, color, offset in settings:
+            pts = trajectory_points(x0=-3.6, x1=4.5, y0=offset, curvature=bend)
             vm = VMobject(color=color, stroke_width=4)
             vm.set_points_smoothly(pts)
             curves.add(vm)
         formula = MathTex(r"y=\frac{qE}{2m}\left(\frac{x}{v_0}\right)^2", font_size=52, color=INK)
         formula.to_edge(DOWN, buff=0.65)
         note = cn("偏转量随 E 增大而增大，随 v₀ 增大而减小。", 27, INK, "BOLD").next_to(formula, UP, buff=0.24)
+        scale_note = cn("曲线为相对趋势示意（SI 单位制），未按同一长度尺度绘制", 20, MUTED).to_edge(DOWN, buff=0.16)
 
         self.play(FadeIn(labels), run_time=0.5)
         self.play(LaggedStart(*[Create(c) for c in curves], lag_ratio=0.25), run_time=1.8)
-        self.play(FadeIn(note, shift=UP), Write(formula), run_time=1.0)
+        self.play(FadeIn(note, shift=UP), Write(formula), FadeIn(scale_note), run_time=1.0)
         self.wait(1.1)
-        self.play(FadeOut(VGroup(header, labels, curves, note, formula)), run_time=0.8)
+        self.play(FadeOut(VGroup(header, labels, curves, note, formula, scale_note)), run_time=0.8)
 
     def summary(self):
         header = cn("课堂归纳", 38, INK, "BOLD").to_edge(UP, buff=0.75)

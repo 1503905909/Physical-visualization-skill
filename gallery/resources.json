@@ -49,8 +49,8 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "带电粒子的运动",
-      "tags": ["抛物线", "运动分解", "极板碰撞"],
-      "desc": "平行板间抛物线轨迹、力与速度分解；含极板碰撞判断，参数过大时轨迹停在极板而不是穿板飞出。",
+      "tags": ["偏转量", "y = UL²/4dU₀", "打板判定"],
+      "desc": "全部真实单位：加速电压 U₀、偏转电压 U、板长 L、板距 d，偏转量直接给出毫米数并标注占半板距的比例；电子、质子、α 粒子在同一 U₀ 下偏转相同。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/charged_particle_uniform_field_html.html",
       "thumb": "gallery/thumbs/charged_particle_uniform_field_html.png"
     },
