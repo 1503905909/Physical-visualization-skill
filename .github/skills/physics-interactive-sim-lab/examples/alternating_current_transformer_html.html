@@ -21,22 +21,27 @@
 
     .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
 
-    /* 16:9 等比舞台：主动画 + 变压器示意同处一块画面，页面无滚动条 */
+    /* 16:9 等比舞台：标签页切换，同一时刻只有一块画布铺满整个舞台 */
     .stage-frame { position: relative; aspect-ratio: 16 / 9;
                    width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #080a0e;
-                   display: flex; flex-direction: column; }
+                   border-radius: 12px; overflow: hidden; background: #080a0e; }
 
-    .scene-main { position: relative; flex: 0 0 73%; min-height: 0; overflow: hidden;
-                  display: flex; align-items: center; justify-content: flex-start; }
-    .scene-tf { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
-                display: flex; align-items: center; justify-content: flex-start; }
+    /* 每个 tabpanel 都占满舞台；画布宽度 100%，内部坐标系与绘制内容不变 */
+    .scene { position: absolute; inset: 0; overflow: hidden; }
+    .scene[hidden] { display: none; }
+    .scene > canvas { display: block; width: 100%; height: 100%;
+                      object-fit: contain; object-position: center; }
 
-    /* 画布按 16:9 / 2.125:1 等比缩放，内部坐标系不变；右侧留白给参数面板 */
-    .scene-main > canvas { display: block; height: 100%; width: auto; max-width: 100%;
-                           object-fit: contain; object-position: left center; }
-    .scene-tf > canvas { display: block; height: 100%; width: auto; max-width: 100%;
-                         object-fit: contain; object-position: left center; }
+    /* 标签页页签：顶部居中浮层 */
+    .hud-tabs { left: 50%; top: 10px; transform: translateX(-50%); z-index: 4;
+                display: flex; gap: 4px; padding: 4px; }
+    .hud-tabs [role="tab"] { font: inherit; font-size: 12.5px; padding: 5px 16px; border-radius: 7px;
+                             cursor: pointer; border: 1px solid transparent; background: transparent;
+                             color: #b9cdd6; }
+    .hud-tabs [role="tab"]:hover { background: rgba(255,255,255,.08); color: #eaf2f5; }
+    .hud-tabs [role="tab"][aria-selected="true"] { background: rgba(34,211,238,.16); color: #eaf2f5;
+                                                   border-color: rgba(34,211,238,.55); }
+    .hud-tabs [role="tab"]:focus-visible { outline: 2px solid #22d3ee; outline-offset: 1px; }
 
     .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
            border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
@@ -51,7 +56,7 @@
     .hud-readout b.ok { color: #4ade80; }
     .hud-readout b.dim { font-size: 12.5px; font-weight: 600; color: #ffd166; }
 
-    .hud-legend { left: 12px; bottom: calc(27% + 10px); max-width: 62%; padding: 6px 10px; font-size: 12px;
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
                   color: #cfe3e9; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .hud-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
     .sw { display: inline-block; width: 16px; height: 4px; border-radius: 2px; flex: 0 0 auto; }
@@ -59,9 +64,20 @@
     .sw-neutral { width: 2px; height: 12px; border-left: 2px dashed #fb923c; border-radius: 0; }
     .sw-current { background: #fbbf24; }
 
-    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin; }
+    /* 默认落在左下角（本页左侧只有磁感线装饰，内容最少）；可拖动并记住位置。
+       max-height 留出顶部读数条与底部图例，矮屏（1024×768）也不会压住读数。 */
+    .hud-panel { left: 8px; bottom: 52px; right: auto; top: auto; width: 258px;
+                 max-height: calc(100% - 116px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin;
+                 cursor: default; }
     .hud-panel[hidden] { display: none; }
+
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip h4 { margin: 0; }
+    .grip-fold { padding: 0 7px; font-size: 11px; line-height: 18px; }
 
     .hud-panel h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
                     color: var(--cyan); }
@@ -90,7 +106,6 @@
     .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
                   padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px;
                   border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 286px; }   /* 面板展开时让到面板左边 */
 
     .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
                 width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
@@ -108,9 +123,13 @@
     .drawer .eq { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--cyan); }
     .drawer .dim { color: #93aab4; font-size: 12px; }
 
+    @media (max-width: 1180px) {
+      /* 窄屏时页签让到右上，避免与左上读数相撞 */
+      .hud-tabs { left: auto; right: 104px; transform: none; }
+    }
+
     @media (max-width: 900px) {
       .hud-panel { width: 210px; font-size: 12px; }
-      .hud-toggle[aria-expanded="true"] { right: 232px; }
     }
 
     /* 短屏（如 1024×768 的 4:3 投影）：面板内容略收紧，保证参数全部可见 */
@@ -127,10 +146,18 @@
   <main class="app">
     <div class="stage">
       <div class="stage-frame">
-        <div class="scene-main">
-          <canvas id="acCanvas" width="1000" height="562"></canvas>
+        <!-- 标签页：同一时刻只显示一块画布，各占满整个舞台 -->
+        <div class="hud hud-tabs" role="tablist" aria-label="画面切换">
+          <button type="button" role="tab" id="tabAc" data-scene="ac" aria-selected="true"
+                  aria-controls="panelAc" tabindex="0">发电机</button>
+          <button type="button" role="tab" id="tabTf" data-scene="tf" aria-selected="false"
+                  aria-controls="panelTf" tabindex="-1">变压器</button>
         </div>
-        <div class="scene-tf">
+
+        <div class="scene" id="panelAc" role="tabpanel" aria-labelledby="tabAc">
+          <canvas id="acCanvas" width="1000" height="562" aria-label="交流发电机与 e–t 波形"></canvas>
+        </div>
+        <div class="scene" id="panelTf" role="tabpanel" aria-labelledby="tabTf" hidden>
           <canvas id="tfCanvas" width="680" height="320" aria-label="理想变压器示意"></canvas>
         </div>
 
@@ -149,8 +176,13 @@
           <span><i class="sw sw-current"></i>感应电流方向</span>
         </div>
 
-        <!-- 参数：右上角可折叠，面板内分「发电机 / 变压器」两组 -->
+        <!-- 参数：默认左下角，可拖动、记忆位置、双击标题折叠，面板内分「发电机 / 变压器」两组 -->
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数调节">
+          <div class="panel-grip" title="拖动移动面板，双击折叠">
+            <h4>参数</h4>
+            <button type="button" class="grip-fold" id="gripFold" aria-expanded="true"
+                    aria-controls="ctrlPanel" aria-label="折叠参数面板">▾</button>
+          </div>
           <h4>交流发电机</h4>
           <div class="field">
             <label for="rpmSlider"><span>转速 N<sub>r</sub></span><span id="rpmValue">60 r/min</span></label>
@@ -217,6 +249,10 @@
           <h3>符号与角度</h3>
           <p>θ 为线圈法线 n 与磁感线 B 的夹角，从中性面（θ = 0°）起算；N<sub>r</sub> 为转速，N 为线圈匝数，n₁、n₂ 为变压器原、副线圈匝数。变压器部分单独设置 U₁，与发电机解耦，便于分别观察两组规律。</p>
 
+          <h3>画法说明</h3>
+          <p>画布中的矩形线圈是<strong>画法示意</strong>：线圈绕竖直转轴匀速转动，转轴与磁感线 B 垂直；实际匝数 N（当前 <span id="mTurns">100</span> 匝）由参数滑块决定，图中不按匝数逐圈绘制。</p>
+          <p>中性面是线圈平面与 B 垂直的位置（θ = 0°），此时磁通量最大、感应电动势为零。变压器绕组圈数同样仅示意、不按比例，铁芯理想且无漏磁。</p>
+
           <h3>模型假设</h3>
           <p>理想变压器，忽略漏磁、铁芯涡流损耗与线圈电阻；电压、电流均为有效值；发电机线圈为矩形、匀速转动，磁场为匀强磁场；从线圈经过中性面开始计时，故 e = E<sub>m</sub> sin ωt。</p>
 
@@ -242,6 +278,33 @@
       var acCtx = acCanvas.getContext("2d");
       var tfCanvas = document.getElementById("tfCanvas");
       var tfCtx = tfCanvas.getContext("2d");
+
+      /* 逻辑坐标系不变：#acCanvas 1000×562，#tfCanvas 680×320。
+         位图按「CSS 显示尺寸 × devicePixelRatio」重算，绘制时用 setTransform
+         把逻辑坐标映射上去，所以画布铺满舞台后不会模糊、也不会变形。 */
+      var LOGICAL = { ac: { w: 1000, h: 562 }, tf: { w: 680, h: 320 } };
+      var viewK = { ac: 0, tf: 0 };
+
+      function syncCanvasScale(which) {
+        var canvas = which === "ac" ? acCanvas : tfCanvas;
+        var lw = LOGICAL[which].w;
+        var lh = LOGICAL[which].h;
+        var rect = canvas.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) {   // 隐藏状态：不计算、不绘制
+          viewK[which] = 0;
+          return 0;
+        }
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        var fit = Math.min(rect.width / lw, rect.height / lh);
+        var w = Math.max(1, Math.round(lw * fit * dpr));
+        var h = Math.max(1, Math.round(lh * fit * dpr));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        viewK[which] = w / lw;
+        return viewK[which];
+      }
 
       var COLORS = {
         fieldLine: "rgba(226,232,240,0.16)",
@@ -321,6 +384,7 @@
         mErms: document.getElementById("mErms"),
         mFreq: document.getElementById("mFreq"),
         mOmega: document.getElementById("mOmega"),
+        mTurns: document.getElementById("mTurns"),
         mInst: document.getElementById("mInst"),
         mInstNote: document.getElementById("mInstNote"),
         mU2: document.getElementById("mU2"),
@@ -457,7 +521,8 @@
             arrow(ctx, marks[j] - 26, y, marks[j] + 12, y, COLORS.fieldHead, 1.4, 6);
           }
         }
-        label(ctx, "B", 24, 120, 15, "rgba(226,232,240,0.72)", "center");
+        // B 标在磁感线顶端左侧：贴着左端但高于参数面板的默认位置
+        label(ctx, "B", 44, 94, 15, "rgba(226,232,240,0.72)", "center");
       }
 
       function drawNeutralPlane(ctx) {
@@ -480,7 +545,7 @@
         ctx.lineTo(x2, y2);
         ctx.stroke();
         ctx.restore();
-        label(ctx, "中性面（线圈平面 ⊥ B）", VIEW.cx, y1 - 22, 13, "#fdba74", "center");
+        label(ctx, "中性面", VIEW.cx, y1 - 22, 13, "#fdba74", "center");
       }
 
       function drawAxis(ctx) {
@@ -547,7 +612,7 @@
         var sideA = project(hw, 0, 0, axes);
         var sideB = project(-hw, 0, 0, axes);
         if (amp < 0.05) {
-          label(ctx, "i = 0（中性面处无感应电流）", VIEW.cx, VIEW.cy + 126, 13, "#fdba74", "center");
+          label(ctx, "i = 0", VIEW.cx, VIEW.cy + 126, 13, "#fdba74", "center");
           return;
         }
         var len = (0.35 + 0.65 * amp) * 0.66 * VIEW.s;
@@ -577,11 +642,6 @@
         label(ctx, "ω", VIEW.cx + 22, 124, 16, "#cbd5e1", "center");
       }
 
-      function drawCoilLabels(ctx) {
-        label(ctx, "矩形线圈（画法示意）N = " + params.turns + " 匝", VIEW.cx, 428, 13.5, "#cbd5e1", "center");
-        label(ctx, "转轴竖直，与 B 垂直", VIEW.cx, 452, 12.5, COLORS.muted, "center");
-      }
-
       /* ---------- e–t 波形 ---------- */
 
       var PLOT = { x0: 646, x1: 972, y0: 104, y1: 470 };
@@ -605,7 +665,7 @@
         ctx.strokeRect(PLOT.x0 - 26, PLOT.y0 - 34, PLOT.x1 - PLOT.x0 + 46, PLOT.y1 - PLOT.y0 + 66);
         ctx.restore();
 
-        label(ctx, "e–t 图像（虚线为 Φ/Φm，仅示意相位）", (PLOT.x0 + PLOT.x1) / 2, PLOT.y0 - 16, 13.5, "#e2e8f0", "center");
+        label(ctx, "e–t 图像", (PLOT.x0 + PLOT.x1) / 2, PLOT.y0 - 16, 13, "#e2e8f0", "center");
 
         // 网格
         var k;
@@ -622,8 +682,7 @@
         segment(ctx, PLOT.x0, yOf(-d.Erms), PLOT.x1, yOf(-d.Erms), "rgba(251,146,60,0.75)", 1.4, [4, 4]);
 
         chipLabel(ctx, "Em = " + Em.toFixed(2) + " V", PLOT.x1 - 4, yOf(Em) - 12, 12, "#fbbf24", "right");
-        chipLabel(ctx, "E = " + d.Erms.toFixed(2) + " V（有效值）", PLOT.x1 - 4, yOf(d.Erms) - 12, 12, "#fb923c", "right");
-        label(ctx, "e = 0", PLOT.x0 + 16, midY - 11, 11.5, COLORS.muted, "center");
+        chipLabel(ctx, "Erms = " + d.Erms.toFixed(2) + " V", PLOT.x1 - 4, yOf(d.Erms) - 12, 12, "#fb923c", "right");
 
         // 中性面对应的时刻：e = 0
         for (k = 0; k <= 4; k += 1) {
@@ -715,13 +774,13 @@
 
         // 图例
         segment(ctx, PLOT.x0, PLOT.y0 - 40, PLOT.x0 + 22, PLOT.y0 - 40, COLORS.wave, 2.6);
-        label(ctx, "e（绿）", PLOT.x0 + 26, PLOT.y0 - 40, 11.5, "#86efac", "left");
+        label(ctx, "e", PLOT.x0 + 26, PLOT.y0 - 40, 11.5, "#86efac", "left");
         if (state.showFlux) {
           ctx.save();
           ctx.setLineDash([5, 5]);
           segment(ctx, PLOT.x0 + 74, PLOT.y0 - 40, PLOT.x0 + 96, PLOT.y0 - 40, COLORS.flux, 1.8);
           ctx.restore();
-          label(ctx, "Φ/Φm（归一化）", PLOT.x0 + 100, PLOT.y0 - 40, 11.5, "#93c5fd", "left");
+          label(ctx, "Φ/Φm", PLOT.x0 + 100, PLOT.y0 - 40, 11.5, "#93c5fd", "left");
         }
         ctx.save();
         ctx.fillStyle = "#fb923c";
@@ -735,11 +794,13 @@
       /* ---------- 变压器 ---------- */
 
       function drawTransformer(ctx, d, phaseSign) {
-        var W = tfCanvas.width;
-        var H = tfCanvas.height;
-        ctx.clearRect(0, 0, W, H);
+        var k = viewK.tf || syncCanvasScale("tf");
+        if (!k) { return; }          // 标签页未显示：不绘制
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, tfCanvas.width, tfCanvas.height);
         ctx.fillStyle = "#080a0e";
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0, 0, tfCanvas.width, tfCanvas.height);
+        ctx.setTransform(k, 0, 0, k, 0, 0);
 
         var coreOuter = { x: 215, y: 70, w: 250, h: 205 };
         var gap = 42;
@@ -760,7 +821,7 @@
         ctx.strokeRect(coreOuter.x + gap, coreOuter.y + gap, coreOuter.w - 2 * gap, coreOuter.h - 2 * gap);
         ctx.restore();
 
-        label(ctx, "铁芯（理想，无漏磁）；绕组圈数仅示意，不按比例", coreOuter.x + coreOuter.w / 2, coreOuter.y + coreOuter.h + 26, 12.5, "rgba(203,213,225,0.85)", "center");
+        label(ctx, "铁芯", coreOuter.x + coreOuter.w / 2, coreOuter.y + coreOuter.h + 26, 13, "rgba(203,213,225,0.85)", "center");
 
         // 线圈匝数决定画出多少圈，只是示意
         var primaryTurns = Math.max(4, Math.min(12, Math.round(params.n1 / 42)));
@@ -883,7 +944,6 @@
         var isStepDown = params.n2 < params.n1;
         var kindText = isStepUp ? "升压变压器" : (isStepDown ? "降压变压器" : "隔离变压器（n₁ = n₂）");
         label(ctx, kindText, 340, 172, 15, isStepUp ? "#fb923c" : (isStepDown ? "#7dd3fc" : "#e2e8f0"), "center");
-        label(ctx, "n₁ : n₂ = " + params.n1 + " : " + params.n2, 340, 196, 12.5, "#cbd5e1", "center");
       }
 
       /* ---------- 数据读出 ---------- */
@@ -947,6 +1007,7 @@
         setText(out.mFreq, "f = " + d.f.toFixed(2) + " Hz");
         setText(out.mOmega, "ω = 2πf = " + d.omega.toFixed(2) + " rad/s，T = " + d.T.toFixed(2) + " s");
         setText(out.mInst, "e = " + e.toFixed(2) + " V");
+        setText(out.mTurns, String(params.turns));
         setText(out.mInstNote, info.long);
 
         setText(out.mU2, "U₂ = " + tf.U2.toFixed(1) + " V");
@@ -963,18 +1024,23 @@
         setText(out.tfRatio, ratioText);
       }
 
-      /* ---------- 主渲染 ---------- */
+      /* ---------- 主渲染 ----------
+         只绘制当前标签页的画布：隐藏的画布既不重算尺寸也不绘制。 */
 
-      function renderAll() {
-        var d = derive();
-        var tf = deriveTransformer();
+      var activeScene = "ac";
+
+      function drawGeneratorScene(d) {
+        var k = viewK.ac || syncCanvasScale("ac");
+        if (!k) { return; }
         var phase = state.theta % TAU;
         var e = d.Em * Math.sin(phase);
         var eFrac = d.Em > 0 ? e / d.Em : 0;
 
+        acCtx.setTransform(1, 0, 0, 1, 0, 0);
         acCtx.clearRect(0, 0, acCanvas.width, acCanvas.height);
         acCtx.fillStyle = "#080a0e";
         acCtx.fillRect(0, 0, acCanvas.width, acCanvas.height);
+        acCtx.setTransform(k, 0, 0, k, 0, 0);
 
         if (state.showField) { drawFieldLines(acCtx); }
         drawAxis(acCtx);
@@ -982,11 +1048,17 @@
         drawRotationHint(acCtx);
         drawCoil(acCtx, phase, eFrac);
         drawNormal(acCtx, phase);
-        drawCoilLabels(acCtx);
         drawWavePanel(acCtx, d);
+      }
 
-        drawTransformer(tfCtx, tf, Math.sin(phase) >= 0 ? 1 : -1);
-
+      function drawActiveScene(d) {
+        if (!d) { d = derive(); }
+        var tf = deriveTransformer();
+        if (activeScene === "ac") {
+          drawGeneratorScene(d);
+        } else {
+          drawTransformer(tfCtx, tf, Math.sin(state.theta % TAU) >= 0 ? 1 : -1);
+        }
         updateReadouts(d, tf);
       }
 
@@ -997,10 +1069,11 @@
         var dt = (ts - state.lastTs) / 1000;
         state.lastTs = ts;
         if (dt > 0.12) { dt = 0.12; }
+        var d = derive();
         if (state.playing) {
-          state.theta = (state.theta + derive().omega * dt) % (2 * TAU);
+          state.theta = (state.theta + d.omega * dt) % (2 * TAU);
         }
-        renderAll();
+        drawActiveScene(d);
         window.requestAnimationFrame(frame);
       }
 
@@ -1032,18 +1105,18 @@
         ui.n1Slider, ui.n2Slider, ui.u1Slider, ui.rSlider].forEach(function (slider) {
         slider.addEventListener("input", function () {
           readControls();
-          renderAll();
+          drawActiveScene();
         });
       });
 
       ui.showField.addEventListener("change", function () {
         state.showField = ui.showField.checked;
-        renderAll();
+        drawActiveScene();
       });
 
       ui.showFlux.addEventListener("change", function () {
         state.showFlux = ui.showFlux.checked;
-        renderAll();
+        drawActiveScene();
       });
 
       ui.pauseBtn.addEventListener("click", function () {
@@ -1069,21 +1142,157 @@
         ui.pauseBtn.textContent = "暂停";
         lastText = {};
         syncControls();
-        renderAll();
+        drawActiveScene();
       });
 
-      // ---------------- 外壳交互：面板折叠 / 抽屉 / 键盘 ----------------
+      // ---------------- 外壳交互：标签页 / 面板 / 抽屉 / 键盘 ----------------
       var shell = {
+        frame: document.querySelector(".stage-frame"),
         panel: document.getElementById("ctrlPanel"),
+        fold: document.getElementById("gripFold"),
         toggle: document.getElementById("ctrlToggle"),
         more: document.getElementById("moreBtn"),
         drawer: document.getElementById("drawer")
       };
 
+      var tablist = document.querySelector('[role="tablist"]');
+      var tabEls = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
+      var sceneEls = {
+        ac: document.getElementById("panelAc"),
+        tf: document.getElementById("panelTf")
+      };
+
+      /* 切换标签页：隐藏的一块 display:none 且不再绘制，显示的一块重算尺寸后重绘 */
+      function setScene(name, focusTab) {
+        if (!sceneEls[name]) { return; }
+        activeScene = name;
+        var i;
+        for (i = 0; i < tabEls.length; i += 1) {
+          var on = tabEls[i].getAttribute("data-scene") === name;
+          tabEls[i].setAttribute("aria-selected", on ? "true" : "false");
+          tabEls[i].tabIndex = on ? 0 : -1;
+          if (on && focusTab) { tabEls[i].focus(); }
+        }
+        sceneEls.ac.hidden = name !== "ac";
+        sceneEls.tf.hidden = name !== "tf";
+        syncCanvasScale(name);
+        drawActiveScene();
+      }
+
+      tabEls.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          setScene(tab.getAttribute("data-scene"), false);
+        });
+      });
+
+      tablist.addEventListener("keydown", function (ev) {
+        var cur = tabEls.indexOf(document.activeElement);
+        if (cur < 0) { return; }
+        var next = -1;
+        if (ev.key === "ArrowRight") { next = (cur + 1) % tabEls.length; }
+        else if (ev.key === "ArrowLeft") { next = (cur - 1 + tabEls.length) % tabEls.length; }
+        else if (ev.key === "Home") { next = 0; }
+        else if (ev.key === "End") { next = tabEls.length - 1; }
+        if (next < 0) { return; }
+        ev.preventDefault();
+        setScene(tabEls[next].getAttribute("data-scene"), true);
+      });
+
+      // ---------------- 参数面板：可拖动 + 位置记忆 ----------------
+      function initDraggablePanel() {
+        var panel = shell.panel;
+        var grip = panel && panel.querySelector(".panel-grip");
+        if (!panel || !grip) { return null; }
+        var KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+
+        function clampToFrame(x, y) {
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          return {
+            x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+            y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+          };
+        }
+        function place(x, y) {
+          var p = clampToFrame(x, y);
+          panel.style.left = p.x + "px";
+          panel.style.top = p.y + "px";
+          panel.style.right = "auto";
+          panel.style.bottom = "auto";
+        }
+        function defaultPlace() {
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          if (!f.height || !r.height) { return; }
+          place(8, f.height - r.height - 52);   // 默认左下角，避开底部图例
+        }
+        function refit() {
+          if (panel.hidden) { return; }
+          if (!userMoved) { defaultPlace(); return; }   // 没被拖过就跟随默认角落
+          if (!panel.style.left) { place(8, 8); return; }
+          place(parseFloat(panel.style.left) || 8, parseFloat(panel.style.top) || 8);
+        }
+
+        var saved = null;
+        try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (err) { saved = null; }
+        if (saved && typeof saved.x === "number" && typeof saved.y === "number") {
+          place(saved.x, saved.y);              // 刷新后恢复上次位置
+        } else {
+          defaultPlace();
+        }
+
+        var dx = 0, dy = 0, dragging = false;
+        var userMoved = !!(saved && typeof saved.x === "number" && typeof saved.y === "number");
+        grip.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0 || e.target.closest("button")) { return; }
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          userMoved = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+          panel.style.bottom = "auto";
+        });
+        grip.addEventListener("pointermove", function (e) {
+          if (!dragging) { return; }
+          var f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+        function endDrag(e) {
+          if (!dragging) { return; }
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture && grip.hasPointerCapture(e.pointerId)) {
+            grip.releasePointerCapture(e.pointerId);
+          }
+          localStorage.setItem(KEY, JSON.stringify({
+            x: parseFloat(panel.style.left),
+            y: parseFloat(panel.style.top)
+          }));
+        }
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+        grip.addEventListener("dblclick", function (e) {
+          if (e.target.closest("button")) { return; }
+          setPanelOpen(shell.panel.hidden);
+        });
+
+        return { refit: refit };
+      }
+
+      var panelDrag = initDraggablePanel();
+
       function setPanelOpen(open) {
         shell.panel.hidden = !open;
         shell.toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        shell.toggle.textContent = open ? "参数 ◂" : "参数 ▸";
+        shell.toggle.textContent = open ? "参数 ▾" : "参数 ▸";
+        if (shell.fold) { shell.fold.setAttribute("aria-expanded", open ? "true" : "false"); }
+        if (open && panelDrag) { panelDrag.refit(); }
       }
 
       function setDrawerOpen(open) {
@@ -1093,6 +1302,14 @@
 
       shell.toggle.addEventListener("click", function () { setPanelOpen(shell.panel.hidden); });
       shell.more.addEventListener("click", function () { setDrawerOpen(shell.drawer.hidden); });
+      shell.fold.addEventListener("click", function () { setPanelOpen(false); });
+
+      // 窗口尺寸变化：面板重新夹回画面内，显示中的画布按新尺寸重算
+      window.addEventListener("resize", function () {
+        if (panelDrag) { panelDrag.refit(); }
+        syncCanvasScale(activeScene);
+        drawActiveScene();
+      });
 
       window.addEventListener("keydown", function (ev) {
         var tag = ev.target && ev.target.tagName;
@@ -1118,7 +1335,7 @@
       setDrawerOpen(false);
 
       syncControls();
-      renderAll();
+      setScene("ac", false);
       window.requestAnimationFrame(frame);
     })();
   </script>

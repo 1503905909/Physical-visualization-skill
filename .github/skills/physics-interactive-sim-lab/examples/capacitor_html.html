@@ -47,6 +47,19 @@
                  overflow-y: auto; padding: 12px; font-size: 12.5px; }
     .hud-panel[hidden] { display: none; }
 
+    /* ---------- 面板可拖动（LAYOUT.md「参数面板必须可拖动」） ---------- */
+    .hud-panel { cursor: default; }
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 8px; touch-action: none; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); z-index: 6; }
+    .panel-grip .grip-title { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
+    .panel-grip .grip-fold { border: 1px solid rgba(255,255,255,.22); border-radius: 6px;
+                             background: rgba(255,255,255,.08); color: var(--ink);
+                             font: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px;
+                             cursor: pointer; }
+    .panel-grip .grip-fold:hover { background: rgba(255,255,255,.18); }
+
     .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
                   padding: 6px 12px; border-radius: 8px; cursor: pointer;
                   border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
@@ -239,6 +252,11 @@
         <button class="hud-toggle" id="ctrlToggle" type="button" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
 
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
+          <div class="panel-grip" id="panelGrip">
+            <span class="grip-title">参数</span>
+            <button type="button" class="grip-fold" id="panelFoldBtn" aria-expanded="true" aria-controls="ctrlPanel" title="折叠 / 展开参数面板">折叠</button>
+          </div>
+
           <p class="panel-mode">情形：<b id="stageMode">接通电源（U 不变）</b></p>
 
           <div class="mode-switch" role="group" aria-label="电源开关">
@@ -1040,10 +1058,12 @@
   var drawer = document.getElementById("drawer");
   var more = document.getElementById("moreBtn");
   var closeBtn = document.getElementById("drawerClose");
+  var foldBtn = document.getElementById("panelFoldBtn");
 
   function setPanel(open) {
     panel.hidden = !open;
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (foldBtn) foldBtn.setAttribute("aria-expanded", open ? "true" : "false");
     if (open) setDrawer(false);
   }
 
@@ -1056,6 +1076,13 @@
   toggle.addEventListener("click", function () { setPanel(panel.hidden); });
   more.addEventListener("click", function () { setDrawer(drawer.hidden); });
   closeBtn.addEventListener("click", function () { setDrawer(false); });
+  if (foldBtn) {
+    foldBtn.addEventListener("click", function () { setPanel(false); });
+    /* 折叠按钮上的按下不要被 grip 的拖动劫持（否则 pointer capture 会吞掉 click） */
+    foldBtn.addEventListener("pointerdown", function (event) { event.stopPropagation(); });
+    /* 双击折叠按钮不要冒泡到 grip 的 dblclick（否则会再折叠一次） */
+    foldBtn.addEventListener("dblclick", function (event) { event.stopPropagation(); });
+  }
 
   document.addEventListener("keydown", function (event) {
     var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : "";
@@ -1085,6 +1112,79 @@
       flow.checked = !flow.checked;
       flow.dispatchEvent(new Event("change", { bubbles: true }));
     }
+  });
+})();
+</script>
+
+<script>
+// 面板拖动 + 位置记忆：所有仿真页面共用同一份实现（LAYOUT.md 原文照抄）
+(function initDraggablePanel(){
+  const panel = document.getElementById('ctrlPanel');
+  const grip  = panel && panel.querySelector('.panel-grip');
+  if (!panel || !grip) return;
+  const KEY = 'hud-panel-pos:' + location.pathname.split('/').pop();
+
+  function clampToFrame(x, y){
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    return {
+      x: Math.min(Math.max(8, x), f.width  - r.width  - 8),
+      y: Math.min(Math.max(8, y), f.height - r.height - 8)
+    };
+  }
+  function place(x, y){
+    const p = clampToFrame(x, y);
+    panel.style.left = p.x + 'px';
+    panel.style.top  = p.y + 'px';
+    panel.style.right = 'auto';
+  }
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved) place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
+
+  let dx = 0, dy = 0, dragging = false;
+  grip.addEventListener('pointerdown', e => {
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    dragging = true; panel.classList.add('dragging');
+    grip.setPointerCapture(e.pointerId);
+    panel.style.left = (r.left - f.left) + 'px';
+    panel.style.top  = (r.top  - f.top ) + 'px';
+    panel.style.right = 'auto';
+  });
+  grip.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const f = panel.parentElement.getBoundingClientRect();
+    place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+  });
+  grip.addEventListener('pointerup', e => {
+    if (!dragging) return;
+    dragging = false; panel.classList.remove('dragging');
+    grip.releasePointerCapture(e.pointerId);
+    localStorage.setItem(KEY, JSON.stringify({
+      x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
+    }));
+  });
+  grip.addEventListener('dblclick', () => document.getElementById('ctrlToggle').click());
+})();
+
+// 面板上的指针事件不向画布穿透；窗口尺寸变化时把面板拉回舞台内
+(function guardPanel(){
+  const panel = document.getElementById('ctrlPanel');
+  if (!panel) return;
+  ['pointerdown', 'pointermove', 'pointerup', 'click'].forEach(function (type) {
+    panel.addEventListener(type, function (e) { e.stopPropagation(); });
+  });
+  window.addEventListener('resize', function () {
+    if (panel.hidden || !panel.style.left) return;
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = Math.min(Math.max(8, parseFloat(panel.style.left)), Math.max(8, f.width - r.width - 8));
+    const y = Math.min(Math.max(8, parseFloat(panel.style.top)), Math.max(8, f.height - r.height - 8));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+    panel.style.right = 'auto';
   });
 })();
 </script>

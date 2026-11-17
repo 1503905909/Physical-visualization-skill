@@ -97,6 +97,16 @@
     .row { display: flex; gap: 6px; margin-top: 8px; }
     .row button { flex: 1; }
 
+    /* ---- 参数面板：首行拖动条（可拖动、可记忆位置） ---- */
+    .hud-panel { cursor: default; }
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .grip-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #9fe8de; }
+    .hud-panel .grip-collapse { flex: 0 0 auto; width: 24px; height: 20px; min-height: 20px; padding: 0;
+                                font-size: 14px; line-height: 1; background: transparent; }
+
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
     @media (max-width: 1100px) {
@@ -133,6 +143,11 @@
         </div>
 
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数控制">
+          <div class="panel-grip" id="panelGrip">
+            <span class="grip-title">参数</span>
+            <button type="button" class="grip-collapse" id="panelCollapse" title="收起参数（P）" aria-label="收起参数">−</button>
+          </div>
+
           <div class="cols">
             <div>
               <div class="field">
@@ -711,10 +726,118 @@
       const drawer = document.getElementById("drawer");
       const moreBtn = document.getElementById("moreBtn");
 
+      /* ---------- 参数面板：拖动 + 位置记忆（拖动事件只落在 grip 上，不进入画布） ---------- */
+
+      function initDraggablePanel() {
+        const panel = ctrlPanel;
+        const grip = panel && panel.querySelector(".panel-grip");
+        const collapseBtn = document.getElementById("panelCollapse");
+        if (!panel || !grip) return function () {};
+        const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+        let dragged = false;
+
+        function clampToFrame(x, y) {
+          const f = panel.parentElement.getBoundingClientRect();
+          const r = panel.getBoundingClientRect();
+          return {
+            x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+            y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+          };
+        }
+
+        function place(x, y) {
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+          const p = clampToFrame(x, y);
+          panel.style.left = p.x + "px";
+          panel.style.top = p.y + "px";
+          panel.style.right = "auto";
+        }
+
+        function readSaved() {
+          try {
+            return JSON.parse(localStorage.getItem(KEY) || "null");
+          } catch (err) {
+            return null;
+          }
+        }
+
+        const saved = readSaved();
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+          dragged = true;
+          place(saved.x, saved.y);          // 恢复上次位置；无记录则用 CSS 默认角落
+        }
+
+        let dx = 0;
+        let dy = 0;
+        let dragging = false;
+
+        grip.addEventListener("pointerdown", (e) => {
+          if (e.button !== 0) return;
+          if (e.target.closest && e.target.closest("button")) return;   // 折叠按钮不触发拖动
+          const f = panel.parentElement.getBoundingClientRect();
+          const r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+          e.preventDefault();
+        });
+
+        grip.addEventListener("pointermove", (e) => {
+          if (!dragging) return;
+          const f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+
+        function endDrag(e) {
+          if (!dragging) return;
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture && grip.hasPointerCapture(e.pointerId)) {
+            grip.releasePointerCapture(e.pointerId);
+          }
+          try {
+            localStorage.setItem(KEY, JSON.stringify({
+              x: parseFloat(panel.style.left),
+              y: parseFloat(panel.style.top)
+            }));
+          } catch (err) { /* 隐私模式下无法写入时忽略 */ }
+          dragged = true;
+        }
+
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+
+        grip.addEventListener("dblclick", (e) => {
+          if (e.target.closest && e.target.closest("button")) return;
+          document.getElementById("ctrlToggle").click();
+        });
+
+        if (collapseBtn) {
+          collapseBtn.addEventListener("click", () => {
+            ctrlToggle.click();
+          });
+        }
+
+        function reclamp() {
+          if (!dragged || panel.hidden) return;
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        }
+        window.addEventListener("resize", reclamp);
+        return reclamp;
+      }
+
+      const reclampPanel = initDraggablePanel();
+
       function setPanelOpen(open) {
         ctrlPanel.hidden = !open;
         ctrlToggle.setAttribute("aria-expanded", open ? "true" : "false");
         ctrlToggle.title = open ? "收起参数（P）" : "展开参数（P）";
+        if (open) reclampPanel();
       }
 
       function setDrawerOpen(open) {

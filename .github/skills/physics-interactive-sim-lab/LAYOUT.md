@@ -102,6 +102,75 @@ body { margin: 0; background: #070d11; overflow: hidden;
 - 折叠用 `aria-expanded`，抽屉用 `hidden` 属性。
 - 1024×768 与 1920×1080 下都要完整可用：面板不遮挡主要物理对象，滑块不被截断。
 
+## 参数面板必须可拖动（防遮挡）
+
+叠加式布局的固有矛盾是：面板一定会压住画布的一角，而不同参数下物理对象会跑到那一角。解决办法不是把面板做小，而是让它**能被拖走、并记住位置**。
+
+```css
+.hud-panel { cursor: default; }
+.hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                         justify-content: space-between; margin: -2px 0 8px; }
+.hud-panel .panel-grip:active { cursor: grabbing; }
+.hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+```
+
+```js
+// 面板拖动 + 位置记忆：所有仿真页面共用同一份实现
+(function initDraggablePanel(){
+  const panel = document.getElementById('ctrlPanel');
+  const grip  = panel && panel.querySelector('.panel-grip');
+  if (!panel || !grip) return;
+  const KEY = 'hud-panel-pos:' + location.pathname.split('/').pop();
+
+  function clampToFrame(x, y){
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    return {
+      x: Math.min(Math.max(8, x), f.width  - r.width  - 8),
+      y: Math.min(Math.max(8, y), f.height - r.height - 8)
+    };
+  }
+  function place(x, y){
+    const p = clampToFrame(x, y);
+    panel.style.left = p.x + 'px';
+    panel.style.top  = p.y + 'px';
+    panel.style.right = 'auto';
+  }
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved) place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
+
+  let dx = 0, dy = 0, dragging = false;
+  grip.addEventListener('pointerdown', e => {
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    dragging = true; panel.classList.add('dragging');
+    grip.setPointerCapture(e.pointerId);
+    panel.style.left = (r.left - f.left) + 'px';
+    panel.style.top  = (r.top  - f.top ) + 'px';
+    panel.style.right = 'auto';
+  });
+  grip.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const f = panel.parentElement.getBoundingClientRect();
+    place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+  });
+  grip.addEventListener('pointerup', e => {
+    if (!dragging) return;
+    dragging = false; panel.classList.remove('dragging');
+    grip.releasePointerCapture(e.pointerId);
+    localStorage.setItem(KEY, JSON.stringify({
+      x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
+    }));
+  });
+  grip.addEventListener('dblclick', () => document.getElementById('ctrlToggle').click());
+})();
+```
+
+面板首行必须是 `.panel-grip`，内含标题（如「参数」）与折叠按钮；双击标题行等同于点「参数」按钮。
+
+**默认位置**：按页面内容选一个空角（哪一角物理对象最少就放哪一角），不要一律放右上。若默认位置仍压住主体，说明该页应把面板改成更扁的两列布局，而不是继续缩小。
+
 ## 自检清单
 
 - [ ] 1366×768 下页面无滚动条，画布宽度 ≥ 70%

@@ -52,12 +52,24 @@
     .sw-field { height: 2px; background: #ffd166; }
 
     .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin; }
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin;
+                 cursor: default; }
     .hud-panel[hidden] { display: none; }
+
+    /* 首行拖拽把手：标题 + 折叠按钮；拖动改位置，双击标题折叠 */
+    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
+                             display: flex; align-items: center; justify-content: space-between;
+                             gap: 8px; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em;
+                              color: var(--cyan); }
+    .hud-panel .grip-btn { width: 22px; height: 22px; padding: 0; line-height: 1; font-size: 12px;
+                           border-radius: 6px; cursor: pointer; }
 
     .hud-panel h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
                     color: var(--cyan); }
-    .hud-panel h4:first-child { margin-top: 0; }
+    .panel-grip + h4 { margin-top: 0; }
 
     .field { margin-top: 7px; }
     .field > label { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px;
@@ -85,10 +97,12 @@
               cursor: pointer; }
     .toggle input { width: 15px; height: 15px; accent-color: #22d3ee; }
 
+    /* 面板展开时折叠按钮在面板首行，此按钮只在折叠后出现 */
     .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
                   padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 286px; }   /* 面板展开时让到面板左边 */
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                  display: none; }
+    .hud-toggle[aria-expanded="false"] { display: inline-block; }
 
     .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
                 width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
@@ -108,13 +122,11 @@
 
     @media (max-width: 900px) {
       .hud-panel { width: 210px; font-size: 12px; }
-      .hud-toggle[aria-expanded="true"] { right: 232px; }
     }
 
-    /* 窄屏：面板收窄，避开 ② 匀强磁场区的右边界 */
+    /* 窄屏：面板收窄，避开 ② 偏转磁场区的右边界 */
     @media (max-width: 1100px) {
       .hud-panel { width: 246px; }
-      .hud-toggle[aria-expanded="true"] { right: 274px; }
     }
 
     /* 短屏（如 1024×768 的 4:3 投影）：面板内容略收紧，保证参数全部可见 */
@@ -124,6 +136,16 @@
       .field { margin-top: 5px; }
       .toggles { gap: 4px; margin-top: 6px; }
       .btn-row { margin-top: 7px; }
+    }
+
+    /* 4:3 投影（1024×768）：舞台只有 567px 高，再收紧一档，保证播放/重置不被截断 */
+    @media (max-width: 1100px) and (max-height: 800px) {
+      .hud-panel { padding: 8px 10px; }
+      .hud-panel h4 { margin: 6px 0 2px; }
+      .field { margin-top: 3px; }
+      .iso-grid, .segmented { margin-top: 4px; }
+      .toggles { gap: 3px; margin-top: 5px; }
+      .btn-row { margin-top: 5px; }
     }
   </style>
 </head>
@@ -135,9 +157,9 @@
 
         <!-- 读数：左上角 ≤4 chips -->
         <div class="hud hud-readout" aria-label="实时读数">
-          <span class="chip"><span class="k">v = E/B₁</span><b id="mSpeed">—</b></span>
-          <span class="chip"><span class="k">r = mv/(qB₂)</span><b class="ok" id="mRadius">—</b></span>
-          <span class="chip"><span class="k">x = 2r</span><b class="ok" id="mLanding">—</b></span>
+          <span class="chip"><span class="k">v</span><b id="mSpeed">—</b></span>
+          <span class="chip"><span class="k">r₁</span><b class="ok" id="mRadius">—</b></span>
+          <span class="chip"><span class="k">x₁</span><b class="ok" id="mLanding">—</b></span>
           <span class="chip"><span class="k">Δx</span><b class="amber" id="mDelta">—</b></span>
         </div>
 
@@ -150,8 +172,13 @@
           <span><i class="sw sw-field"></i>电场 E</span>
         </div>
 
-        <!-- 参数：右上角可折叠 -->
+        <!-- 参数：可拖动 + 可折叠（首行把手） -->
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数调节">
+          <div class="panel-grip" id="panelGrip">
+            <span class="panel-name">参数</span>
+            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
+                    title="折叠（双击标题行也可）">◂</button>
+          </div>
           <h4>电场与磁场</h4>
           <div class="field">
             <label for="eSlider"><span>选择器电场 E</span><span id="eValue">2.0×10⁴ V/m</span></label>
@@ -210,6 +237,14 @@
           <h3>结论</h3>
           <p>速度选择器只放行 v = E/B₁；进入 B₂ 后 r = mv/(qB₂)，落点 x = 2r。同速同电荷时落点 x ∝ m，越远质量越大。</p>
           <p class="eq">x = 2mv/(qB₂) = 2mE/(qB₁B₂)　⇒　m = qB₁B₂x/(2E)</p>
+
+          <h3>装置与公式</h3>
+          <ol>
+            <li>① 速度选择器（E ⊥ B₁）：只放行 v = E/B₁ 的离子。</li>
+            <li>② 偏转磁场（B₂ ⊙ 垂直纸面向外）：半圆半径 r = mv/(qB₂)。</li>
+            <li>③ 照相底片（刻度 x / cm）：落点 x = 2r。</li>
+          </ol>
+          <p class="eq">v = E/B₁　r = mv/(qB₂)　x = 2r　m = qB₁B₂x/(2E)</p>
 
           <h3>当前读数明细</h3>
           <p>主离子 <b id="dIon1">²⁰Ne⁺</b>，m = <span id="dM1">—</span>；对比离子 <b id="dIon2">²²Ne⁺</b>，m = <span id="dM2">—</span></p>
@@ -545,7 +580,7 @@
           }
         }
 
-        text("② 匀强磁场 B₂ ⊙ 垂直纸面向外", 470, 116, { size: 12, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
+        text("偏转磁场 B₂ ⊙", 470, 116, { size: 12, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
       }
 
       function drawPlate(m) {
@@ -586,8 +621,8 @@
           });
         }
 
-        text("③ 照相底片", GEO.plateX + 12, 108, { size: 13, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
-        text("刻度 x / cm", GEO.plateX + 12, 126, { size: 11, color: COLORS.field, halo: COLORS.bg });
+        text("照相底片", GEO.plateX + 12, 108, { size: 13, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
+        text("x / cm", GEO.plateX + 12, 126, { size: 11, color: COLORS.field, halo: COLORS.bg });
       }
 
       function drawArcProgress(R, u, color, width, dashed) {
@@ -664,7 +699,7 @@
         if (labelY > GEO.b2.y + GEO.b2.h - 8) {
           labelY = y - 16 - (extra || 0);
         }
-        text(tag + " = " + fmtLen(xcm) + " cm", GEO.plateX + 14, labelY, {
+        text(tag + " " + fmtLen(xcm) + " cm", GEO.plateX + 14, labelY, {
           size: 11,
           weight: "700",
           color: color,
@@ -684,7 +719,7 @@
         ctx.stroke();
         ctx.restore();
 
-        text("① 速度选择器（E ⊥ B₁）", 30, 100, { size: 13, weight: "700", color: "#c7d2e2" });
+        text("速度选择器", 30, 100, { size: 13, weight: "700", color: "#c7d2e2" });
         text("B₁ ⊙", 286, 100, { size: 12, align: "right", color: COLORS.field });
 
         // 入射直线（选速正确的离子）
@@ -739,9 +774,6 @@
         dotSymbol(124, 139, 3.4, "rgba(148,163,184,0.55)");
         dotSymbol(124, 161, 3.4, "rgba(148,163,184,0.55)");
         dotSymbol(268, 161, 3.4, "rgba(148,163,184,0.55)");
-
-        text("qE = qvB₁  ⇒  v = E / B₁", 30, 208, { size: 13, weight: "700", color: COLORS.forceE });
-        text("偏离直线者被极板挡掉", 30, 228, { size: 11, color: COLORS.muted });
       }
 
       function drawSource() {
@@ -1032,6 +1064,7 @@
         shell.panel.hidden = !open;
         shell.toggle.setAttribute("aria-expanded", open ? "true" : "false");
         shell.toggle.textContent = open ? "参数 ◂" : "参数 ▸";
+        if (open) { shell.panel.dispatchEvent(new CustomEvent("panel:open")); }
       }
 
       function setDrawerOpen(open) {
@@ -1061,6 +1094,89 @@
           setDrawerOpen(false);
         }
       });
+
+      // ---------------- 参数面板：拖动 + 位置记忆 ----------------
+      // 首行 .panel-grip 负责拖动；位置存 localStorage，刷新后恢复；双击标题行折叠/展开
+      (function initDraggablePanel() {
+        const panel = document.getElementById("ctrlPanel");
+        const grip = panel && panel.querySelector(".panel-grip");
+        const collapseBtn = document.getElementById("panelCollapse");
+        if (!panel || !grip) { return; }
+
+        const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+        const MIN_VISIBLE_H = 220;   // 拖到画面下方时至少留这么高，超出部分面板内滚动
+
+        function readSaved() {
+          try { return JSON.parse(localStorage.getItem(KEY) || "null"); }
+          catch (err) { return null; }
+        }
+        function writeSaved(pos) {
+          try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch (err) { /* 隐私模式忽略 */ }
+        }
+
+        function place(x, y) {
+          const f = panel.parentElement.getBoundingClientRect();
+          const w = panel.offsetWidth;
+          const px = Math.min(Math.max(8, x), Math.max(8, f.width - w - 8));
+          const py = Math.min(Math.max(8, y), Math.max(8, f.height - MIN_VISIBLE_H - 8));
+          panel.style.left = px + "px";
+          panel.style.top = py + "px";
+          panel.style.right = "auto";
+          panel.style.maxHeight = Math.max(MIN_VISIBLE_H, f.height - py - 8) + "px";
+        }
+
+        const saved = readSaved();
+        if (saved && isFinite(saved.x) && isFinite(saved.y)) { place(saved.x, saved.y); }
+
+        let dx = 0, dy = 0, dragging = false;
+        grip.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0) { return; }
+          const f = panel.parentElement.getBoundingClientRect();
+          const r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+        });
+        grip.addEventListener("pointermove", function (e) {
+          if (!dragging) { return; }
+          const f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+        function endDrag(e) {
+          if (!dragging) { return; }
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture(e.pointerId)) { grip.releasePointerCapture(e.pointerId); }
+          writeSaved({ x: parseFloat(panel.style.left), y: parseFloat(panel.style.top) });
+        }
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+
+        // 双击标题行 = 点折叠按钮；落在按钮上时交给按钮自己处理
+        grip.addEventListener("dblclick", function (e) {
+          if (e.target.closest("button")) { return; }
+          setPanelOpen(panel.hidden);
+        });
+        if (collapseBtn) {
+          collapseBtn.addEventListener("click", function () { setPanelOpen(false); });
+        }
+
+        // 窗口尺寸变化后把面板重新夹回舞台内
+        window.addEventListener("resize", function () {
+          if (panel.hidden || panel.style.left === "") { return; }
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        });
+        // 折叠期间改过窗口尺寸时，展开后同样重新夹回
+        panel.addEventListener("panel:open", function () {
+          if (panel.style.left === "") { return; }
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        });
+      })();
 
       setPanelOpen(true);
       setDrawerOpen(false);

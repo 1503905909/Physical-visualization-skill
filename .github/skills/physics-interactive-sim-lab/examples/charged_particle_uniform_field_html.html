@@ -35,14 +35,32 @@
     .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
                   color: #cfe3e9; }
 
-    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
+    /* 参数面板默认贴左下角（避开左上 chips、左下图例，也不压两块极板与轨迹）。
+       宽度 min(132px, 9.6vw, 17vh)：1366×768 下 131px，右缘 157px，仍在极板左缘 188px 之外。 */
+    .hud-panel { left: 12px; right: auto; top: auto; bottom: 52px;
+                 width: min(132px, 9.6vw, 17vh); max-height: calc(100% - 64px);
+                 overflow-y: auto; padding: 10px; font-size: 12px; cursor: default; }
     .hud-panel[hidden] { display: none; }
 
+    /* 首行把手：标题 + 折叠按钮；拖动改位置，双击折叠（LAYOUT.md「参数面板必须可拖动」） */
+    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
+                             display: flex; align-items: center; justify-content: space-between;
+                             gap: 6px; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #7fd6e4; }
+    .hud-panel .grip-btn { width: 20px; height: 20px; padding: 0; line-height: 1; font-size: 12px;
+                           border-radius: 6px; cursor: pointer; color: #eaf2f5;
+                           background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); }
+    .hud-panel .grip-btn:hover { background: rgba(255,255,255,.18); }
+
+    /* 折叠后「参数」按钮才出现；展开时首行把手上已有折叠按钮 */
     .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
                   padding: 6px 12px; border-radius: 8px; cursor: pointer;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 286px; }   /* 面板展开时让到面板左边 */
+                  font: inherit; font-size: 12.5px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                  display: none; }
+    .hud-toggle[aria-expanded="false"] { display: inline-block; }
 
     .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
                 width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
@@ -55,8 +73,7 @@
     .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
 
     @media (max-width: 900px) {
-      .hud-panel { width: 210px; font-size: 12px; }
-      .hud-toggle[aria-expanded="true"] { right: 232px; }
+      .hud-panel { padding: 8px; font-size: 11.5px; }
     }
 
     /* —— 叠加层内部样式（只影响外观） —— */
@@ -75,27 +92,28 @@
     .hud-panel::-webkit-scrollbar, .drawer::-webkit-scrollbar { width: 6px; }
     .hud-panel::-webkit-scrollbar-thumb, .drawer::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
 
-    .panel-title { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; color: #8aa2ac; }
+    .panel-title { margin: 0 0 6px; font-size: 10.5px; letter-spacing: .08em; color: #8aa2ac; }
     .hud button { font-family: inherit; cursor: pointer; }
-    .hud-panel .field { margin-top: 10px; }
-    .hud-panel .field label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #cfe3e9; }
+    .hud-panel .field { margin-top: 9px; }
+    .hud-panel .field label { display: flex; flex-wrap: wrap; justify-content: space-between;
+                              gap: 0 6px; font-size: 11.5px; color: #cfe3e9; }
     .hud-panel .field label b { color: #7fd6e4; font-weight: 700; }
     .hud-panel input[type="range"] { width: 100%; margin: 4px 0 0; accent-color: #7fd6e4; }
-    .hud-panel .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-    .hud-panel .segmented button { min-height: 30px; padding: 0 4px; font-size: 12px; font-weight: 700; color: #dbe9ee;
+    .hud-panel .segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+    .hud-panel .segmented button { min-height: 27px; padding: 0 2px; font-size: 11.5px; font-weight: 700; color: #dbe9ee;
                                    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); border-radius: 7px; }
     .hud-panel .segmented button:hover { background: rgba(255,255,255,.12); }
     .hud-panel .segmented button.active { background: #0f766e; border-color: #0f766e; color: #fff; }
-    .hud-panel .toggles { display: grid; gap: 6px; margin-top: 10px; }
-    .hud-panel .toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #cfe3e9; user-select: none; }
-    .hud-panel .toggle input { width: 15px; height: 15px; accent-color: #7fd6e4; }
-    .hud-panel .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-    .hud-panel .btn-row button { min-height: 32px; border-radius: 8px; font-size: 12.5px; font-weight: 700;
+    .hud-panel .toggles { display: grid; gap: 5px; margin-top: 9px; }
+    .hud-panel .toggle { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .hud-panel .toggle input { width: 14px; height: 14px; accent-color: #7fd6e4; flex: 0 0 auto; }
+    .hud-panel .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+    .hud-panel .btn-row button { min-height: 30px; border-radius: 8px; font-size: 12px; font-weight: 700;
                                  border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #eaf2f5; }
     .hud-panel .btn-row button:hover { background: rgba(255,255,255,.14); }
     .hud-panel .btn-row button.primary-btn { background: #0f766e; border-color: #0f766e; color: #fff; }
     .hud-panel .btn-row button.primary-btn:hover { background: #0d665f; }
-    .hud-panel .ctl-hint { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: #9fb6bf; }
+    .hud-panel .ctl-hint { margin: 7px 0 0; font-size: 10.5px; line-height: 1.45; color: #9fb6bf; }
 
     .drawer .formula-line { margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px;
                             background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; }
@@ -127,7 +145,11 @@
         </div>
 
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
-          <p class="panel-title">参数</p>
+          <div class="panel-grip" id="panelGrip" title="拖动可移动面板（双击折叠）">
+            <span class="panel-name">参数</span>
+            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
+                    title="折叠（双击标题行也可）">◂</button>
+          </div>
 
           <div class="field">
             <label for="fieldSlider"><span>电场强度 E</span><b id="fieldValue">1.0</b></label>
@@ -675,6 +697,86 @@
         setDrawer(false);
       }
     });
+
+    // —— 参数面板：拖动 + 位置记忆（LAYOUT.md「参数面板必须可拖动」）——
+    // 首行 .panel-grip 拖动改位置，位置写 localStorage 刷新后恢复；双击把手等同折叠。
+    // 指针被 grip 的 setPointerCapture 捕获，拖动全程不会落到画布上。
+    (function initDraggablePanel() {
+      const panelEl = document.getElementById("ctrlPanel");
+      const grip = panelEl && panelEl.querySelector(".panel-grip");
+      const collapseBtn = document.getElementById("panelCollapse");
+      if (!panelEl || !grip) return;
+      const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+      // 默认位置由 CSS 以 bottom 锚定（贴在左下图例上方）；拖动后改为 left + top 锚定。
+
+      function clampToFrame(x, y) {
+        const f = panelEl.parentElement.getBoundingClientRect();
+        const r = panelEl.getBoundingClientRect();
+        return {
+          x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+          y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+        };
+      }
+      function place(x, y) {
+        const p = clampToFrame(x, y);
+        panelEl.style.left = p.x + "px";
+        panelEl.style.top = p.y + "px";
+        panelEl.style.right = "auto";
+        panelEl.style.bottom = "auto";
+      }
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (err) { saved = null; }
+      if (saved && isFinite(saved.x) && isFinite(saved.y)) place(saved.x, saved.y);
+
+      let dx = 0, dy = 0, dragging = false, moved = false;
+      grip.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 || e.target.closest("button")) return;   // 把手上的折叠按钮自己处理点击
+        const f = panelEl.parentElement.getBoundingClientRect();
+        const r = panelEl.getBoundingClientRect();
+        dx = e.clientX - r.left; dy = e.clientY - r.top;
+        dragging = true; moved = false;
+        panelEl.classList.add("dragging");
+        grip.setPointerCapture(e.pointerId);
+        panelEl.style.left = (r.left - f.left) + "px";
+        panelEl.style.top = (r.top - f.top) + "px";
+        panelEl.style.right = "auto";
+        panelEl.style.bottom = "auto";
+      });
+      grip.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const f = panelEl.parentElement.getBoundingClientRect();
+        const nx = e.clientX - f.left - dx;
+        const ny = e.clientY - f.top - dy;
+        if (Math.abs(nx - parseFloat(panelEl.style.left)) > 1 ||
+            Math.abs(ny - parseFloat(panelEl.style.top)) > 1) moved = true;
+        place(nx, ny);
+      });
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        panelEl.classList.remove("dragging");
+        if (grip.hasPointerCapture(e.pointerId)) grip.releasePointerCapture(e.pointerId);
+        if (!moved) return;   // 只是点了一下把手，不写脏位置
+        try {
+          localStorage.setItem(KEY, JSON.stringify({
+            x: parseFloat(panelEl.style.left), y: parseFloat(panelEl.style.top)
+          }));
+        } catch (err) { /* 隐私模式下忽略 */ }
+      }
+      grip.addEventListener("pointerup", endDrag);
+      grip.addEventListener("pointercancel", endDrag);
+      if (collapseBtn) collapseBtn.addEventListener("click", () => setPanel(false));
+      grip.addEventListener("dblclick", (e) => {
+        if (e.target.closest("button")) return;
+        ctrlToggle.click();
+      });
+      // 窗口尺寸变化后把面板重新夹回舞台内
+      window.addEventListener("resize", () => {
+        if (panelEl.hidden || !panelEl.style.left) return;
+        place(parseFloat(panelEl.style.left), parseFloat(panelEl.style.top));
+      });
+    })();
 
     window.addEventListener("resize", render);
     render();

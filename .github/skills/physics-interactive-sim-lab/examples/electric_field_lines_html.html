@@ -54,15 +54,27 @@
     .sw.dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3030;
               border: 1px solid #ffffff; }
 
-    .hud-panel { right: 12px; top: 12px; width: 300px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 10px 12px; font-size: 12.5px; }
+    /* 默认放左上（读数 chips 下方）：避开画面中央的电荷与右上角的初始试探电荷 */
+    .hud-panel { left: 12px; top: 68px; right: auto; width: 300px;
+                 max-height: calc(100% - 80px);
+                 overflow-y: auto; padding: 10px 12px; font-size: 12.5px; cursor: default; }
     .hud-panel[hidden] { display: none; }
 
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
-                  font: inherit; font-size: 12.5px;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 328px; }   /* 面板展开时让到面板左边 */
+    /* —— 参数面板拖动条（LAYOUT.md「参数面板必须可拖动」） —— */
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; gap: 8px; margin: -2px 0 8px;
+                             padding: 0 0 5px; border-bottom: 1px solid rgba(255,255,255,.12);
+                             font-size: 12px; font-weight: 700; color: #cfe3e9;
+                             touch-action: none; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-title { letter-spacing: .08em; }
+    .panel-fold { flex: 0 0 auto; padding: 2px 8px; border-radius: 6px; cursor: pointer;
+                  font: inherit; font-size: 11.5px; font-weight: 400; line-height: 1.4;
+                  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
+                  color: #cfe3e9; }
+    .panel-fold:hover { background: rgba(255,255,255,.14); color: #fff; }
+    .panel-body[hidden] { display: none; }
 
     .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
                 width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
@@ -115,7 +127,6 @@
 
     @media (max-width: 900px) {
       .hud-panel { width: 210px; font-size: 12px; }
-      .hud-toggle[aria-expanded="true"] { right: 232px; }
       .scene-row { grid-template-columns: 1fr; }
     }
   </style>
@@ -140,31 +151,36 @@
         </div>
 
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
-          <div class="scene-row" role="group" aria-label="电场线场景">
-            <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
-            <button type="button" class="scene-btn" data-scene="singleNegative">负点电荷</button>
-            <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
-            <button type="button" class="scene-btn" data-scene="samePositive">等量同种</button>
+          <div class="panel-grip" title="拖动移动面板，双击折叠">
+            <span class="panel-title">参数</span>
+            <button type="button" class="panel-fold" id="ctrlToggle" aria-expanded="true" aria-controls="panelBody" aria-label="折叠参数面板">收起</button>
           </div>
 
-          <div class="row"><label for="densitySlider">每个电荷线条数</label><b id="densityValue">14 条/电荷</b></div>
-          <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" aria-label="每个电荷线条数" />
+          <div class="panel-body" id="panelBody">
+            <div class="scene-row" role="group" aria-label="电场线场景">
+              <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
+              <button type="button" class="scene-btn" data-scene="singleNegative">负点电荷</button>
+              <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
+              <button type="button" class="scene-btn" data-scene="samePositive">等量同种</button>
+            </div>
 
-          <div class="row"><label for="distanceSlider">两电荷距离</label><b id="distanceValue">3.0</b></div>
-          <input id="distanceSlider" type="range" min="2.0" max="4.8" value="3.0" step="0.2" aria-label="两电荷距离" />
+            <div class="row"><label for="densitySlider">每个电荷线条数</label><b id="densityValue">14 条/电荷</b></div>
+            <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" aria-label="每个电荷线条数" />
 
-          <div class="toggles">
-            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示背景场方向（等长箭头）</span></label>
-            <label class="toggle"><input type="checkbox" id="showTestCharge" checked /><span>显示正试探电荷</span></label>
-            <label class="toggle"><input type="checkbox" id="animateArrows" checked /><span>箭头流动提示</span></label>
-          </div>
+            <div class="row"><label for="distanceSlider">两电荷距离</label><b id="distanceValue">3.0</b></div>
+            <input id="distanceSlider" type="range" min="2.0" max="4.8" value="3.0" step="0.2" aria-label="两电荷距离" />
 
-          <div class="reset-row">
-            <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
+            <div class="toggles">
+              <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示背景场方向（等长箭头）</span></label>
+              <label class="toggle"><input type="checkbox" id="showTestCharge" checked /><span>显示正试探电荷</span></label>
+              <label class="toggle"><input type="checkbox" id="animateArrows" checked /><span>箭头流动提示</span></label>
+            </div>
+
+            <div class="reset-row">
+              <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
+            </div>
           </div>
         </aside>
-
-        <button type="button" class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
 
         <button type="button" class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="说明与课堂问题">?</button>
 
@@ -890,13 +906,18 @@
     // —— 外壳交互：参数面板折叠 / 「?」抽屉（不涉及物理与拖拽逻辑） ——
     const ctrlToggle = document.getElementById("ctrlToggle");
     const ctrlPanel = document.getElementById("ctrlPanel");
+    const panelBody = document.getElementById("panelBody");
     const moreBtn = document.getElementById("moreBtn");
     const drawer = document.getElementById("drawer");
     const drawerClose = document.getElementById("drawerClose");
+    let clampPanelPosition = null;
 
     function setPanelOpen(open) {
-      ctrlPanel.hidden = !open;
+      panelBody.hidden = !open;
       ctrlToggle.setAttribute("aria-expanded", String(open));
+      ctrlToggle.textContent = open ? "收起" : "展开";
+      ctrlToggle.setAttribute("aria-label", open ? "折叠参数面板" : "展开参数面板");
+      if (clampPanelPosition) clampPanelPosition();
     }
 
     function setDrawerOpen(open) {
@@ -904,7 +925,7 @@
       moreBtn.setAttribute("aria-expanded", String(open));
     }
 
-    ctrlToggle.addEventListener("click", () => setPanelOpen(ctrlPanel.hidden));
+    ctrlToggle.addEventListener("click", () => setPanelOpen(panelBody.hidden));
     moreBtn.addEventListener("click", () => setDrawerOpen(drawer.hidden));
     drawerClose.addEventListener("click", () => setDrawerOpen(false));
 
@@ -925,10 +946,92 @@
         || (tag === "INPUT" && ["text", "number", "search", "email", "url", "password", "tel"].includes(el.type));
       if (typing) return;
       const key = event.key.toLowerCase();
-      if (key === "p") { event.preventDefault(); setPanelOpen(ctrlPanel.hidden); }
+      if (key === "p") { event.preventDefault(); setPanelOpen(panelBody.hidden); }
       else if (key === "r") { event.preventDefault(); controls.resetBtn.click(); }
       else if (event.key === "?") { event.preventDefault(); setDrawerOpen(drawer.hidden); }
     });
+
+    // —— 面板拖动 + 位置记忆：LAYOUT.md「参数面板必须可拖动」的共用实现 ——
+    (function initDraggablePanel(){
+      const panel = document.getElementById("ctrlPanel");
+      const grip = panel && panel.querySelector(".panel-grip");
+      if (!panel || !grip) return;
+      const frame = panel.parentElement;
+      const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+
+      function clampToFrame(x, y) {
+        const f = frame.getBoundingClientRect();
+        const r = panel.getBoundingClientRect();
+        return {
+          x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+          y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+        };
+      }
+      function place(x, y) {
+        const p = clampToFrame(x, y);
+        panel.style.left = p.x + "px";
+        panel.style.top = p.y + "px";
+        panel.style.right = "auto";
+      }
+      clampPanelPosition = function () {
+        if (!panel.style.left) return;
+        place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+      };
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (error) { saved = null; }
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+        place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
+      }
+
+      let dx = 0, dy = 0, dragging = false;
+      function endDrag(event) {
+        if (!dragging) return;
+        dragging = false;
+        panel.classList.remove("dragging");
+        if (event && event.pointerId !== undefined && grip.hasPointerCapture(event.pointerId)) {
+          grip.releasePointerCapture(event.pointerId);
+        }
+        try {
+          localStorage.setItem(KEY, JSON.stringify({
+            x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
+          }));
+        } catch (error) { /* 隐私模式下写入失败也不影响拖动 */ }
+      }
+
+      grip.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button")) return;   // 折叠按钮不是拖动手柄
+        if (event.button !== 0) return;
+        const f = frame.getBoundingClientRect();
+        const r = panel.getBoundingClientRect();
+        dx = event.clientX - r.left; dy = event.clientY - r.top;
+        dragging = true;
+        panel.classList.add("dragging");
+        grip.setPointerCapture(event.pointerId);
+        panel.style.left = (r.left - f.left) + "px";
+        panel.style.top = (r.top - f.top) + "px";
+        panel.style.right = "auto";
+        event.preventDefault();
+        event.stopPropagation();   // 面板浮在画布之上，拖动不穿透到 canvas
+      });
+      grip.addEventListener("pointermove", (event) => {
+        if (!dragging) return;
+        const f = frame.getBoundingClientRect();
+        place(event.clientX - f.left - dx, event.clientY - f.top - dy);
+      });
+      grip.addEventListener("pointerup", endDrag);
+      grip.addEventListener("pointercancel", endDrag);
+
+      grip.addEventListener("dblclick", (event) => {
+        if (event.target.closest("button")) return;
+        const toggle = document.getElementById("ctrlToggle");
+        if (toggle) toggle.click();
+      });
+
+      window.addEventListener("resize", () => {
+        if (!dragging && clampPanelPosition) clampPanelPosition();
+      });
+    })();
 
     animate();
   </script>

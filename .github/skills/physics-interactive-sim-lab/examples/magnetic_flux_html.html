@@ -49,7 +49,7 @@
 
     /* 面板压成两列短卡片：高度低于线圈上沿，任何时刻都不遮物理主体 */
     .hud-panel { right: 12px; top: 12px; width: var(--hud-w); max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 8px 10px; font-size: 12px; }
+                 overflow-y: auto; padding: 6px 10px; font-size: 12px; }
     .hud-panel[hidden] { display: none; }
 
     .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
@@ -80,11 +80,11 @@
 
     /* ---- 面板内部：两列紧凑卡片 ---- */
     .hud-panel .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
-    .hud-panel .field { margin-top: 6px; }
+    .hud-panel .field { margin-top: 5px; }
     .hud-panel .field:first-child { margin-top: 0; }
     .field-label { margin-bottom: 3px; color: #cfe3e9; font-size: 11.5px; }
-    .field label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 2px;
-                   color: #cfe3e9; font-size: 11.5px; }
+    .field label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 1px;
+                   color: #cfe3e9; font-size: 11.5px; line-height: 1.35; }
     .field label b { color: #7fd6e4; font-weight: 700; white-space: nowrap; }
     input[type="range"] { width: 100%; height: 16px; accent-color: var(--accent); display: block; }
 
@@ -98,12 +98,22 @@
     .hud-panel button:disabled { opacity: .45; cursor: not-allowed; }
     .scene-btn.active, .hud-panel button.primary { background: var(--accent-deep); border-color: var(--accent); color: #ffffff; }
 
-    .toggles { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 8px; }
+    .toggles { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; }
     .toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
     .toggle input { width: 14px; height: 14px; accent-color: var(--accent); }
 
-    .row { display: flex; gap: 6px; margin-top: 8px; }
+    .row { display: flex; gap: 6px; margin-top: 6px; }
     .row button { flex: 1; }
+
+    /* ---- 参数面板：首行拖动条（可拖动、可记忆位置） ---- */
+    .hud-panel { cursor: default; }
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 6px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .grip-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #9fe8de; }
+    .hud-panel .grip-collapse { flex: 0 0 auto; width: 24px; height: 18px; min-height: 18px; padding: 0;
+                                font-size: 14px; line-height: 1; background: transparent; }
 
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
@@ -141,6 +151,11 @@
         </div>
 
         <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
+          <div class="panel-grip" id="panelGrip">
+            <span class="grip-title">参数</span>
+            <button type="button" class="grip-collapse" id="panelCollapse" title="收起参数（P）" aria-label="收起参数">−</button>
+          </div>
+
           <div class="cols">
             <div>
               <div class="field">
@@ -1006,10 +1021,118 @@
       var drawer = document.getElementById("drawer");
       var moreBtn = document.getElementById("moreBtn");
 
+      /* ---------- 参数面板：拖动 + 位置记忆（拖动事件只落在 grip 上，不进入画布） ---------- */
+
+      function initDraggablePanel() {
+        var panel = ctrlPanel;
+        var grip = panel && panel.querySelector(".panel-grip");
+        var collapseBtn = document.getElementById("panelCollapse");
+        if (!panel || !grip) return function () {};
+        var KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+        var dragged = false;
+
+        function clampToFrame(x, y) {
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          return {
+            x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+            y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+          };
+        }
+
+        function place(x, y) {
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+          var p = clampToFrame(x, y);
+          panel.style.left = p.x + "px";
+          panel.style.top = p.y + "px";
+          panel.style.right = "auto";
+        }
+
+        function readSaved() {
+          try {
+            return JSON.parse(localStorage.getItem(KEY) || "null");
+          } catch (err) {
+            return null;
+          }
+        }
+
+        var saved = readSaved();
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+          dragged = true;
+          place(saved.x, saved.y);          // 恢复上次位置；无记录则用 CSS 默认角落
+        }
+
+        var dx = 0;
+        var dy = 0;
+        var dragging = false;
+
+        grip.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0) return;
+          if (e.target.closest && e.target.closest("button")) return;   // 折叠按钮不触发拖动
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+          e.preventDefault();
+        });
+
+        grip.addEventListener("pointermove", function (e) {
+          if (!dragging) return;
+          var f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+
+        function endDrag(e) {
+          if (!dragging) return;
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture && grip.hasPointerCapture(e.pointerId)) {
+            grip.releasePointerCapture(e.pointerId);
+          }
+          try {
+            localStorage.setItem(KEY, JSON.stringify({
+              x: parseFloat(panel.style.left),
+              y: parseFloat(panel.style.top)
+            }));
+          } catch (err) { /* 隐私模式下无法写入时忽略 */ }
+          dragged = true;
+        }
+
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+
+        grip.addEventListener("dblclick", function (e) {
+          if (e.target.closest && e.target.closest("button")) return;
+          document.getElementById("ctrlToggle").click();
+        });
+
+        if (collapseBtn) {
+          collapseBtn.addEventListener("click", function () {
+            ctrlToggle.click();
+          });
+        }
+
+        function reclamp() {
+          if (!dragged || panel.hidden) return;
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        }
+        window.addEventListener("resize", reclamp);
+        return reclamp;
+      }
+
+      var reclampPanel = initDraggablePanel();
+
       function setPanelOpen(open) {
         ctrlPanel.hidden = !open;
         ctrlToggle.setAttribute("aria-expanded", open ? "true" : "false");
         ctrlToggle.title = open ? "收起参数（P）" : "展开参数（P）";
+        if (open) reclampPanel();
       }
 
       function setDrawerOpen(open) {
