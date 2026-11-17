@@ -236,10 +236,35 @@
       var chartCanvas = document.getElementById("phiChart");
       var cctx = chartCanvas.getContext("2d");
 
-      var CW = canvas.width;
-      var CH = canvas.height;
+      /* 逻辑画布 = 原 canvas.width / height，坐标、图形、字号一律不变；
+         位图尺寸 = CSS 尺寸 × 设备像素比，由 syncBackingStore() 每帧同步。 */
+      var LW = 1600;
+      var LH = 900;
+      var CW = LW;
+      var CH = LH;
       var CX0 = CW / 2;
       var CY0 = CH / 2;
+
+      function syncBackingStore() {
+        var r = canvas.getBoundingClientRect();
+        var dpr = Math.min(window.devicePixelRatio || 1, 3);
+        var w = Math.max(1, Math.round(r.width * dpr));
+        var h = Math.max(1, Math.round(r.height * dpr));
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      }
+
+      // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+      function beginFrame() {
+        syncBackingStore();
+        ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+      }
+
+      // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+      function toLogical(e) {
+        var r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * (LW / r.width),
+                 y: (e.clientY - r.top) * (LH / r.height) };
+      }
 
       var FIELD_X = 0.30;
       var FIELD_Y = 0.175;
@@ -855,6 +880,7 @@
       /* ---------- 主渲染 ---------- */
 
       function render() {
+        beginFrame();
         ctx.clearRect(0, 0, CW, CH);
         ctx.fillStyle = C.bg;
         ctx.fillRect(0, 0, CW, CH);
@@ -867,6 +893,10 @@
       }
 
       /* ---------- 交互 ---------- */
+
+      /* 视口尺寸 / 系统缩放变化后：重设位图并立即重画 */
+      window.addEventListener("resize", function () { render(); });
+      window.addEventListener("orientationchange", function () { render(); });
 
       function syncPlayButton() {
         if (state.scene === "static") {
@@ -908,14 +938,6 @@
         syncPlayButton();
       }
 
-      function canvasPoint(event) {
-        var rect = canvas.getBoundingClientRect();
-        return {
-          x: (event.clientX - rect.left) * (CW / rect.width),
-          y: (event.clientY - rect.top) * (CH / rect.height)
-        };
-      }
-
       function hitLoop(p) {
         if (state.scene !== "translate") return false;
         var g = coilGeom();
@@ -928,7 +950,7 @@
       }
 
       canvas.addEventListener("pointerdown", function (event) {
-        var p = canvasPoint(event);
+        var p = toLogical(event);
         if (!hitLoop(p)) return;
         state.dragging = true;
         state.playing = false;
@@ -940,7 +962,7 @@
 
       canvas.addEventListener("pointermove", function (event) {
         if (!state.dragging) return;
-        var p = canvasPoint(event);
+        var p = toLogical(event);
         state.xc = clamp((p.x - CX0) / SCALE + state.dragOffset, -0.46, 0.46);
       });
 

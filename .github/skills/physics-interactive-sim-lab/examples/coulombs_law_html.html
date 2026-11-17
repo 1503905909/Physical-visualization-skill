@@ -258,6 +258,31 @@
     const canvas = document.getElementById("simulationCanvas");
     const ctx = canvas.getContext("2d");
 
+    // —— 高清渲染（HiDPI）：LAYOUT.md「高清渲染」 ——
+    // LW / LH = 该页原来的 canvas.width / canvas.height，作为逻辑坐标系（不要改）
+    const LW = 960, LH = 540;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
     const controls = {
       q1Slider: document.getElementById("q1Slider"),
       q2Slider: document.getElementById("q2Slider"),
@@ -374,8 +399,8 @@
     }
 
     function stageGeometry() {
-      const w = canvas.width;
-      const h = canvas.height;
+      const w = LW;
+      const h = LH;
       return {
         w,
         h,
@@ -597,7 +622,7 @@
       }
     }
 
-    function drawScene() {
+    function drawAll() {
       const g = stageGeometry();
       ctx.clearRect(0, 0, g.w, g.h);
       ctx.fillStyle = "#080a0e";
@@ -647,7 +672,8 @@
     function render() {
       syncControlsFromState();
       updateOutputs();
-      drawScene();
+      beginFrame();   // 每帧绘制前先按 CSS 尺寸 × DPR 重设位图，再把映射设回逻辑坐标
+      drawAll();
     }
 
     function setCharge(which, value) {
@@ -696,13 +722,7 @@
     }
 
     function canvasPoint(event) {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      return {
-        x: (event.clientX - rect.left) * scaleX,
-        y: (event.clientY - rect.top) * scaleY
-      };
+      return toLogical(event);   // 逻辑坐标换算见 toLogical（LW / rect.width）
     }
 
     function hitCharge(point) {

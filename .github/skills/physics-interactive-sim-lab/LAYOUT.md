@@ -97,10 +97,49 @@ body { margin: 0; background: #070d11; overflow: hidden;
 ## 交互规则
 
 - 所有滑块、按钮、拖拽功能**必须保持原有行为**，只改外观与位置。
-- 指针映射不得错位：如果原代码用 `canvas.getBoundingClientRect()` 换算，改造后画布 CSS 尺寸变化，必须仍按 `canvas.width / rect.width` 缩放。
+- 指针映射不得错位：画布 CSS 尺寸与位图尺寸不一致，指针必须先换算到逻辑坐标（见下一节）。
 - 键盘：`空格` 播放/暂停、`R` 重置、`P` 折叠/展开参数、`?` 打开抽屉。
 - 折叠用 `aria-expanded`，抽屉用 `hidden` 属性。
 - 1024×768 与 1920×1080 下都要完整可用：面板不遮挡主要物理对象，滑块不被截断。
+
+## 高清渲染（HiDPI）：位图必须跟着显示尺寸走
+
+**画布不允许固定位图尺寸后靠 CSS 拉伸。** 逻辑画布 960×540 被铺到 1920 宽的屏幕上就是放大 2 倍，肉眼可见发虚；投影和论文截图都会糊。正确做法是把位图设成「CSS 尺寸 × 设备像素比」，再让绘制统一映射回逻辑坐标：
+
+```js
+// LW / LH = 该页原来的 canvas.width / canvas.height，作为逻辑坐标系（不要改）
+const LW = 960, LH = 540;
+
+function syncBackingStore() {
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = Math.max(1, Math.round(r.width * dpr));
+  const h = Math.max(1, Math.round(r.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+
+// 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+function beginFrame() {
+  syncBackingStore();
+  ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+}
+
+// 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+function toLogical(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (LW / r.width),
+           y: (e.clientY - r.top) * (LH / r.height) };
+}
+```
+
+要点：
+
+- 所有 `canvas.width / rect.width` 形式的指针换算，全部替换为 `LW / rect.width`。
+- 每一帧绘制前调用 `beginFrame()`；`resize` 后重新调用一次并重画。
+- 除 `beginFrame()` 外不要再随手 `ctx.setTransform`，否则逻辑坐标会错位。
+- 逻辑画布内部坐标、图形、文字字号一律不变——变的只是位图密度。
+
+**论文插图怎么取图**：不设导出按钮。需要高分辨率图片时，把浏览器窗口拉到足够大（或把显示缩放设为 100%、窗口 2560×1440 以上）再系统截图；HiDPI 改造后位图密度跟着窗口走，截出来就是清晰的。
 
 ## 参数面板必须可拖动（防遮挡）
 

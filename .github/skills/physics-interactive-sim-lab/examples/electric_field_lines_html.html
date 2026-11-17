@@ -226,6 +226,31 @@
     const canvas = document.getElementById("fieldCanvas");
     const ctx = canvas.getContext("2d");
 
+    // —— 高清渲染（HiDPI）：LAYOUT.md「高清渲染」 ——
+    // LW / LH = 该页原来的 canvas.width / canvas.height，作为逻辑坐标系（不要改）
+    const LW = 1600, LH = 900;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
     const controls = {
       densitySlider: document.getElementById("densitySlider"),
       distanceSlider: document.getElementById("distanceSlider"),
@@ -299,11 +324,11 @@
 
     function worldToCanvas(point) {
       const b = worldBounds();
-      const sx = canvas.width / (b.xmax - b.xmin);
-      const sy = canvas.height / (b.ymax - b.ymin);
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
       const s = Math.min(sx, sy) * 0.92;
-      const ox = canvas.width / 2;
-      const oy = canvas.height / 2;
+      const ox = LW / 2;
+      const oy = LH / 2;
       return {
         x: ox + point.x * s,
         y: oy - point.y * s
@@ -312,12 +337,12 @@
 
     function canvasToWorld(point) {
       const b = worldBounds();
-      const sx = canvas.width / (b.xmax - b.xmin);
-      const sy = canvas.height / (b.ymax - b.ymin);
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
       const s = Math.min(sx, sy) * 0.92;
       return {
-        x: clamp((point.x - canvas.width / 2) / s, b.xmin + 0.2, b.xmax - 0.2),
-        y: clamp((canvas.height / 2 - point.y) / s, b.ymin + 0.25, b.ymax - 0.25)
+        x: clamp((point.x - LW / 2) / s, b.xmin + 0.2, b.xmax - 0.2),
+        y: clamp((LH / 2 - point.y) / s, b.ymin + 0.25, b.ymax - 0.25)
       };
     }
 
@@ -413,7 +438,7 @@
       const visible = [];
       for (let i = 4; i < points.length - 5; i += 1) {
         const p = points[i];
-        if (isFiniteCanvasPoint(p) && p.x >= 0 && p.x <= canvas.width && p.y >= 0 && p.y <= canvas.height) {
+        if (isFiniteCanvasPoint(p) && p.x >= 0 && p.x <= LW && p.y >= 0 && p.y <= LH) {
           visible.push(i);
         }
       }
@@ -531,9 +556,9 @@
     }
 
     function drawBackground() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, LW, LH);
       ctx.fillStyle = "#080a0e";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, LW, LH);
 
       ctx.save();
       ctx.strokeStyle = "rgba(255,255,255,0.055)";
@@ -586,10 +611,10 @@
 
     function canvasHalfExtent() {
       const b = worldBounds();
-      const sx = canvas.width / (b.xmax - b.xmin);
-      const sy = canvas.height / (b.ymax - b.ymin);
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
       const s = Math.min(sx, sy) * 0.92;
-      return { s, halfWidth: canvas.width / (2 * s), halfHeight: canvas.height / (2 * s) };
+      return { s, halfWidth: LW / (2 * s), halfHeight: LH / (2 * s) };
     }
 
     function singleFieldLines(charges) {
@@ -787,7 +812,7 @@
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.font = "bold 18px Microsoft YaHei, Arial";
       ctx.textAlign = "center";
-      ctx.fillText("电场线方向 = 正试探电荷受力方向", canvas.width / 2, canvas.height - 22);
+      ctx.fillText("电场线方向 = 正试探电荷受力方向", LW / 2, LH - 22);
       ctx.restore();
     }
 
@@ -807,7 +832,7 @@
       controls.distanceSlider.disabled = state.scene.startsWith("single");
     }
 
-    function render() {
+    function drawAll() {
       const charges = sceneCharges();
       const paths = buildFieldLines(charges);
       updateOutputs(paths.length);
@@ -821,6 +846,11 @@
       drawModelLabel();
     }
 
+    function render() {
+      beginFrame();   // 每帧绘制前先按 CSS 尺寸 × DPR 重设位图，再把映射设回逻辑坐标
+      drawAll();
+    }
+
     function animate() {
       state.time += 1;
       render();
@@ -828,13 +858,7 @@
     }
 
     function canvasPoint(event) {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      return {
-        x: (event.clientX - rect.left) * scaleX,
-        y: (event.clientY - rect.top) * scaleY
-      };
+      return toLogical(event);   // 逻辑坐标换算见 toLogical（LW / rect.width）
     }
 
     function hitTestCharge(point, charges) {

@@ -249,8 +249,36 @@
       progress: 0
     };
 
-    const STAGE_WIDTH = 960;
-    const STAGE_HEIGHT = 540;
+    // —— 高清渲染（HiDPI，LAYOUT.md「高清渲染（HiDPI）」）——
+    // LW / LH 是该页原来的 canvas.width / canvas.height，作为逻辑坐标系，不要改。
+    // 位图尺寸 = CSS 尺寸 × devicePixelRatio（≤3），绘制一律用逻辑坐标，
+    // 所以极板、箭头、字号不随屏幕放大变化，只是位图更密、不再发虚。
+    const LW = 960, LH = 540;
+    const STAGE_WIDTH = LW;
+    const STAGE_HEIGHT = LH;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画。
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width。
+    // （本页画布没有拖拽交互，保留统一工具，后续加交互时直接用。）
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
     const PLATE = { left: 125, right: 835, top: 105, bottom: 435, midY: 270 };
     const Y_SCALE = 135;
     const HALF_GAP_PX = (PLATE.bottom - PLATE.top) / 2; // 165 px，极板内沿到中线的距离
@@ -385,9 +413,9 @@
 
     function drawStage(m) {
       const g = geometry();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, LW, LH);
       ctx.fillStyle = "#080a0e";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, LW, LH);
 
       ctx.save();
       ctx.fillStyle = "rgba(255,48,48,0.16)";
@@ -419,7 +447,7 @@
       const g = geometry();
       ctx.save();
       ctx.beginPath();
-      ctx.rect(0, 0, canvas.width, canvas.height);
+      ctx.rect(0, 0, LW, LH);
       ctx.clip();
       ctx.strokeStyle = "#ffd166";
       ctx.lineWidth = 4;
@@ -600,10 +628,14 @@
         : baseNote;
     }
 
+    function drawAll() {
+      drawStage(getModel());
+    }
+
     function render() {
-      const m = getModel();
-      updateOutputs(m);
-      drawStage(m);
+      updateOutputs(getModel());
+      beginFrame();
+      drawAll();
     }
 
     function animate() {

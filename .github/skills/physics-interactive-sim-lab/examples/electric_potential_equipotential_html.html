@@ -225,6 +225,33 @@
     heatCanvas.width = 160;
     heatCanvas.height = 90;
 
+    // —— 高清渲染（HiDPI，LAYOUT.md「高清渲染（HiDPI）」）——
+    // LW / LH 是该页原来的 canvas.width / canvas.height，作为逻辑坐标系，不要改。
+    // 位图尺寸 = CSS 尺寸 × devicePixelRatio（≤3），绘制与指针一律用逻辑坐标，
+    // 所以图形与字号不随屏幕放大变化，只是位图更密、不再发虚。
+    const LW = 960, LH = 540;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画。
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width。
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
     // 归一化电势单位：页面所有电势都显示为 φ̃ = φ/(kQ₀/R₀)。
     // 取 Q₀ = 1 nC、R₀ = 1 m（1 世界单位 = 1 m），则 kQ₀/R₀ = 8.99 V。
     const VOLT_PER_UNIT = 8.99;   // k·Q₀/R₀ [V]
@@ -290,20 +317,20 @@
 
     function worldToCanvas(point) {
       const b = worldBounds();
-      const sx = canvas.width / (b.xmax - b.xmin);
-      const sy = canvas.height / (b.ymax - b.ymin);
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
       const s = Math.min(sx, sy) * 0.92;
-      return { x: canvas.width / 2 + point.x * s, y: canvas.height / 2 - point.y * s };
+      return { x: LW / 2 + point.x * s, y: LH / 2 - point.y * s };
     }
 
     function canvasToWorld(point) {
       const b = worldBounds();
-      const sx = canvas.width / (b.xmax - b.xmin);
-      const sy = canvas.height / (b.ymax - b.ymin);
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
       const s = Math.min(sx, sy) * 0.92;
       return {
-        x: clamp((point.x - canvas.width / 2) / s, b.xmin + 0.1, b.xmax - 0.1),
-        y: clamp((canvas.height / 2 - point.y) / s, b.ymin + 0.1, b.ymax - 0.1)
+        x: clamp((point.x - LW / 2) / s, b.xmin + 0.1, b.xmax - 0.1),
+        y: clamp((LH / 2 - point.y) / s, b.ymin + 0.1, b.ymax - 0.1)
       };
     }
 
@@ -351,17 +378,17 @@
     }
 
     function drawBackground() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, LW, LH);
       ctx.fillStyle = "#080a0e";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, LW, LH);
 
       if (controls.showHeat.checked) {
         const img = heatCtx.createImageData(heatCanvas.width, heatCanvas.height);
         for (let j = 0; j < heatCanvas.height; j += 1) {
           for (let i = 0; i < heatCanvas.width; i += 1) {
             const w = canvasToWorld({
-              x: (i / (heatCanvas.width - 1)) * canvas.width,
-              y: (j / (heatCanvas.height - 1)) * canvas.height
+              x: (i / (heatCanvas.width - 1)) * LW,
+              y: (j / (heatCanvas.height - 1)) * LH
             });
             const c = colorForPotential(potentialAt(w.x, w.y));
             const idx = (j * heatCanvas.width + i) * 4;
@@ -373,7 +400,7 @@
         }
         heatCtx.putImageData(img, 0, 0);
         ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(heatCanvas, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(heatCanvas, 0, 0, LW, LH);
       }
 
       ctx.save();
@@ -676,8 +703,7 @@
       return "右下方";
     }
 
-    function render() {
-      updateOutputs();
+    function drawAll() {
       drawBackground();
       drawEquipotentialLines();
       drawFieldVectors();
@@ -685,12 +711,14 @@
       drawProbe();
     }
 
+    function render() {
+      updateOutputs();
+      beginFrame();
+      drawAll();
+    }
+
     function canvasPoint(event) {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: (event.clientX - rect.left) * canvas.width / rect.width,
-        y: (event.clientY - rect.top) * canvas.height / rect.height
-      };
+      return toLogical(event);
     }
 
     function hitProbe(point) {

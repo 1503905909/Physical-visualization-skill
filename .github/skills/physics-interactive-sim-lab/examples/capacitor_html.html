@@ -351,8 +351,31 @@
   <script>
     const canvas = document.getElementById("capCanvas");
     const ctx = canvas.getContext("2d");
-    const CW = canvas.width;
-    const CH = canvas.height;
+
+    /* 逻辑坐标系：原来 canvas.width / canvas.height 的 1600×900（不要改）。
+       位图改为「CSS 尺寸 × DPR」，绘制一律按逻辑坐标（LAYOUT.md「高清渲染」）。 */
+    const LW = 1600, LH = 900;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
 
     const EPS0 = 8.8541878128e-12;
     const FONT_CN = "'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', Arial, sans-serif";
@@ -600,31 +623,31 @@
     }
 
     function drawBackground(g) {
-      const grad = ctx.createLinearGradient(0, 0, 0, CH);
+      const grad = ctx.createLinearGradient(0, 0, 0, LH);
       grad.addColorStop(0, "#0a0d13");
       grad.addColorStop(1, "#05070a");
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, CW, CH);
+      ctx.fillRect(0, 0, LW, LH);
 
       const glow = ctx.createRadialGradient(g.cx, g.cy, 60, g.cx, g.cy, 560);
       glow.addColorStop(0, "rgba(120, 160, 220, 0.10)");
       glow.addColorStop(1, "rgba(120, 160, 220, 0)");
       ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, CW, CH);
+      ctx.fillRect(0, 0, LW, LH);
 
       ctx.save();
       ctx.strokeStyle = "rgba(255,255,255,0.045)";
       ctx.lineWidth = 1;
-      for (let x = 0; x <= CW; x += 100) {
+      for (let x = 0; x <= LW; x += 100) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, CH);
+        ctx.lineTo(x, LH);
         ctx.stroke();
       }
-      for (let y = 0; y <= CH; y += 100) {
+      for (let y = 0; y <= LH; y += 100) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(CW, y);
+        ctx.lineTo(LW, y);
         ctx.stroke();
       }
       ctx.restore();
@@ -865,8 +888,8 @@
 
     function drawStage(m) {
       const g = stageGeom();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, CW, CH);
+      beginFrame();
+      ctx.clearRect(0, 0, LW, LH);
       drawBackground(g);
       drawCircuit(g);
       drawMedium(g);
@@ -1043,6 +1066,11 @@
       });
       updateModeText();
       syncLabels();
+      render();
+    });
+
+    window.addEventListener("resize", function () {
+      syncBackingStore();
       render();
     });
 
