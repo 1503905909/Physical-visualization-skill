@@ -67,9 +67,29 @@ Physical-visualization-skill/
 │   ├── appendix_charged_particle_example.md
 │   ├── physics-topics.md
 │   └── setup-guide.md
-├── build/                              # 构建产物（截图、视频帧等）
+├── index.html                          # 资源画廊（由脚本生成，可直接打开）
+├── gallery/
+│   ├── resources.json                  # 资源清单（唯一需要手工维护的文件）
+│   └── thumbs/                         # 画廊缩略图
+├── tools/
+│   └── build_gallery.py                # 画廊生成与一致性检查
 └── README.md
 ```
+
+## 资源画廊
+
+`index.html` 是一个可直接打开的页面，把全部交互仿真与讲解动画按教材章节列在一起，支持关键词搜索，可按类型（交互仿真 / 讲解动画）和章节筛选，点击卡片即可打开对应资源。
+
+- **本地查看**：双击根目录的 `index.html`，或用任意静态服务器打开。
+- **在线浏览**：在仓库 Settings → Pages 中把源设为 `main` 分支根目录，即可通过 `https://<用户名>.github.io/Physical-visualization-skill/` 访问。
+- **新增资源**：在 `gallery/resources.json` 里加一条记录（含 `type`、`title`、`chapter`、`path` 等字段），然后运行：
+
+```bash
+python tools/build_gallery.py          # 重新生成 index.html
+python tools/build_gallery.py --check  # 只检查：列出未登记的文件与缺失的缩略图
+```
+
+Manim 动画渲染出 `build/videos/manim/<id>.mp4` 后重新生成，画廊会直接在卡片里播放视频；未渲染时卡片显示场景类名和可复制的渲染命令。
 
 ## 已包含示例
 
