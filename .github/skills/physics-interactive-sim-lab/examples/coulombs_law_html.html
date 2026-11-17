@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
   <title>库仑定律交互仿真实验</title>
   <style>
     :root {
@@ -337,6 +338,22 @@
       line-height: 1.6;
     }
 
+    .arrow-legend {
+      margin: 10px 0 0;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      background: #f8fafc;
+      color: #475467;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .arrow-legend strong {
+      color: #0f172a;
+    }
+
     @media (max-width: 960px) {
       .layout {
         grid-template-columns: 1fr;
@@ -378,11 +395,17 @@
           <div class="stage-wrap">
             <canvas id="simulationCanvas" width="960" height="540"></canvas>
             <div class="stage-readout">
-              <div class="readout-item">q<sub>1</sub>: <span id="stageQ1">-4.0 uC</span></div>
-              <div class="readout-item">q<sub>2</sub>: <span id="stageQ2">8.0 uC</span></div>
+              <div class="readout-item">q<sub>1</sub>: <span id="stageQ1">-4.0 μC</span></div>
+              <div class="readout-item">q<sub>2</sub>: <span id="stageQ2">8.0 μC</span></div>
               <div class="readout-item">r: <span id="stageR">3.0 cm</span></div>
             </div>
           </div>
+          <p class="arrow-legend">
+            <strong>图例：箭头长度与静电力大小 F 成正比。</strong>
+            全页固定比例 <strong>0.20 px/N</strong>（参考力 F<sub>ref</sub> = 850 N），不随参数变化重新归一化；
+            F &lt; 60 N 时箭头取最小长度 12 px，F &gt; 850 N 时封顶 170 px。
+            箭头方向表示受力方向，粗细固定；力值读数保留 3 位有效数字（≥ 1000 N 时用科学计数法）。
+          </p>
         </section>
 
         <section class="control-panel" aria-label="参数控制">
@@ -394,7 +417,7 @@
                 <span class="charge-dot" id="dotQ1"></span>
               </div>
               <div class="field">
-                <label for="q1Slider"><span>电荷量 q1</span><span id="q1Value">-4.0 uC</span></label>
+                <label for="q1Slider"><span>电荷量 q1</span><span id="q1Value">-4.0 μC</span></label>
                 <div class="number-row">
                   <button type="button" id="q1Dec" aria-label="减小电荷1">-</button>
                   <input id="q1Number" type="number" min="-10" max="10" value="-4" step="0.5" />
@@ -414,7 +437,7 @@
                 <span class="charge-dot" id="dotQ2"></span>
               </div>
               <div class="field">
-                <label for="q2Slider"><span>电荷量 q2</span><span id="q2Value">8.0 uC</span></label>
+                <label for="q2Slider"><span>电荷量 q2</span><span id="q2Value">8.0 μC</span></label>
                 <div class="number-row">
                   <button type="button" id="q2Dec" aria-label="减小电荷2">-</button>
                   <input id="q2Number" type="number" min="-10" max="10" value="8" step="0.5" />
@@ -428,7 +451,7 @@
               </div>
             </div>
           </div>
-          <p class="hint">白色箭头表示两个电荷受到的静电力方向，箭头长度表示力的相对大小；下方标尺单位为厘米。</p>
+          <p class="hint">白色箭头表示两个电荷受到的静电力方向，箭头长度与力的大小成正比（0.20 px/N，固定比例，不随参数动态缩放）；下方标尺单位为厘米。拖动时两电荷中心最近 0.6 cm，画面间距、读数与按 r 计算的力三者一致。</p>
         </section>
 
         <section class="inquiry-panel" aria-label="课堂观察问题">
@@ -449,7 +472,7 @@
         </div>
         <div class="metric">
           <div class="metric-label">静电力大小</div>
-          <div class="metric-value" id="forceValue">319.6 N</div>
+          <div class="metric-value" id="forceValue">320 N</div>
         </div>
         <div class="metric">
           <div class="metric-label">两电荷距离</div>
@@ -485,6 +508,15 @@
   <script>
     const K = 8.99e9;
     const MIN_DISTANCE_CM = 0.6;
+    const MIN_POSITION_CM = 0.5;
+    const MAX_POSITION_CM = 9.5;
+    const CHARGE_RADIUS = 20;
+    // 箭头长度按 F 线性映射（不用对数）：length(px) = F(N) × 0.2。
+    // 全页固定，不做动态归一化；只保留视觉上必要的最小长度与画布上限。
+    const ARROW_PX_PER_NEWTON = 0.2;
+    const ARROW_MIN_PX = 12;   // 对应 60 N
+    const ARROW_MAX_PX = 170;  // 对应 850 N，即图例中的 F_ref
+    const ARROW_LANE_OFFSET = 26;
     const canvas = document.getElementById("simulationCanvas");
     const ctx = canvas.getContext("2d");
 
@@ -542,11 +574,12 @@
     }
 
     function formatCharge(value) {
-      return `${value.toFixed(1)} uC`;
+      return `${value.toFixed(1)} μC`;
     }
 
+    // 画面上的真实中心距：位置约束保证它恒 ≥ MIN_DISTANCE_CM，不再钳制读数。
     function distanceCm() {
-      return Math.max(Math.abs(state.x2 - state.x1), MIN_DISTANCE_CM);
+      return Math.abs(state.x2 - state.x1);
     }
 
     function calculateForce() {
@@ -562,17 +595,38 @@
       return { magnitude, interaction };
     }
 
+    function superscript(number) {
+      const map = {
+        "-": "⁻",
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹"
+      };
+      return String(number).split("").map((ch) => map[ch] || ch).join("");
+    }
+
     function formatForce(value) {
-      if (controls.scientificNotation.checked) {
-        return `${value.toExponential(3)} N`;
+      if (!Number.isFinite(value)) return "— N";
+      if (value === 0) return "0 N";
+      const exponent = Math.floor(Math.log10(value));
+      const rounded = Number(value.toPrecision(3));
+      const useScientific = controls.scientificNotation.checked
+        || exponent >= 3
+        || exponent <= -3
+        || rounded >= 1000;
+      if (useScientific) {
+        const [mantissa, exp] = value.toExponential(2).split("e");
+        return `${mantissa} × 10${superscript(Number(exp))} N`;
       }
-      if (value >= 1000) {
-        return `${value.toFixed(0)} N`;
-      }
-      if (value >= 10) {
-        return `${value.toFixed(1)} N`;
-      }
-      return `${value.toFixed(3)} N`;
+      const decimals = Math.max(0, 2 - exponent);
+      return `${rounded.toFixed(decimals)} N`;
     }
 
     function chargeColor(q) {
@@ -602,7 +656,7 @@
 
     function xToCm(x) {
       const g = stageGeometry();
-      return clamp(((x - g.rulerLeft) / (g.rulerRight - g.rulerLeft)) * 10, 0.5, 9.5);
+      return clamp(((x - g.rulerLeft) / (g.rulerRight - g.rulerLeft)) * 10, MIN_POSITION_CM, MAX_POSITION_CM);
     }
 
     function drawRoundedRect(x, y, width, height, radius, fill, stroke) {
@@ -626,9 +680,8 @@
       }
     }
 
-    function drawArrow(x1, y1, x2, y2, color, lineWidth) {
+    function drawArrow(x1, y1, x2, y2, color, lineWidth, headLength = 18) {
       const angle = Math.atan2(y2 - y1, x2 - x1);
-      const headLength = 18;
       ctx.save();
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
@@ -704,8 +757,11 @@
       ctx.moveTo(left, y);
       ctx.lineTo(right, y);
       ctx.stroke();
-      drawArrow(left + 2, y, left + 30, y, "#10b981", 3);
-      drawArrow(right - 2, y, right - 30, y, "#10b981", 3);
+      // 箭头长度随跨度收缩：r = 0.6 cm 时两条 30 px 箭头会叠成一个疙瘩，看不出这是"这一段 = r"。
+      const tick = Math.min(28, Math.max(5, (right - left) / 3));
+      const head = Math.min(18, tick * 0.7);
+      drawArrow(left + 2, y, left + 2 + tick, y, "#10b981", 3, head);
+      drawArrow(right - 2, y, right - 2 - tick, y, "#10b981", 3, head);
       ctx.font = "19px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
@@ -714,7 +770,7 @@
     }
 
     function drawCharge(x, y, q, label) {
-      const radius = 38 + Math.min(12, Math.abs(q) * 1.2);
+      const radius = CHARGE_RADIUS;
       const gradient = ctx.createRadialGradient(x - radius / 3, y - radius / 3, 8, x, y, radius);
       gradient.addColorStop(0, "rgba(255,255,255,0.92)");
       gradient.addColorStop(0.22, chargeColor(q));
@@ -735,11 +791,11 @@
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 24px Arial";
+      ctx.font = "bold 19px Arial";
       const sign = q > 0 ? "+" : q < 0 ? "-" : "0";
-      ctx.fillText(sign, x, y - 12);
-      ctx.font = "bold 20px Arial";
-      ctx.fillText(label, x, y + 16);
+      ctx.fillText(sign, x, y - 5);
+      ctx.font = "bold 12px Arial";
+      ctx.fillText(label, x, y + 9);
       ctx.restore();
       return radius;
     }
@@ -765,9 +821,12 @@
       const attract = interaction === "吸引";
       const dir1 = attract ? signToQ2 : -signToQ2;
       const dir2 = -dir1;
-      const arrowLength = clamp(42 + Math.log10(magnitude + 1) * 36, 56, 155);
-      const y = g.arrowY;
-      const lineWidth = clamp(5 + Math.log10(magnitude + 1) * 1.1, 6, 12);
+      const arrowLength = clamp(magnitude * ARROW_PX_PER_NEWTON, ARROW_MIN_PX, ARROW_MAX_PX);
+      const headLength = clamp(arrowLength * 0.3, 7, 18);
+      const lineWidth = 7;
+      // 吸引时两条箭头分到上下两条平行线上，避免在中间交叉重叠。
+      const y1 = attract ? g.arrowY - ARROW_LANE_OFFSET : g.arrowY;
+      const y2 = attract ? g.arrowY + ARROW_LANE_OFFSET : g.arrowY;
 
       ctx.save();
       ctx.setLineDash([8, 8]);
@@ -775,24 +834,27 @@
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x1, g.chargeY - r1 - 4);
-      ctx.lineTo(x1, y);
+      ctx.lineTo(x1, y1);
       ctx.moveTo(x2, g.chargeY - r2 - 4);
-      ctx.lineTo(x2, y);
+      ctx.lineTo(x2, y2);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
 
-      drawArrow(x1, y, x1 + dir1 * arrowLength, y, "#ffffff", lineWidth);
-      drawArrow(x2, y, x2 + dir2 * arrowLength, y, "#ffffff", lineWidth);
+      // 圆头线帽会让笔画向起点外多出 lineWidth/2，先把起点内缩同样的量，
+      // 这样屏幕上量到的箭头可见长度就严格等于 arrowLength = F × 0.20 px（成正比的硬保证）。
+      const tailInset = lineWidth / 2;
+      drawArrow(x1 + dir1 * tailInset, y1, x1 + dir1 * arrowLength, y1, "#ffffff", lineWidth, headLength);
+      drawArrow(x2 + dir2 * tailInset, y2, x2 + dir2 * arrowLength, y2, "#ffffff", lineWidth, headLength);
 
       if (controls.showForceValues.checked) {
         ctx.save();
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 21px Arial";
+        ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
-        ctx.fillText(`q1 受力 = ${formatForce(magnitude)}`, x1, y - 22);
-        ctx.fillText(`q2 受力 = ${formatForce(magnitude)}`, x2, y - 22);
+        ctx.fillText(`q1 受力 = ${formatForce(magnitude)}`, x1, y1 - 14);
+        ctx.fillText(`q2 受力 = ${formatForce(magnitude)}`, x2, y2 - 14);
         ctx.restore();
       }
     }
@@ -814,24 +876,6 @@
       const r1 = drawCharge(x1, g.chargeY, state.q1, "q1");
       const r2 = drawCharge(x2, g.chargeY, state.q2, "q2");
       drawForceArrows(x1, x2, r1, r2);
-    }
-
-    function applyLockedDistance(moved) {
-      if (!state.lockDistance) return;
-      const d = state.lockedDistance;
-      if (moved === "q1") {
-        const direction = state.x2 >= state.x1 ? 1 : -1;
-        state.x2 = clamp(state.x1 + direction * d, 0.5, 9.5);
-        if (Math.abs(state.x2 - state.x1) < MIN_DISTANCE_CM) {
-          state.x1 = clamp(state.x2 - direction * d, 0.5, 9.5);
-        }
-      } else {
-        const direction = state.x2 >= state.x1 ? 1 : -1;
-        state.x1 = clamp(state.x2 - direction * d, 0.5, 9.5);
-        if (Math.abs(state.x2 - state.x1) < MIN_DISTANCE_CM) {
-          state.x2 = clamp(state.x1 + direction * d, 0.5, 9.5);
-        }
-      }
     }
 
     function syncControlsFromState() {
@@ -875,19 +919,40 @@
     }
 
     function setPosition(which, value) {
-      const pos = clamp(Number(value) || 0.5, 0.5, 9.5);
-      if (which === "x1") {
-        state.x1 = pos;
-        if (Math.abs(state.x2 - state.x1) < MIN_DISTANCE_CM) {
-          state.x2 = clamp(state.x1 + MIN_DISTANCE_CM, 0.5, 9.5);
+      const other = which === "x1" ? "x2" : "x1";
+      const pos = clamp(Number(value) || MIN_POSITION_CM, MIN_POSITION_CM, MAX_POSITION_CM);
+      const sideToOther = Math.sign(state[other] - state[which]) || 1;
+
+      if (state.lockDistance) {
+        // 保持距离：让另一电荷跟随，边界处改为挡住被拖电荷。
+        const gap = Math.max(state.lockedDistance, MIN_DISTANCE_CM);
+        let otherPos = pos + sideToOther * gap;
+        let nextSelf = pos;
+        if (otherPos > MAX_POSITION_CM) {
+          otherPos = MAX_POSITION_CM;
+          nextSelf = MAX_POSITION_CM - gap;
+        } else if (otherPos < MIN_POSITION_CM) {
+          otherPos = MIN_POSITION_CM;
+          nextSelf = MIN_POSITION_CM + gap;
         }
-        applyLockedDistance("q1");
+        state[which] = nextSelf;
+        state[other] = otherPos;
+      } else if (Math.abs(state[other] - pos) < MIN_DISTANCE_CM) {
+        // 目标位置会突破最小间距：先把另一电荷推到 0.6 cm 外；若顶到边界，
+        // 就把被拖电荷挡回来，保证画面间距 = distanceCm() = 受力计算用的 r。
+        let otherPos = pos + sideToOther * MIN_DISTANCE_CM;
+        let nextSelf = pos;
+        if (otherPos > MAX_POSITION_CM) {
+          otherPos = MAX_POSITION_CM;
+          nextSelf = MAX_POSITION_CM - MIN_DISTANCE_CM;
+        } else if (otherPos < MIN_POSITION_CM) {
+          otherPos = MIN_POSITION_CM;
+          nextSelf = MIN_POSITION_CM + MIN_DISTANCE_CM;
+        }
+        state[which] = nextSelf;
+        state[other] = otherPos;
       } else {
-        state.x2 = pos;
-        if (Math.abs(state.x2 - state.x1) < MIN_DISTANCE_CM) {
-          state.x1 = clamp(state.x2 - MIN_DISTANCE_CM, 0.5, 9.5);
-        }
-        applyLockedDistance("q2");
+        state[which] = pos;
       }
       render();
     }
@@ -906,12 +971,11 @@
       const g = stageGeometry();
       const x1 = cmToX(state.x1);
       const x2 = cmToX(state.x2);
-      const radius1 = 50;
-      const radius2 = 50;
+      const hitRadius = CHARGE_RADIUS + 8;
       const d1 = Math.hypot(point.x - x1, point.y - g.chargeY);
       const d2 = Math.hypot(point.x - x2, point.y - g.chargeY);
-      if (d1 <= radius1) return "x1";
-      if (d2 <= radius2) return "x2";
+      if (d1 <= hitRadius && d1 <= d2) return "x1";
+      if (d2 <= hitRadius) return "x2";
       return null;
     }
 

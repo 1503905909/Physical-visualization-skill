@@ -114,6 +114,27 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
     }
 
+    .stage-alert {
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      max-width: calc(100% - 36px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: rgba(10, 13, 20, 0.9);
+      border: 1px solid rgba(255, 209, 102, 0.85);
+      color: #ffd166;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: center;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    }
+
+    .stage-alert[hidden] { display: none; }
+
     .side-panel { padding: 14px; }
     .side-panel h2, .control-panel h2, .inquiry-panel h2 { margin: 0 0 12px; font-size: 18px; }
 
@@ -191,7 +212,7 @@
     <header class="topbar">
       <div>
         <h1>回旋加速器可视化资源</h1>
-        <p class="subtitle">观察粒子在 D 形盒中受磁场偏转、在缝隙中受电场加速，理解半径增大与周期不随速率改变的近似条件。</p>
+        <p class="subtitle">观察粒子在 D 形盒中受磁场偏转、在缝隙中受电场加速，理解 r ∝ √n 与周期不随速率改变的近似条件。</p>
       </div>
       <div class="formula">r = mv / qB，T = 2πm / qB，ΔE<sub>k</sub> = qU</div>
     </header>
@@ -203,9 +224,10 @@
             <canvas id="cyclotronCanvas" width="960" height="540"></canvas>
             <div class="stage-readout">
               <div class="readout-item">粒子：<span id="stageParticle">质子</span></div>
-              <div class="readout-item">加速次数：<span id="stageBoosts">0</span></div>
+              <div class="readout-item">加速次数：<span id="stageBoosts">0 / 10</span></div>
               <div class="readout-item">状态：<span id="stageStatus">暂停</span></div>
             </div>
+            <div class="stage-alert" id="stageAlert" hidden></div>
           </div>
         </section>
 
@@ -230,7 +252,7 @@
                 <button type="button" class="particle-btn active" data-particle="proton">质子</button>
                 <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
               </div>
-              <p class="hint">用相对 q/m 表示差异，便于课堂比较半径和周期。</p>
+              <p class="hint">用相对 q/m 表示差异：质子 m/q = 1，α 粒子 m/q = 2（半径 √2 倍、周期 2 倍）。</p>
             </div>
 
             <div class="control-block">
@@ -260,20 +282,23 @@
       <aside class="side-panel" aria-label="资源说明">
         <h2>资源说明</h2>
         <div class="metric">
-          <div class="metric-label">半径变化</div>
-          <div class="metric-value neutral" id="radiusValue">逐步增大</div>
+          <div class="metric-label">半径变化（末端 / 初始）</div>
+          <div class="metric-value neutral" id="radiusValue">r末 / r₁ = 3.16</div>
+          <div class="metric-note" id="radiusNote"></div>
         </div>
         <div class="metric">
           <div class="metric-label">周期关系</div>
-          <div class="metric-value" id="periodValue">T ∝ m / qB</div>
+          <div class="metric-value" id="periodValue">T = 2πm / qB</div>
+          <div class="metric-note" id="periodNote"></div>
         </div>
         <div class="metric">
           <div class="metric-label">能量增量</div>
-          <div class="metric-value" id="energyValue">每次过缝隙增加 qU</div>
+          <div class="metric-value" id="energyValue">ΔE<sub>k</sub> = qU</div>
+          <div class="metric-note" id="energyNote"></div>
         </div>
         <div class="metric">
           <div class="metric-label">模型假设</div>
-          <div class="metric-note">采用非相对论、匀强磁场、缝隙电场瞬时加速的简化模型，适合对应高中教材中的工作原理分析。</div>
+          <div class="metric-note" id="modelNote">非相对论、匀强磁场、薄缝瞬时加速的简化模型。缝隙内无磁场、仅电场；进入 D 形盒后磁场使其做半圆运动。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</div>
         </div>
       </aside>
     </section>
@@ -299,9 +324,13 @@
       stageParticle: document.getElementById("stageParticle"),
       stageBoosts: document.getElementById("stageBoosts"),
       stageStatus: document.getElementById("stageStatus"),
+      stageAlert: document.getElementById("stageAlert"),
       radiusValue: document.getElementById("radiusValue"),
+      radiusNote: document.getElementById("radiusNote"),
       periodValue: document.getElementById("periodValue"),
-      energyValue: document.getElementById("energyValue")
+      periodNote: document.getElementById("periodNote"),
+      energyValue: document.getElementById("energyValue"),
+      energyNote: document.getElementById("energyNote")
     };
 
     const PARTICLES = {
@@ -309,69 +338,115 @@
       alpha: { name: "α 粒子", q: 2, m: 4, color: "#ff7a2f", label: "2+" }
     };
 
+    /* 舞台几何：D 形盒中心、半径与缝隙宽度（画布坐标 960×540） */
+    const GEOM = { cx: 480, cy: 276, radius: 214, gap: 46 };
+
+    /* 轨道允许到达的“D 形盒可用半径”：留 14 px 安全边距，防止轨道压到盒壁 */
+    const R_AVAIL = GEOM.radius - 14;      // = 200 px
+    const TARGET_PASSES = 10;              // 期望最多显示的加速次数
+
+    /* 显示比例系数：r_px = R_SCALE · √(n·U·m/q) / B。
+       只允许整体缩放 —— 不含任何固定偏置，保证 r_n ∝ √n、∝√U、∝√(m/q)、∝1/B。
+       取值由默认质子（B=1.2、U=1.5、m/q=1）第 10 次加速后半径 = 190 px 定标：
+       R_SCALE = 190 × 1.2 / √(10 × 1.5) ≈ 58.87 */
+    const R_SCALE = (190 * 1.2) / Math.sqrt(10 * 1.5);
+
+    /* v 箭头长度 = V_SCALE · √(2nqU/m) ∝ v，同样只整体缩放、无偏置 */
+    const V_SCALE = 12.8;
+
+    /* 动画：每半圈用时 ∝ m/(qB)，即角速度 ∝ qB/m（默认质子 B=1.2 时约 1.44 半圈/秒） */
+    const ANIM_K = 1.2;
+
     const state = {
       B: 1.2,
       U: 1.5,
       particle: "proton",
       playing: false,
-      progress: 0
+      pass: 0            // 已完成的半圈数（浮点，半圈为单位）
     };
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
     }
 
-    function stage() {
-      return { cx: 480, cy: 276, radius: 214, gap: 46 };
+    function num(value) {
+      return String(Math.round(value * 100) / 100);
     }
 
-    function particle() {
+    function particleDef() {
       return PARTICLES[state.particle];
     }
 
-    function modelValues() {
-      const p = particle();
-      const qOverM = p.q / p.m;
-      const passCount = 10;
-      const baseRadius = 24;
-      const radiusScale = 34;
-      const radii = [];
-      for (let i = 1; i <= passCount + 1; i += 1) {
-        radii.push(clamp(baseRadius + radiusScale * Math.sqrt(i * state.U / qOverM) / state.B, 34, 202));
-      }
-      const maxRadius = radii[radii.length - 1];
-      const finalSpeed = Math.sqrt(2 * p.q * state.U * passCount / p.m);
-      const period = p.m / (p.q * state.B);
-      return { qOverM, passCount, radii, maxRadius, finalSpeed, period };
-    }
+    /* 物理模型：r_n = R_SCALE·√(n·U·m/q)/B，n = 过缝隙次数（每次 +qU）。
+       半径一旦会超过可用半径就不再加速，而不是把多个半径 clamp 成同一个值。 */
+    function buildScene() {
+      const p = particleDef();
+      const mOverQ = p.m / p.q;
+      const radiusOf = n => (R_SCALE * Math.sqrt(n * state.U * mOverQ)) / state.B;
 
-    function orbitPointByPass(passFloat) {
-      const s = stage();
-      const values = modelValues();
-      const pass = clamp(passFloat, 0, values.passCount);
-      const segment = Math.min(Math.floor(pass), values.passCount - 1);
-      const local = pass - segment;
-      const r = values.radii[segment];
-      const clockwiseInRightDee = segment % 2 === 0;
-      const theta = clockwiseInRightDee
-        ? -Math.PI / 2 + local * Math.PI
-        : Math.PI / 2 + local * Math.PI;
+      let passCount = 1;
+      while (passCount < TARGET_PASSES && radiusOf(passCount + 1) <= R_AVAIL) {
+        passCount += 1;
+      }
+
+      const radii = [];
+      for (let n = 1; n <= passCount; n += 1) radii.push(radiusOf(n));
+
+      /* 半圆逐段首尾相接：第 k 段从缝线上 y_k 处以水平速度出发，
+         圆心在速度方向右侧 90°（屏幕坐标 y 向下，正电荷 + B 出屏 → 顺时针），
+         半径 r_k，走过半圈后回到缝线 y_k ± 2r_k；下一段从同一点继续。
+         于是相邻两段端点严格重合，缝隙处不会再出现竖直跳变。 */
+      const arcs = [];
+      let y = 0;
+      for (let k = 0; k < passCount; k += 1) {
+        const r = radii[k];
+        const isRight = k % 2 === 0;
+        const centerY = isRight ? y + r : y - r;
+        const endY = isRight ? y + 2 * r : y - 2 * r;
+        arcs.push({ r, isRight, centerY, startY: y, endY });
+        y = endY;
+      }
+
+      let minY = 0;
+      let maxY = 0;
+      arcs.forEach(arc => {
+        minY = Math.min(minY, arc.endY);
+        maxY = Math.max(maxY, arc.endY);
+      });
+      const midY = (minY + maxY) / 2;   // 整体平移量（只平移，不改变任何半径）
+
       return {
-        x: s.cx + r * Math.cos(theta),
-        y: s.cy + r * Math.sin(theta),
-        r,
-        segment,
-        local,
-        theta
+        p,
+        passCount,
+        radii,
+        arcs,
+        midY,
+        hitLimit: passCount < TARGET_PASSES,
+        minRadius: radii[0],
+        maxRadius: radii[passCount - 1]
       };
     }
 
-    function currentPass() {
-      return modelValues().passCount * clamp(state.progress, 0, 1);
-    }
-
-    function currentPoint() {
-      return orbitPointByPass(currentPass());
+    /* 半圈连续的参数化：passFloat∈[0, passCount]，k 为段号，t 为该段内进度 */
+    function arcPoint(scene, passFloat) {
+      const total = scene.passCount;
+      const pass = clamp(passFloat, 0, total);
+      const k = Math.min(Math.floor(pass), total - 1);
+      const t = pass - k;
+      const arc = scene.arcs[k];
+      const baseAngle = arc.isRight ? -Math.PI / 2 : Math.PI / 2;
+      const angle = baseAngle + t * Math.PI;
+      const acy = GEOM.cy + (arc.centerY - scene.midY);
+      return {
+        x: GEOM.cx + arc.r * Math.cos(angle),
+        y: acy + arc.r * Math.sin(angle),
+        r: arc.r,
+        k,
+        t,
+        angle,
+        acx: GEOM.cx,
+        acy
+      };
     }
 
     function drawArrow(x1, y1, x2, y2, color, width = 3, headLength = 10) {
@@ -395,111 +470,133 @@
     }
 
     function drawCyclotronBody() {
-      const s = stage();
+      const { cx, cy, radius, gap } = GEOM;
       ctx.save();
       ctx.fillStyle = "#080a0e";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       if (controls.showBField.checked) {
-        ctx.fillStyle = "rgba(255,255,255,0.28)";
         ctx.font = "bold 16px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        for (let y = s.cy - 180; y <= s.cy + 180; y += 46) {
-          for (let x = s.cx - 240; x <= s.cx + 240; x += 52) {
-            if (Math.hypot(x - s.cx, y - s.cy) < s.radius - 10 && Math.abs(x - s.cx) > s.gap / 2 + 6) {
+        for (let y = cy - 180; y <= cy + 180; y += 46) {
+          for (let x = cx - 240; x <= cx + 240; x += 52) {
+            /* 缝隙内不画磁场点：缝隙内无磁场，只有电场 */
+            if (Math.hypot(x - cx, y - cy) < radius - 10 && Math.abs(x - cx) > gap / 2 + 6) {
               ctx.beginPath();
               ctx.arc(x, y, 7, 0, Math.PI * 2);
               ctx.strokeStyle = "rgba(255,255,255,0.22)";
               ctx.lineWidth = 1.4;
               ctx.stroke();
+              ctx.fillStyle = "rgba(255,255,255,0.28)";
               ctx.fillText("·", x, y - 1);
             }
           }
         }
       }
 
-      const leftGradient = ctx.createLinearGradient(s.cx - s.radius, s.cy, s.cx, s.cy);
+      const leftGradient = ctx.createLinearGradient(cx - radius, cy, cx, cy);
       leftGradient.addColorStop(0, "rgba(35,51,79,0.95)");
       leftGradient.addColorStop(1, "rgba(17,24,39,0.96)");
-      const rightGradient = ctx.createLinearGradient(s.cx, s.cy, s.cx + s.radius, s.cy);
+      const rightGradient = ctx.createLinearGradient(cx, cy, cx + radius, cy);
       rightGradient.addColorStop(0, "rgba(17,24,39,0.96)");
       rightGradient.addColorStop(1, "rgba(35,51,79,0.95)");
 
       ctx.fillStyle = leftGradient;
       ctx.beginPath();
-      ctx.moveTo(s.cx - s.gap / 2, s.cy - s.radius);
-      ctx.arc(s.cx - s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, true);
+      ctx.moveTo(cx - gap / 2, cy - radius);
+      ctx.arc(cx - gap / 2, cy, radius, -Math.PI / 2, Math.PI / 2, true);
       ctx.closePath();
       ctx.fill();
 
       ctx.fillStyle = rightGradient;
       ctx.beginPath();
-      ctx.moveTo(s.cx + s.gap / 2, s.cy - s.radius);
-      ctx.arc(s.cx + s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, false);
+      ctx.moveTo(cx + gap / 2, cy - radius);
+      ctx.arc(cx + gap / 2, cy, radius, -Math.PI / 2, Math.PI / 2, false);
       ctx.closePath();
       ctx.fill();
 
       ctx.strokeStyle = "rgba(255,255,255,0.72)";
       ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(s.cx - s.gap / 2, s.cy - s.radius);
-      ctx.arc(s.cx - s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, true);
-      ctx.lineTo(s.cx - s.gap / 2, s.cy - s.radius);
+      ctx.moveTo(cx - gap / 2, cy - radius);
+      ctx.arc(cx - gap / 2, cy, radius, -Math.PI / 2, Math.PI / 2, true);
+      ctx.lineTo(cx - gap / 2, cy - radius);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(s.cx + s.gap / 2, s.cy - s.radius);
-      ctx.arc(s.cx + s.gap / 2, s.cy, s.radius, -Math.PI / 2, Math.PI / 2, false);
-      ctx.lineTo(s.cx + s.gap / 2, s.cy - s.radius);
+      ctx.moveTo(cx + gap / 2, cy - radius);
+      ctx.arc(cx + gap / 2, cy, radius, -Math.PI / 2, Math.PI / 2, false);
+      ctx.lineTo(cx + gap / 2, cy - radius);
       ctx.stroke();
 
       ctx.fillStyle = "rgba(255,209,102,0.13)";
-      ctx.fillRect(s.cx - s.gap / 2, s.cy - s.radius + 18, s.gap, s.radius * 2 - 36);
+      ctx.fillRect(cx - gap / 2, cy - radius + 18, gap, radius * 2 - 36);
       ctx.strokeStyle = "rgba(255,209,102,0.75)";
       ctx.setLineDash([8, 8]);
-      ctx.strokeRect(s.cx - s.gap / 2, s.cy - s.radius + 18, s.gap, s.radius * 2 - 36);
+      ctx.strokeRect(cx - gap / 2, cy - radius + 18, gap, radius * 2 - 36);
       ctx.setLineDash([]);
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 20px Microsoft YaHei, Arial";
       ctx.textAlign = "center";
-      ctx.fillText("D₁", s.cx - 128, s.cy - 180);
-      ctx.fillText("D₂", s.cx + 128, s.cy - 180);
+      ctx.textBaseline = "middle";
+      ctx.fillText("D₁", cx - 128, cy - 180);
+      ctx.fillText("D₂", cx + 128, cy - 180);
       ctx.font = "bold 18px Microsoft YaHei, Arial";
-      ctx.fillText("匀强磁场 B 垂直屏面向外", s.cx, 58);
-      ctx.fillStyle = "#ffd166";
-      ctx.fillText("缝隙电场周期性反向", s.cx, s.cy + s.radius + 34);
+      ctx.fillText("匀强磁场 B 垂直屏面向外", cx, 58);
       ctx.restore();
     }
 
-    function drawGapField() {
-      const s = stage();
-      const pass = currentPass();
-      const cycle = Math.floor(pass);
-      const toRight = cycle % 2 === 0;
-      const flash = Math.abs(pass - Math.round(pass)) < 0.08 ? 1 : 0.45;
+    /* 缝隙内标注：无磁场，仅电场（竖排放在缝隙带中央） */
+    function drawGapLabel() {
       ctx.save();
-      ctx.globalAlpha = flash;
-      for (let y = s.cy - 110; y <= s.cy + 110; y += 55) {
-        if (toRight) drawArrow(s.cx - 20, y, s.cx + 20, y, "#ffd166", 4, 12);
-        else drawArrow(s.cx + 20, y, s.cx - 20, y, "#ffd166", 4, 12);
+      ctx.translate(GEOM.cx, GEOM.cy + 118);
+      ctx.rotate(-Math.PI / 2);
+      const w = 136;
+      const h = 24;
+      ctx.fillStyle = "rgba(8,10,14,0.9)";
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.strokeStyle = "rgba(255,209,102,0.7)";
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.fillStyle = "#ffd166";
+      ctx.font = "bold 14px Microsoft YaHei, Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("缝隙内：无磁场，仅电场", 0, 1);
+      ctx.restore();
+    }
+
+    function drawGapField(scene) {
+      const point = arcPoint(scene, state.pass);
+      /* 电场每半圈反向：半圈前半段与“进入本段时的加速方向”一致，
+         半圈中点反向，正好为下一次过缝加速 */
+      const isRightArc = point.k % 2 === 0;
+      const flipped = point.t > 0.5;
+      const toRight = isRightArc ? !flipped : flipped;
+      const nearGapCrossing = point.t < 0.1 || point.t > 0.9;
+
+      ctx.save();
+      ctx.globalAlpha = nearGapCrossing ? 1 : 0.5;
+      for (let y = GEOM.cy - 110; y <= GEOM.cy + 110; y += 55) {
+        if (toRight) drawArrow(GEOM.cx - 20, y, GEOM.cx + 20, y, "#ffd166", 4, 12);
+        else drawArrow(GEOM.cx + 20, y, GEOM.cx - 20, y, "#ffd166", 4, 12);
       }
       ctx.restore();
     }
 
-    function drawPath() {
-      const values = modelValues();
-      const stepsPerHalf = 46;
+    function drawPath(scene) {
+      const stepsPerHalf = 48;
       ctx.save();
-      ctx.lineWidth = 3.4;
+      ctx.lineWidth = 3.2;
       ctx.strokeStyle = "#ffd166";
       ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.beginPath();
       let started = false;
-      for (let seg = 0; seg < values.passCount; seg += 1) {
+      for (let k = 0; k < scene.passCount; k += 1) {
         for (let i = 0; i <= stepsPerHalf; i += 1) {
-          const local = i / stepsPerHalf;
-          const p = orbitPointByPass(seg + local);
+          const p = arcPoint(scene, k + i / stepsPerHalf);
           if (!started) {
             ctx.moveTo(p.x, p.y);
             started = true;
@@ -510,27 +607,29 @@
       }
       ctx.stroke();
 
-      ctx.strokeStyle = "rgba(255,255,255,0.24)";
-      ctx.lineWidth = 1.5;
-      for (let i = 1; i <= values.passCount; i += 1) {
-        const p = orbitPointByPass(i);
+      /* 过缝点：相邻两段半圆的公共端点 */
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      for (let k = 0; k <= scene.passCount; k += 1) {
+        const p = arcPoint(scene, k);
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.restore();
     }
 
-    function drawParticleAndVectors() {
-      const pInfo = particle();
-      const point = currentPoint();
-      const inRightDee = point.segment % 2 === 0;
-      const tangentAngle = point.theta + Math.PI / 2;
-      const speed = 54 + point.r * 0.14;
-      const vx = Math.cos(tangentAngle);
-      const vy = Math.sin(tangentAngle);
-      const inwardX = (stage().cx - point.x) / point.r;
-      const inwardY = (stage().cy - point.y) / point.r;
+    function drawParticleAndVectors(scene) {
+      const pInfo = particleDef();
+      const point = arcPoint(scene, state.pass);
+      const passIndex = Math.min(scene.passCount, point.k + 1);
+      /* v = √(2nqU/m)：箭头长度严格 ∝ v（无固定偏置） */
+      const speedPhys = Math.sqrt((2 * passIndex * pInfo.q * state.U) / pInfo.m);
+      const vLen = V_SCALE * speedPhys;
+      const vx = -Math.sin(point.angle);
+      const vy = Math.cos(point.angle);
+      const fx = (point.acx - point.x) / point.r;   // 洛伦兹力指向本段圆心
+      const fy = (point.acy - point.y) / point.r;
+      const fLen = vLen * 0.62;                     // F = qvB ∝ v（同一 B 下比例固定）
 
       ctx.save();
       ctx.shadowColor = "rgba(255,209,102,0.45)";
@@ -551,46 +650,101 @@
       ctx.restore();
 
       if (controls.showVectors.checked) {
-        drawArrow(point.x, point.y, point.x + vx * speed, point.y + vy * speed, "rgba(255,255,255,0.9)", 4, 12);
-        drawArrow(point.x, point.y, point.x + inwardX * 60, point.y + inwardY * 60, "#7dd3fc", 4, 12);
+        drawArrow(point.x, point.y, point.x + vx * vLen, point.y + vy * vLen, "rgba(255,255,255,0.92)", 4, 11);
+        drawArrow(point.x, point.y, point.x + fx * fLen, point.y + fy * fLen, "#7dd3fc", 4, 11);
         ctx.save();
-        ctx.fillStyle = "#ffffff";
         ctx.font = "bold 16px Arial";
-        ctx.fillText("v", point.x + vx * (speed + 14), point.y + vy * (speed + 14));
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const labelV = Math.max(vLen, 26) + 12;
+        const labelF = Math.max(fLen, 26) + 12;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("v", point.x + vx * labelV, point.y + vy * labelV);
         ctx.fillStyle = "#7dd3fc";
-        ctx.fillText("F洛", point.x + inwardX * 78, point.y + inwardY * 78);
+        ctx.fillText("F洛", point.x + fx * labelF, point.y + fy * labelF);
         ctx.restore();
       }
     }
 
-    function updateOutputs() {
-      const p = particle();
-      const values = modelValues();
-      const boosts = Math.max(0, Math.floor(currentPass()));
+    function updateReadouts(scene) {
+      const p = particleDef();
+      const boosts = clamp(Math.ceil(state.pass - 1e-9), 0, scene.passCount);
+      const r1 = scene.minRadius;
+      const rEnd = scene.maxRadius;
+      const ratio = rEnd / r1;
+      const finished = state.pass >= scene.passCount - 1e-9;
+
       output.bValue.textContent = state.B.toFixed(1);
       output.uValue.textContent = state.U.toFixed(1);
       output.stageParticle.textContent = p.name;
-      output.stageBoosts.textContent = boosts.toString();
-      output.stageStatus.textContent = state.playing ? "播放" : "暂停";
-      output.radiusValue.textContent = `末端半径约为初始的 ${(values.maxRadius / values.radii[0]).toFixed(1)} 倍`;
-      output.periodValue.textContent = `相对周期 ${(values.period).toFixed(2)}；B 越大周期越短`;
-      output.energyValue.textContent = `每次约增加 ${p.q}q × ${state.U.toFixed(1)}U`;
+      output.stageBoosts.textContent = `${boosts} / ${scene.passCount}`;
+      output.stageStatus.textContent = state.playing
+        ? "播放"
+        : (finished ? (scene.hitLimit ? "已达最大半径" : "加速完成") : "暂停");
+
+      /* 半径：比值只用实际画出的最大半径（第 passCount 段），并给出 √n 参照 */
+      output.radiusValue.textContent = `r末 / r₁ = ${ratio.toFixed(2)}`;
+      const limitNote = scene.hitLimit
+        ? `；已达 D 形盒可用半径 ${R_AVAIL} px，加速在第 ${scene.passCount} 次后停止`
+        : "";
+      output.radiusNote.textContent =
+        `实际画出：r₁ = ${r1.toFixed(1)} px → 末段 r = ${rEnd.toFixed(1)} px（n = ${scene.passCount}）。`
+        + `r_n = 比例 × √(n·U·m/q)/B，纯 √n 模型应得 √${scene.passCount} = ${Math.sqrt(scene.passCount).toFixed(2)}`
+        + limitNote;
+
+      /* 周期：按 T = 2πm/(qB) 给值，并明确基准 T₀ */
+      const period = (2 * Math.PI * p.m) / (p.q * state.B);
+      const T0 = 2 * Math.PI;   // 质子（m = q = 1）、B = 1 时的周期基准
+      output.periodValue.textContent = `T = 2πm/(qB) = ${period.toFixed(2)}`;
+      output.periodNote.textContent =
+        `相对单位。基准 T₀ = 2π ≈ 6.28（质子、B = 1），故 T/T₀ = ${(period / T0).toFixed(2)} = m/(qB)；`
+        + `α 的 m/q = 2，同 B 下周期是质子的 2 倍`;
+
+      /* 能量：ΔE_k = qU，q 是电荷数，不与单位 q 混写 */
+      const dE = p.q * state.U;
+      output.energyValue.textContent = `ΔE_k = qU = ${num(dE)}（相对单位）`;
+      output.energyNote.textContent =
+        `每过一次缝隙增加 qU（电荷数 q：质子 1、α 2；当前 q = ${p.q}，U = ${state.U.toFixed(1)}）；`
+        + `已加速 ${boosts} 次，累计 E_k = ${num(boosts * dE)}`;
+
+      if (scene.hitLimit) {
+        output.stageAlert.hidden = false;
+        output.stageAlert.textContent = finished
+          ? `已达到最大半径（可用半径 ${R_AVAIL} px）：加速在第 ${scene.passCount} 次后停止`
+          : `已达到最大半径（可用半径 ${R_AVAIL} px）：本参数下最多加速 ${scene.passCount} 次`;
+      } else if (finished) {
+        output.stageAlert.hidden = false;
+        output.stageAlert.textContent =
+          `加速 ${scene.passCount} 次完成：末段半径 ${rEnd.toFixed(1)} px（可用半径 ${R_AVAIL} px）`;
+      } else {
+        output.stageAlert.hidden = true;
+      }
     }
 
     function render() {
-      updateOutputs();
+      const scene = buildScene();
+      if (state.pass > scene.passCount) state.pass = scene.passCount;
+      updateReadouts(scene);
       drawCyclotronBody();
-      drawGapField();
-      drawPath();
-      drawParticleAndVectors();
+      drawGapField(scene);
+      drawPath(scene);
+      drawGapLabel();
+      drawParticleAndVectors(scene);
     }
 
-    function animate() {
+    let lastTimestamp = 0;
+
+    function animate(timestamp) {
+      const dt = lastTimestamp ? Math.max(0, Math.min(0.05, (timestamp - lastTimestamp) / 1000)) : 0;
+      lastTimestamp = timestamp;
+
       if (state.playing) {
-        const speedFactor = 0.0028 + 0.0008 * state.B;
-        state.progress += speedFactor;
-        if (state.progress >= 1) {
-          state.progress = 1;
+        const scene = buildScene();
+        const p = particleDef();
+        const omegaScale = (p.q * state.B) / p.m;    // ∝ 1/T = qB/(2πm)
+        state.pass += ANIM_K * omegaScale * dt;
+        if (state.pass >= scene.passCount) {
+          state.pass = scene.passCount;
           state.playing = false;
           controls.playBtn.textContent = "播放";
         }
@@ -621,14 +775,15 @@
     });
 
     controls.playBtn.addEventListener("click", () => {
+      const scene = buildScene();
+      if (!state.playing && state.pass >= scene.passCount - 1e-9) state.pass = 0;
       state.playing = !state.playing;
       controls.playBtn.textContent = state.playing ? "暂停" : "播放";
-      if (state.progress >= 1) state.progress = 0;
       render();
     });
 
     controls.resetBtn.addEventListener("click", () => {
-      state.progress = 0;
+      state.pass = 0;
       state.playing = false;
       controls.playBtn.textContent = "播放";
       render();

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>点电荷电场线可视化资源</title>
+  <link rel="icon" href="data:," />
   <style>
     :root {
       --bg: #eef2f6;
@@ -115,7 +116,7 @@
       left: 16px;
       top: 14px;
       display: grid;
-      grid-template-columns: repeat(3, auto);
+      grid-template-columns: repeat(2, auto);
       gap: 8px;
       pointer-events: none;
     }
@@ -364,6 +365,7 @@
             <div class="stage-readout">
               <div class="readout-item">场景：<span id="stageScene">正点电荷</span></div>
               <div class="readout-item">电场线：<span id="stageDirection">向外发散</span></div>
+              <div class="readout-item">线条总数：<span id="stageCount">14 条</span></div>
               <div class="readout-item">试探电荷：<span id="stageTest">显示</span></div>
             </div>
           </div>
@@ -382,7 +384,7 @@
             <div class="control-block">
               <div class="control-title">电场线</div>
               <div class="field">
-                <label for="densitySlider"><span>线条数量</span><span id="densityValue">14 条</span></label>
+                <label for="densitySlider"><span>每个电荷线条数</span><span id="densityValue">14 条/电荷</span></label>
                 <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" />
               </div>
               <div class="field">
@@ -396,7 +398,7 @@
               <div class="toggles">
                 <label class="toggle">
                   <input type="checkbox" id="showVectors" checked />
-                  <span>显示背景场方向</span>
+                  <span>显示背景场方向（等长箭头）</span>
                 </label>
                 <label class="toggle">
                   <input type="checkbox" id="showTestCharge" checked />
@@ -407,11 +409,12 @@
                   <span>箭头流动提示</span>
                 </label>
               </div>
+              <p class="hint">背景短箭头等长，只表示该点电场方向，不表示场强大小。</p>
             </div>
 
             <div class="control-block">
               <div class="control-title">课堂操作</div>
-              <p class="hint">在画布中拖动黄色试探电荷，观察该点电场方向。电场线表示模型，不是真实存在的线。</p>
+              <p class="hint">在画布中拖动黄色试探电荷，观察该点电场方向（黄色 F 箭头长度固定，只表示方向，不表示受力大小）。电场线表示模型，不是真实存在的线。</p>
               <div class="reset-row">
                 <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
               </div>
@@ -470,6 +473,7 @@
       distanceValue: document.getElementById("distanceValue"),
       stageScene: document.getElementById("stageScene"),
       stageDirection: document.getElementById("stageDirection"),
+      stageCount: document.getElementById("stageCount"),
       stageTest: document.getElementById("stageTest"),
       sceneName: document.getElementById("sceneName"),
       fieldDirection: document.getElementById("fieldDirection"),
@@ -497,7 +501,7 @@
         direction: "从正电荷出发并终止于负电荷",
         stageDirection: "+Q → -Q",
         force: "沿电场线切线方向",
-        tip: "等量异种点电荷的电场线从正电荷出发，最终指向负电荷。负电荷右侧的线段表示从画面外绕回并终止于负电荷的场线。"
+        tip: "等量异种点电荷的电场线从正电荷出发，最终指向负电荷。部分场线在画面外绕回，同一条线被画布边缘截成两段，因此“线条总数”会多于每电荷条数；从画面边缘进入并终止于负电荷的线段就是这些绕回场线的另一端。"
       },
       samePositive: {
         name: "等量同种点电荷",
@@ -594,11 +598,6 @@
       return charges.some(c => Math.hypot(x - c.x, y - c.y) < radius);
     }
 
-    function inBounds(x, y) {
-      const b = worldBounds();
-      return x > b.xmin && x < b.xmax && y > b.ymin && y < b.ymax;
-    }
-
     function inIntegrationBounds(x, y) {
       return x > -13 && x < 13 && y > -8 && y < 8;
     }
@@ -640,32 +639,34 @@
       return point && Number.isFinite(point.x) && Number.isFinite(point.y);
     }
 
-    function drawArrowHeadOnPath(path, color, offset = 0) {
+    function drawArrowHeadOnPath(path, color, ratio = 0.5) {
       if (path.length < 12) return;
+      const points = path.map(worldToCanvas);
       const visible = [];
-      for (let i = 4; i < path.length - 5; i += 1) {
-        if (inBounds(path[i].x, path[i].y)) {
+      for (let i = 4; i < points.length - 5; i += 1) {
+        const p = points[i];
+        if (isFiniteCanvasPoint(p) && p.x >= 0 && p.x <= canvas.width && p.y >= 0 && p.y <= canvas.height) {
           visible.push(i);
         }
       }
       if (visible.length < 6) return;
-      const ratio = clamp(0.5 + offset, 0.28, 0.72);
-      const idx = visible[Math.floor((visible.length - 1) * ratio)];
-      const center = worldToCanvas(path[idx]);
+      const position = clamp(ratio, 0.04, 0.96);
+      const idx = visible[Math.min(visible.length - 1, Math.floor((visible.length - 1) * position))];
+      const center = points[idx];
       if (!isFiniteCanvasPoint(center)) return;
 
       let beforeIdx = idx;
       let afterIdx = idx;
       const targetDistance = 18;
       for (let i = idx - 1; i >= 0; i -= 1) {
-        const p = worldToCanvas(path[i]);
+        const p = points[i];
         if (isFiniteCanvasPoint(p) && Math.hypot(p.x - center.x, p.y - center.y) >= targetDistance) {
           beforeIdx = i;
           break;
         }
       }
-      for (let i = idx + 1; i < path.length; i += 1) {
-        const p = worldToCanvas(path[i]);
+      for (let i = idx + 1; i < points.length; i += 1) {
+        const p = points[i];
         if (isFiniteCanvasPoint(p) && Math.hypot(p.x - center.x, p.y - center.y) >= targetDistance) {
           afterIdx = i;
           break;
@@ -673,8 +674,8 @@
       }
       if (beforeIdx === idx || afterIdx === idx) return;
 
-      const p1 = worldToCanvas(path[beforeIdx]);
-      const p2 = worldToCanvas(path[afterIdx]);
+      const p1 = points[beforeIdx];
+      const p2 = points[afterIdx];
       if (!isFiniteCanvasPoint(p1) || !isFiniteCanvasPoint(p2)) return;
       if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 22) return;
       drawArrow(p1.x, p1.y, p2.x, p2.y, color, 2.35, 12);
@@ -802,10 +803,9 @@
           const e = fieldAt(x, y, charges);
           if (e.m < 0.0001) continue;
           const start = worldToCanvas({ x, y });
-          const strength = Math.log1p(e.m);
           const edgeFade = clamp(1 - (Math.abs(x) / 5.3) ** 2 - (Math.abs(y) / 3.1) ** 2, 0.15, 1);
-          const length = clamp(7 + strength * 8, 8, 24) * edgeFade;
-          const alpha = clamp(0.12 + strength * 0.08, 0.12, 0.32) * edgeFade;
+          const length = 16;
+          const alpha = 0.26 * edgeFade;
           const end = {
             x: start.x + (e.x / e.m) * length,
             y: start.y - (e.y / e.m) * length
@@ -816,66 +816,69 @@
       ctx.restore();
     }
 
+    function canvasHalfExtent() {
+      const b = worldBounds();
+      const sx = canvas.width / (b.xmax - b.xmin);
+      const sy = canvas.height / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.92;
+      return { s, halfWidth: canvas.width / (2 * s), halfHeight: canvas.height / (2 * s) };
+    }
+
     function singleFieldLines(charges) {
       const charge = charges[0];
-      const count = state.density * 2;
-      const paths = [];
+      const count = state.density;
       const innerRadius = 0.42;
-      const outerRadius = 2.86;
-      const segments = 52;
+      const { halfWidth, halfHeight } = canvasHalfExtent();
+      const paths = [];
+      const segments = 96;
       for (let i = 0; i < count; i += 1) {
         const angle = (i / count) * Math.PI * 2;
         const dirX = Math.cos(angle);
         const dirY = Math.sin(angle);
+        const tx = Math.abs(dirX) > 1e-9 ? halfWidth / Math.abs(dirX) : Infinity;
+        const ty = Math.abs(dirY) > 1e-9 ? halfHeight / Math.abs(dirY) : Infinity;
+        const outerRadius = Math.min(tx, ty);
         const path = [];
         for (let j = 0; j <= segments; j += 1) {
-          const t = j / segments;
-          const radius = charge.q > 0
-            ? innerRadius + (outerRadius - innerRadius) * t
-            : outerRadius - (outerRadius - innerRadius) * t;
+          const radius = innerRadius + (outerRadius - innerRadius) * (j / segments);
           path.push({
             x: charge.x + dirX * radius,
             y: charge.y + dirY * radius
           });
+        }
+        if (charge.q < 0) {
+          path.reverse();
         }
         paths.push(path);
       }
       return paths;
     }
 
-    function pairFieldLines(charges) {
+    function dipoleFieldLines(charges) {
+      const positive = charges.find(c => c.q > 0);
+      const negative = charges.find(c => c.q < 0);
+      if (!positive || !negative) return [];
       const paths = [];
-      const positiveCharges = charges.filter(c => c.q > 0);
-      const seedCount = state.scene === "samePositive" ? state.density : Math.max(8, Math.round(state.density * 1.25));
-      for (const c of positiveCharges) {
-        const angles = seedAnglesForCharge(c, charges, seedCount);
-        for (const angle of angles) {
-          const start = {
-            x: c.x + Math.cos(angle) * 0.42,
-            y: c.y + Math.sin(angle) * 0.42
-          };
-          const path = integrateLine(start, charges, c, 1);
-          if (path.length > 12) paths.push(path);
+      const escapedSeeds = [];
+      const angles = seedAnglesForCharge(positive, charges, state.density);
+      for (const angle of angles) {
+        const start = {
+          x: positive.x + Math.cos(angle) * 0.42,
+          y: positive.y + Math.sin(angle) * 0.42
+        };
+        const path = integrateLine(start, charges, positive, 1);
+        if (path.length <= 12) continue;
+        paths.push(path);
+        const end = path[path.length - 1];
+        if (!reachedOppositeCharge(end.x, end.y, charges, positive)) {
+          escapedSeeds.push(angle);
         }
       }
-      if (state.scene === "dipole") {
-        paths.push(...dipoleOuterTerminalLines(charges));
-      }
-      return paths;
-    }
-
-    function dipoleOuterTerminalLines(charges) {
-      const negative = charges.find(c => c.q < 0);
-      if (!negative) return [];
-      const paths = [];
-      const count = Math.max(5, Math.round(state.density * 0.75));
-      const spread = Math.PI * 0.62;
-      for (let i = 0; i < count; i += 1) {
-        const t = count === 1 ? 0.5 : i / (count - 1);
-        const angle = -spread / 2 + t * spread;
+      for (const angle of escapedSeeds) {
+        const mirrorAngle = angle + Math.PI;
         const start = {
-          x: negative.x + Math.cos(angle) * 0.43,
-          y: negative.y + Math.sin(angle) * 0.43
+          x: negative.x + Math.cos(mirrorAngle) * 0.42,
+          y: negative.y + Math.sin(mirrorAngle) * 0.42
         };
         const path = integrateLine(start, charges, negative, -1);
         if (path.length > 16) {
@@ -885,14 +888,39 @@
       return paths;
     }
 
-    function drawFieldLines(charges) {
-      const paths = charges.length === 1
-        ? singleFieldLines(charges)
-        : pairFieldLines(charges);
-      const phase = controls.animateArrows.checked ? (Math.sin(state.time * 0.04) * 0.08) : 0;
+    function pairFieldLines(charges) {
+      if (state.scene === "dipole") return dipoleFieldLines(charges);
+      const paths = [];
+      const positiveCharges = charges.filter(c => c.q > 0);
+      for (const c of positiveCharges) {
+        for (const angle of seedAnglesForCharge(c, charges, state.density)) {
+          const start = {
+            x: c.x + Math.cos(angle) * 0.42,
+            y: c.y + Math.sin(angle) * 0.42
+          };
+          const path = integrateLine(start, charges, c, 1);
+          if (path.length > 12) paths.push(path);
+        }
+      }
+      return paths;
+    }
+
+    function buildFieldLines(charges) {
+      return charges.length === 1 ? singleFieldLines(charges) : pairFieldLines(charges);
+    }
+
+    function drawFieldLines(paths) {
+      const phase = controls.animateArrows.checked ? Math.sin(state.time * 0.04) * 0.06 : 0;
+      const radial = state.scene.startsWith("single");
       for (const path of paths) {
         drawWorldPath(path, "#f8fafc", 2.2, 0.78);
-        drawArrowHeadOnPath(path, "#f8fafc", phase);
+        if (radial) {
+          for (const ratio of [0.2, 0.5, 0.8]) {
+            drawArrowHeadOnPath(path, "#f8fafc", ratio + phase);
+          }
+        } else {
+          drawArrowHeadOnPath(path, "#f8fafc", 0.5 + phase);
+        }
       }
     }
 
@@ -925,14 +953,19 @@
       ctx.restore();
     }
 
+    function testDisplayPosition(charges) {
+      const test = state.test;
+      return {
+        x: test.x,
+        y: test.y + (isNearCharge(test.x, test.y, charges, 0.48) ? 0.15 : 0)
+      };
+    }
+
     function drawTestCharge(charges) {
       if (!controls.showTestCharge.checked) return;
       const test = state.test;
-      if (isNearCharge(test.x, test.y, charges, 0.48)) {
-        test.y += 0.15;
-      }
       const e = fieldAt(test.x, test.y, charges);
-      const p = worldToCanvas(test);
+      const p = worldToCanvas(testDisplayPosition(charges));
       ctx.save();
       ctx.fillStyle = "#ffd166";
       ctx.strokeStyle = "#ffffff";
@@ -990,9 +1023,10 @@
       ctx.restore();
     }
 
-    function updateOutputs() {
+    function updateOutputs(fieldLineCount) {
       const scene = SCENES[state.scene];
-      output.densityValue.textContent = `${state.density} 条`;
+      output.densityValue.textContent = `${state.density} 条/电荷`;
+      output.stageCount.textContent = `${fieldLineCount} 条`;
       output.distanceValue.textContent = state.scene.startsWith("single") ? "单电荷" : `${state.distance.toFixed(1)}`;
       output.stageScene.textContent = scene.name;
       output.stageDirection.textContent = scene.stageDirection;
@@ -1007,10 +1041,11 @@
 
     function render() {
       const charges = sceneCharges();
-      updateOutputs();
+      const paths = buildFieldLines(charges);
+      updateOutputs(paths.length);
       drawBackground();
       drawVectorGrid(charges);
-      drawFieldLines(charges);
+      drawFieldLines(paths);
       for (const c of charges) {
         drawCharge(c);
       }
@@ -1034,15 +1069,15 @@
       };
     }
 
-    function hitTestCharge(point) {
-      const p = worldToCanvas(state.test);
+    function hitTestCharge(point, charges) {
+      const p = worldToCanvas(testDisplayPosition(charges));
       return Math.hypot(point.x - p.x, point.y - p.y) < 28;
     }
 
     canvas.addEventListener("pointerdown", (event) => {
       if (!controls.showTestCharge.checked) return;
       const point = canvasPoint(event);
-      if (!hitTestCharge(point)) return;
+      if (!hitTestCharge(point, sceneCharges())) return;
       state.draggingTest = true;
       canvas.setPointerCapture(event.pointerId);
     });

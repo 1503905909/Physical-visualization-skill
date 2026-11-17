@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>带电粒子在匀强电场中的运动可视化资源</title>
+  <link rel="icon" href="data:," />
   <style>
     :root {
       --bg: #eef2f6;
@@ -180,6 +181,7 @@
                 <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示力和速度分解</span></label>
                 <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>显示运动分解参考</span></label>
               </div>
+              <p class="hint">力箭头长度随 qE/m 单调增大，v₀ 箭头长度与 v₀ 成正比；箭头仅示意相对大小，精确量值见右侧读数。</p>
               <div class="field">
                 <button type="button" class="primary-btn" id="playBtn">播放</button>
                 <button type="button" id="resetBtn">重置</button>
@@ -205,12 +207,13 @@
           <div class="metric-value" id="forceDirection">向下</div>
         </div>
         <div class="metric">
-          <div class="metric-label">离开电场时偏转</div>
+          <div class="metric-label" id="deflectionLabel">离开电场时偏转</div>
           <div class="metric-value neutral" id="deflectionValue">0.00</div>
+          <div class="metric-note" id="deflectionNote"></div>
         </div>
         <div class="metric">
           <div class="metric-label">运动分解</div>
-          <div class="metric-note" id="motionNote">水平方向近似匀速，竖直方向在电场力作用下做匀加速运动。</div>
+          <div class="metric-note" id="motionNote">水平方向匀速，竖直方向在电场力作用下做匀加速运动。</div>
         </div>
       </aside>
     </section>
@@ -239,7 +242,9 @@
       stageDeflection: document.getElementById("stageDeflection"),
       stageStatus: document.getElementById("stageStatus"),
       forceDirection: document.getElementById("forceDirection"),
+      deflectionLabel: document.getElementById("deflectionLabel"),
       deflectionValue: document.getElementById("deflectionValue"),
+      deflectionNote: document.getElementById("deflectionNote"),
       motionNote: document.getElementById("motionNote")
     };
 
@@ -252,12 +257,19 @@
       progress: 0
     };
 
+    const STAGE_WIDTH = 960;
+    const STAGE_HEIGHT = 540;
+    const PLATE = { left: 125, right: 835, top: 105, bottom: 435, midY: 270 };
+    const Y_SCALE = 135;
+    const HALF_GAP_PX = (PLATE.bottom - PLATE.top) / 2; // 165 px，极板内沿到中线的距离
+    const DEFLECTION_LIMIT = HALF_GAP_PX / Y_SCALE;    // 11/9 ≈ 1.2222（相对值）
+
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
     }
 
     function geometry() {
-      return { left: 125, right: 835, top: 105, bottom: 435, midY: 270 };
+      return PLATE;
     }
 
     function acceleration() {
@@ -269,15 +281,36 @@
       return 0.5 * acceleration() * Math.pow(t * T, 2);
     }
 
-    function finalDeflection() {
-      return deflectionAt(1);
+    // 解 |y(t) - midY| = 165 px，即 0.5·|a|·(t/v0)²·Y_SCALE = 165；
+    // 取 [0,1] 内最小的正根；无正根或根大于 1 时返回 null。
+    function collisionTime() {
+      const a = Math.abs(acceleration());
+      if (!(a > 0)) return null;
+      const t = state.v0 * Math.sqrt((2 * DEFLECTION_LIMIT) / a);
+      return Number.isFinite(t) && t > 0 ? t : null;
+    }
+
+    function getModel() {
+      const a = acceleration();
+      const rawHit = collisionTime();
+      const hitsPlate = rawHit !== null && rawHit <= 1;
+      const tEnd = hitsPlate ? rawHit : 1;
+      return {
+        a,
+        hitsPlate,
+        tHit: rawHit,
+        tEnd,
+        exitDeflection: deflectionAt(1),
+        endDeflection: deflectionAt(tEnd),
+        plate: hitsPlate ? (a > 0 ? "下极板" : "上极板") : null,
+        clipped: false
+      };
     }
 
     function pathPoint(t) {
       const g = geometry();
       const x = g.left + t * (g.right - g.left);
-      const yScale = 135;
-      const y = g.midY + deflectionAt(t) * yScale;
+      const y = g.midY + deflectionAt(t) * Y_SCALE;
       return { x, y };
     }
 
@@ -301,7 +334,64 @@
       ctx.restore();
     }
 
-    function drawStage() {
+    function roundRectPath(x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.arcTo(x + w, y, x + w, y + radius, radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+      ctx.lineTo(x + radius, y + h);
+      ctx.arcTo(x, y + h, x, y + h - radius, radius);
+      ctx.lineTo(x, y + radius);
+      ctx.arcTo(x, y, x + radius, y, radius);
+      ctx.closePath();
+    }
+
+    // 所有画布文字都经过这里，保证文字外框不会越出画布。
+    function clampedTextX(x, text, align) {
+      const pad = 10;
+      const width = ctx.measureText(text).width;
+      let left = x;
+      if (align === "center") left = x - width / 2;
+      else if (align === "right") left = x - width;
+      left = clamp(left, pad, Math.max(pad, STAGE_WIDTH - pad - width));
+      if (align === "center") return left + width / 2;
+      if (align === "right") return left + width;
+      return left;
+    }
+
+    function clampedTextY(y, fontSize) {
+      const pad = 8;
+      return clamp(y, pad + fontSize * 0.8, STAGE_HEIGHT - pad);
+    }
+
+    function drawTag(lines, x, y, color) {
+      ctx.save();
+      ctx.font = "bold 16px Microsoft YaHei, Arial";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      const padX = 9;
+      const padY = 7;
+      const lineH = 21;
+      const textW = Math.max(...lines.map(line => ctx.measureText(line).width));
+      const boxW = textW + padX * 2;
+      const boxH = lines.length * lineH + padY * 2;
+      const bx = clamp(x, 8, Math.max(8, STAGE_WIDTH - 8 - boxW));
+      const by = clamp(y, 8, Math.max(8, STAGE_HEIGHT - 8 - boxH));
+      ctx.fillStyle = "rgba(8,10,14,0.86)";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      roundRectPath(bx, by, boxW, boxH, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      lines.forEach((line, index) => ctx.fillText(line, bx + padX, by + padY + index * lineH));
+      ctx.restore();
+    }
+
+    function drawStage(m) {
       const g = geometry();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#080a0e";
@@ -327,26 +417,33 @@
       }
       ctx.restore();
 
-      drawPath();
-      drawParticle();
-      drawLabels();
+      drawPath(m);
+      drawParticle(m);
+      if (m.hitsPlate) drawImpact(m);
+      drawLabels(m);
     }
 
-    function drawPath() {
+    function drawPath(m) {
       const g = geometry();
       ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, canvas.width, canvas.height);
+      ctx.clip();
       ctx.strokeStyle = "#ffd166";
       ctx.lineWidth = 4;
       ctx.lineCap = "round";
       ctx.beginPath();
-      for (let i = 0; i <= 140; i += 1) {
-        const p = pathPoint(i / 140);
+      const steps = 160;
+      for (let i = 0; i <= steps; i += 1) {
+        const p = pathPoint(m.tEnd * (i / steps));
+        if (p.y < 0 || p.y > STAGE_HEIGHT) m.clipped = true;
         if (i === 0) ctx.moveTo(p.x, p.y);
         else ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
 
       if (controls.showGhosts.checked) {
+        const pEnd = pathPoint(m.tEnd);
         ctx.setLineDash([8, 8]);
         ctx.strokeStyle = "rgba(255,255,255,0.35)";
         ctx.lineWidth = 2;
@@ -354,18 +451,17 @@
         ctx.moveTo(g.left, g.midY);
         ctx.lineTo(g.right, g.midY);
         ctx.stroke();
-        const p = pathPoint(1);
         ctx.beginPath();
-        ctx.moveTo(g.right, g.midY);
-        ctx.lineTo(g.right, p.y);
+        ctx.moveTo(pEnd.x, g.midY);
+        ctx.lineTo(pEnd.x, pEnd.y);
         ctx.stroke();
         ctx.setLineDash([]);
       }
       ctx.restore();
     }
 
-    function drawParticle() {
-      const t = clamp(state.progress, 0, 1);
+    function drawParticle(m) {
+      const t = clamp(state.progress, 0, m.tEnd);
       const p = pathPoint(t);
       const color = state.charge > 0 ? "#ff3030" : "#5363ff";
       ctx.save();
@@ -387,61 +483,143 @@
       ctx.restore();
 
       if (controls.showVectors.checked) {
-        const forceSign = state.charge > 0 ? 1 : -1;
-        drawArrow(p.x, p.y, p.x, p.y + forceSign * 72, "#ffd166", 5, 15);
-        drawArrow(p.x, p.y, p.x + 74, p.y, "rgba(255,255,255,0.86)", 4, 12);
+        const forceSign = m.a >= 0 ? 1 : -1;
+        // F ∝ qE/m；线性映射，上限取「粒子贴到极板时到画布边缘的余量」（约 95 px），
+        // 使箭头在任何位置都能完整画出，渲染长度随 qE/m 严格单调。
+        const forceLength = clamp(28 + 16.5 * Math.abs(m.a), 28, 94);
+        const tipY = clamp(p.y + forceSign * forceLength, 6, STAGE_HEIGHT - 6);
+        // v₀ 箭头长度与 v₀ 严格成正比；系数保证粒子在出板处（x=right）也不越界。
+        const speedLength = 40 * state.v0;
+        const tipX = clamp(p.x + speedLength, 6, STAGE_WIDTH - 6);
+        drawArrow(p.x, p.y, p.x, tipY, "#ffd166", 5, 15);
+        drawArrow(p.x, p.y, tipX, p.y, "rgba(255,255,255,0.86)", 4, 12);
+
         ctx.save();
-        ctx.fillStyle = "#ffd166";
         ctx.font = "bold 18px Arial";
-        ctx.fillText("F=qE", p.x + 10, p.y + forceSign * 88);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ffd166";
+        const fLabel = "F=qE";
+        ctx.fillText(fLabel, clampedTextX(p.x + 46, fLabel, "center"), clampedTextY((p.y + tipY) / 2, 18));
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("v₀", p.x + 83, p.y - 8);
+        const vLabel = "v₀";
+        ctx.fillText(vLabel, clampedTextX((p.x + tipX) / 2, vLabel, "center"), clampedTextY(p.y - 18, 18));
         ctx.restore();
       }
     }
 
-    function drawLabels() {
+    function drawImpact(m) {
+      const p = pathPoint(m.tEnd);
+      const dir = m.a >= 0 ? 1 : -1;
+      ctx.save();
+      ctx.strokeStyle = "#ff5d5d";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 27, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (let i = 0; i < 4; i += 1) {
+        const angle = Math.PI / 4 + i * Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(angle) * 32, p.y + Math.sin(angle) * 32);
+        ctx.lineTo(p.x + Math.cos(angle) * 42, p.y + Math.sin(angle) * 42);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#ff5d5d";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y + dir * 14, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      const lines = [
+        `撞板点 t = ${m.tEnd.toFixed(2)}（x = ${m.tEnd.toFixed(2)}L）`,
+        `撞板时偏转 y = ${Math.abs(m.endDeflection).toFixed(2)}（相对值）`
+      ];
+      drawTag(lines, p.x + 48, dir > 0 ? p.y - 92 : p.y + 46, "#ff8a8a");
+    }
+
+    function drawLabels(m) {
       const g = geometry();
-      const p = pathPoint(1);
       ctx.save();
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.font = "bold 18px Microsoft YaHei, Arial";
       ctx.textAlign = "center";
-      ctx.fillText("水平：近似匀速运动", (g.left + g.right) / 2, g.bottom + 73);
-      ctx.fillText("竖直：在电场力作用下做匀加速运动", (g.left + g.right) / 2, 49);
-      ctx.fillStyle = "#ffd166";
-      ctx.textAlign = "left";
-      ctx.fillText(`偏转量 y ≈ ${Math.abs(finalDeflection()).toFixed(2)}`, g.right - 130, p.y + (p.y < g.midY ? -18 : 30));
+      ctx.textBaseline = "alphabetic";
+      const horizontalText = "水平：匀速运动";
+      const verticalText = "竖直：在电场力作用下做匀加速运动";
+      ctx.fillText(horizontalText, clampedTextX((g.left + g.right) / 2, horizontalText, "center"), clampedTextY(500, 18));
+      ctx.fillText(verticalText, clampedTextX((g.left + g.right) / 2, verticalText, "center"), clampedTextY(524, 18));
+
+      if (!m.hitsPlate) {
+        const pEnd = pathPoint(m.tEnd);
+        const label = `偏转量 y ≈ ${Math.abs(m.endDeflection).toFixed(2)}（相对值）`;
+        ctx.fillStyle = "#ffd166";
+        ctx.textAlign = "right";
+        const labelY = pEnd.y < g.midY ? pEnd.y - 18 : pEnd.y + 30;
+        ctx.fillText(label, clampedTextX(g.right - 10, label, "right"), clampedTextY(labelY, 18));
+      }
+
+      if (m.clipped) {
+        const warn = "轨迹已超出画布，仅显示可见部分";
+        ctx.fillStyle = "#ff8a8a";
+        ctx.textAlign = "center";
+        ctx.fillText(warn, clampedTextX(480, warn, "center"), clampedTextY(478, 18));
+      }
       ctx.restore();
     }
 
-    function updateOutputs() {
-      const def = finalDeflection();
+    function updateOutputs(m) {
       const forceText = state.charge > 0 ? "向下，与电场方向一致" : "向上，与电场方向相反";
       output.fieldValue.textContent = state.E.toFixed(1);
       output.speedValue.textContent = state.v0.toFixed(1);
       output.massValue.textContent = state.mass.toFixed(1);
       output.stageParticle.textContent = state.charge > 0 ? "正电荷" : "负电荷";
-      output.stageDeflection.textContent = Math.abs(def).toFixed(2);
-      output.stageStatus.textContent = state.playing ? "播放" : "暂停";
+      // 画布读数跟随粒子当前位置；到端点时恰好等于离开电场（或撞板）时的偏转量。
+      const progress = clamp(state.progress, 0, m.tEnd);
+      const atEnd = progress >= m.tEnd - 1e-6;
+      output.stageDeflection.textContent = `${Math.abs(m.endDeflection * (progress / m.tEnd) ** 2).toFixed(2)}（相对值）`;
       output.forceDirection.textContent = forceText;
       output.forceDirection.className = state.charge > 0 ? "metric-value positive" : "metric-value negative";
-      output.deflectionValue.textContent = `${Math.abs(def).toFixed(2)}（相对值）`;
-      output.motionNote.textContent = state.v0 > 1.8
+
+      if (!atEnd) {
+        output.stageStatus.textContent = "尚未离开电场（仍偏转中）";
+      } else if (m.hitsPlate) {
+        output.stageStatus.textContent = `已打到${m.plate}（t = ${m.tEnd.toFixed(2)}，未离开电场）`;
+      } else {
+        output.stageStatus.textContent = `离开电场时偏转 y = ${Math.abs(m.endDeflection).toFixed(2)}（相对值）`;
+      }
+
+      if (m.hitsPlate) {
+        output.deflectionLabel.textContent = "打到极板时偏转";
+        output.deflectionValue.textContent = `${Math.abs(m.endDeflection).toFixed(2)}（相对值）`;
+        output.deflectionNote.textContent = `t = ${m.tEnd.toFixed(2)}（x = ${m.tEnd.toFixed(2)}L）时打到${m.plate}，粒子未离开电场；该值为撞板瞬间的偏转量。`;
+      } else {
+        output.deflectionLabel.textContent = "离开电场时偏转";
+        output.deflectionValue.textContent = `${Math.abs(m.endDeflection).toFixed(2)}（相对值）`;
+        output.deflectionNote.textContent = "t = 1.00（x = L）时离开电场。";
+      }
+
+      const baseNote = state.v0 > 1.8
         ? "初速度较大，通过电场时间较短，因此偏转减小；本图上极板为正、下极板为负，电场方向向下。"
-        : "本图上极板为正、下极板为负，电场方向向下；粒子水平方向近似匀速，竖直方向在电场力作用下做匀加速运动。";
+        : "本图上极板为正、下极板为负，电场方向向下；粒子水平方向匀速，竖直方向在电场力作用下做匀加速运动。";
+      output.motionNote.textContent = m.hitsPlate
+        ? `${baseNote} 当前参数下粒子在 t = ${m.tEnd.toFixed(2)} 时打到${m.plate}，未离开电场。`
+        : baseNote;
     }
 
     function render() {
-      updateOutputs();
-      drawStage();
+      const m = getModel();
+      updateOutputs(m);
+      drawStage(m);
     }
 
     function animate() {
       if (state.playing) {
+        const m = getModel();
         state.progress += 0.0065;
-        if (state.progress >= 1) {
-          state.progress = 1;
+        if (state.progress >= m.tEnd) {
+          state.progress = m.tEnd;
           state.playing = false;
           controls.playBtn.textContent = "播放";
         }
@@ -465,7 +643,7 @@
     controls.playBtn.addEventListener("click", () => {
       state.playing = !state.playing;
       controls.playBtn.textContent = state.playing ? "暂停" : "播放";
-      if (state.progress >= 1) state.progress = 0;
+      if (state.progress >= getModel().tEnd) state.progress = 0;
       render();
     });
     controls.resetBtn.addEventListener("click", () => {
