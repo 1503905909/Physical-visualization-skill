@@ -217,8 +217,8 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "回旋加速器",
-      "tags": ["D 形盒", "缝隙直线加速", "30 秒"],
-      "desc": "30 秒带字幕讲解：缝内直线加速、盒内半圆偏转，半径 r ∝ √n 与周期 T = 2πm/(qB) 一屏一个知识点。",
+      "tags": ["D 形盒", "缝隙加速", "r ∝ √n"],
+      "desc": "46 秒带字幕讲解：缝内直线加速、盒内半圆偏转；从静止累计加速 n 次后 r ∝ √n，固定粒子与匀强磁场下周期 T = 2πm/(qB) 不随速度改变（非相对论）。",
       "path": ".github/skills/manim-physics-animator/examples/cyclotron.py",
       "scene": "CyclotronScene"
     },
