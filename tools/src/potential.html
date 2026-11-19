@@ -82,13 +82,12 @@
         <button data-scene="singlePositive" class="on">正点电荷</button>
         <button data-scene="singleNegative">负点电荷</button>
         <button data-scene="dipole">等量异种</button>
-        <button data-scene="samePositive">等量同种</button>
       </div>
     </div>
 
     <div class="grp">
       <p>参数</p>
-      <div class="row"><span>等势面层数</span><b id="lvTxt">7</b></div>
+      <div class="row"><span>等势线层数</span><b id="lvTxt">7</b></div>
       <input id="levels" type="range" min="3" max="13" step="2" value="7">
       <div class="row"><span>电势色阶</span><b id="scTxt">1.0</b></div>
       <input id="scale" type="range" min="0.5" max="2.5" step="0.1" value="1">
@@ -137,6 +136,13 @@
     document.getElementById('btn2d').classList.toggle('on', !is3d);
     document.querySelectorAll('#scenes button').forEach(b =>
       b.classList.toggle('on', b.dataset.scene === lab.state.scene));
+    // 滑块与状态同步（支持 ?levels=&scale= 直达）
+    const lvEl = document.getElementById('levels');
+    lvEl.value = lab.state.levels;
+    document.getElementById('lvTxt').textContent = lab.state.levels;
+    const scEl = document.getElementById('scale');
+    scEl.value = lab.state.scale;
+    document.getElementById('scTxt').textContent = (+lab.state.scale).toFixed(1);
   })();
 
   document.querySelectorAll('#scenes button').forEach(btn => {

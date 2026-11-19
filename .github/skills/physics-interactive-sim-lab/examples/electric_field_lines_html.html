@@ -406,11 +406,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const sceneKey0 = cfg.scene || "singlePositive";
     const qs = new URLSearchParams(location.search);
     let state = {
-      scene: (cfg.mode === "potential" && qs.get("scene") === "uniform") ? sceneKey0
+      scene: (cfg.mode === "potential" && (qs.get("scene") === "uniform" || qs.get("scene") === "samePositive")) ? sceneKey0
         : (SCENES[qs.get("scene")] ? qs.get("scene") : sceneKey0),
-      levels: 7,
+      levels: (function () { const v = parseInt(qs.get("levels"), 10); return v >= 3 && v <= 13 ? v : 7; })(),
       density: 12,
-      scale: 1,
+      scale: (function () { const v = parseFloat(qs.get("scale")); return v >= 0.5 && v <= 2.5 ? v : 1; })(),
       view: qs.get("view") === "3d" ? "3d" : "2d"
     };
 
@@ -706,7 +706,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           const y = -BOUND.y + (2 * BOUND.y * j) / NY;
           const v = softPotential(x, y);
           pos.push(x, y, ZMAX * Math.tanh(v * 1.55));
-          const t = Math.tanh(v * 1.4);
+          const t = Math.tanh(v * 1.4 * state.scale);
           const c = t >= 0
             ? cMid.clone().lerp(cPos, Math.min(1, t))
             : cMid.clone().lerp(cNeg, Math.min(1, -t));
@@ -1037,9 +1037,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
     function setScene(k) { state.scene = k; rebuildAll(); }
     function setView(v) { state.view = v; applyView(); }
-    function setLevels(n) { state.levels = n; buildEquipotential(); applyView(); }
+    function setLevels(n) { state.levels = n; buildEquipotential(); buildTerrain(); applyView(); }
     function setDensity(n) { state.density = n; buildFieldLines(); applyView(); }
-    function setScale(s) { state.scale = s; buildSlice(); applyView(); }
+    function setScale(s) { state.scale = s; buildSlice(); buildTerrain(); applyView(); }
     function setLayer(k, on) { layers[k] = on; applyView(); }
 
     function onResize() {

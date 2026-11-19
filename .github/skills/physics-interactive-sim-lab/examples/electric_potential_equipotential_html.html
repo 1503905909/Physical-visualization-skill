@@ -82,13 +82,12 @@
         <button data-scene="singlePositive" class="on">正点电荷</button>
         <button data-scene="singleNegative">负点电荷</button>
         <button data-scene="dipole">等量异种</button>
-        <button data-scene="samePositive">等量同种</button>
       </div>
     </div>
 
     <div class="grp">
       <p>参数</p>
-      <div class="row"><span>等势面层数</span><b id="lvTxt">7</b></div>
+      <div class="row"><span>等势线层数</span><b id="lvTxt">7</b></div>
       <input id="levels" type="range" min="3" max="13" step="2" value="7">
       <div class="row"><span>电势色阶</span><b id="scTxt">1.0</b></div>
       <input id="scale" type="range" min="0.5" max="2.5" step="0.1" value="1">
@@ -411,11 +410,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const sceneKey0 = cfg.scene || "singlePositive";
     const qs = new URLSearchParams(location.search);
     let state = {
-      scene: (cfg.mode === "potential" && qs.get("scene") === "uniform") ? sceneKey0
+      scene: (cfg.mode === "potential" && (qs.get("scene") === "uniform" || qs.get("scene") === "samePositive")) ? sceneKey0
         : (SCENES[qs.get("scene")] ? qs.get("scene") : sceneKey0),
-      levels: 7,
+      levels: (function () { const v = parseInt(qs.get("levels"), 10); return v >= 3 && v <= 13 ? v : 7; })(),
       density: 12,
-      scale: 1,
+      scale: (function () { const v = parseFloat(qs.get("scale")); return v >= 0.5 && v <= 2.5 ? v : 1; })(),
       view: qs.get("view") === "3d" ? "3d" : "2d"
     };
 
@@ -711,7 +710,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           const y = -BOUND.y + (2 * BOUND.y * j) / NY;
           const v = softPotential(x, y);
           pos.push(x, y, ZMAX * Math.tanh(v * 1.55));
-          const t = Math.tanh(v * 1.4);
+          const t = Math.tanh(v * 1.4 * state.scale);
           const c = t >= 0
             ? cMid.clone().lerp(cPos, Math.min(1, t))
             : cMid.clone().lerp(cNeg, Math.min(1, -t));
@@ -1042,9 +1041,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
     function setScene(k) { state.scene = k; rebuildAll(); }
     function setView(v) { state.view = v; applyView(); }
-    function setLevels(n) { state.levels = n; buildEquipotential(); applyView(); }
+    function setLevels(n) { state.levels = n; buildEquipotential(); buildTerrain(); applyView(); }
     function setDensity(n) { state.density = n; buildFieldLines(); applyView(); }
-    function setScale(s) { state.scale = s; buildSlice(); applyView(); }
+    function setScale(s) { state.scale = s; buildSlice(); buildTerrain(); applyView(); }
     function setLayer(k, on) { layers[k] = on; applyView(); }
 
     function onResize() {
@@ -1104,6 +1103,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     document.getElementById('btn2d').classList.toggle('on', !is3d);
     document.querySelectorAll('#scenes button').forEach(b =>
       b.classList.toggle('on', b.dataset.scene === lab.state.scene));
+    // 滑块与状态同步（支持 ?levels=&scale= 直达）
+    const lvEl = document.getElementById('levels');
+    lvEl.value = lab.state.levels;
+    document.getElementById('lvTxt').textContent = lab.state.levels;
+    const scEl = document.getElementById('scale');
+    scEl.value = lab.state.scale;
+    document.getElementById('scTxt').textContent = (+lab.state.scale).toFixed(1);
   })();
 
   document.querySelectorAll('#scenes button').forEach(btn => {
