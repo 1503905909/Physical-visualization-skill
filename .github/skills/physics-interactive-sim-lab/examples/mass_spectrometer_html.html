@@ -3,267 +3,298 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>质谱仪可视化资源</title>
   <link rel="icon" href="data:," />
+  <title>质谱仪可视化资源</title>
   <style>
     :root {
-      --accent: #0f766e;
-      --cyan: #7fd6e4;
+      --page: #f4f6f8;
+      --card: #ffffff;
+      --ink: #16232b;
+      --muted: #5d7480;
+      --line: #e3e8ec;
+      --stage: #0b141a;
+      --accent: #2f7f8f;
+      --amber: #b45309;
     }
 
-    *, *::before, *::after { box-sizing: border-box; }
+    * { box-sizing: border-box; }
 
     html, body { height: 100%; }
-    body { margin: 0; background: #070d11; overflow: hidden;
-           font: 14px/1.5 -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; color: #eaf2f5; }
+    body { margin: 0; background: var(--page); color: var(--ink); overflow: hidden;
+           font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+           -webkit-font-smoothing: antialiased; }
 
-    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+    /* —— 顶栏：白底，高 56px —— */
+    .topbar { height: 56px; display: flex; align-items: center; gap: 16px;
+              padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .brand { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .01em;
+             white-space: nowrap; }
 
-    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+    /* 读数条：白底小卡片，标签 + 深色加粗数值 */
+    .readout { margin-left: auto; display: flex; align-items: center; min-width: 0;
+               padding: 3px 2px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 1px 2px rgba(22, 35, 43, .05); }
+    .ro-item { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px;
+               font-size: 12.5px; white-space: nowrap; }
+    .ro-item + .ro-item { border-left: 1px solid #eef2f4; }
+    .ro-k { color: var(--muted); font-size: 12.5px; }
+    .ro-item b { color: var(--ink); font-size: 13.5px; font-weight: 700; }
+    .ro-item b.ok { color: #15803d; }
+    .ro-item b.amber { color: var(--amber); }
 
-    /* 16:9 等比舞台：同时受宽高约束 */
-    .stage-frame { position: relative; aspect-ratio: 16 / 9;
-                   width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+    .top-actions { margin-left: 4px; display: flex; gap: 8px; }
+    .top-btn { height: 30px; padding: 0 13px; border: 1px solid var(--line);
+               border-radius: 8px; background: var(--card); color: var(--ink);
+               font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1;
+               cursor: pointer; }
+    .top-btn:hover { background: #f7f9fa; border-color: #d5dde2; }
+    .top-btn.round { width: 30px; padding: 0; border-radius: 50%;
+                     color: var(--muted); font-weight: 700; font-size: 13px; }
+    .top-btn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #ffffff; }
 
+    /* —— 主体：左黑色画布窗口 + 右白色参数卡 —— */
+    .workspace { position: relative; height: calc(100vh - 56px); display: flex;
+                 align-items: flex-start; justify-content: center; gap: 18px;
+                 padding: 14px 20px 16px; }
+
+    /* 宽度 = min(72vw, (100vh - 150px) * 16 / 9)，写成只含 + 的等价式 */
+    .stage-column { flex: 0 0 auto; width: min(72vw, calc(177.78vh - 266.67px));
+                    display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9;
+                   overflow: hidden; background: var(--stage); border-radius: 14px;
+                   box-shadow: 0 14px 34px rgba(11, 20, 26, .2), 0 2px 6px rgba(11, 20, 26, .14); }
     .stage-frame > canvas { display: block; width: 100%; height: 100%; }
 
-    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
-           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
-           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+    .legend { display: flex; align-items: center; justify-content: center; gap: 18px;
+              padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 10px; font-size: 12px; color: var(--muted);
+              white-space: nowrap; overflow: hidden; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; }
+    .sw { display: inline-block; width: 16px; height: 3px; border-radius: 2px;
+          background: var(--ink); flex: 0 0 auto; }
+    .sw.dot { width: 9px; height: 9px; border-radius: 50%; border: 0; background: #ef4444; }
+    .sw.track { background: #22c55e; }
+    .sw.ghost { background: repeating-linear-gradient(90deg, #86efac 0 5px, transparent 5px 9px); }
+    .sw.rej { background: repeating-linear-gradient(90deg, #fb923c 0 4px, transparent 4px 8px); }
+    .sw.field { background: #e0a800; height: 3px; }
 
-    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
-                   padding: 6px 10px; font-size: 12.5px; }
-    .hud-readout b { font-size: 14px; color: var(--cyan); }
-    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
-    .hud-readout .chip + .chip { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.14); }
-    .hud-readout .k { font-size: 11px; color: #93aab4; }
-    .hud-readout b.ok { color: #4ade80; }
-    .hud-readout b.amber { color: #ffd166; }
+    /* —— 右侧参数卡：白底、圆角 12、细边框 —— */
+    .panel { flex: 0 0 auto; width: 280px; padding: 14px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 12px;
+             box-shadow: 0 1px 2px rgba(22, 35, 43, .04);
+             max-height: calc(100vh - 86px); overflow-y: auto; }
+    .group + .group { margin-top: 14px; }
+    .group-label { margin: 0 0 8px; color: #7c8d97; font-size: 12px; letter-spacing: .04em; }
 
-    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
-                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .hud-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-    .sw { display: inline-block; width: 16px; height: 4px; border-radius: 2px; flex: 0 0 auto; }
-    .sw-ion { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; }
-    .sw-track { background: #22c55e; }
-    .sw-ghost { background: repeating-linear-gradient(90deg, #86efac 0 5px, transparent 5px 9px); }
-    .sw-rej { background: repeating-linear-gradient(90deg, #fb923c 0 4px, transparent 4px 8px); }
-    .sw-field { height: 2px; background: #ffd166; }
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 8px; margin-top: 9px; color: var(--muted); font-size: 11.5px; }
+    .row b { color: var(--ink); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 4px 0 0;
+                          accent-color: var(--accent); background: transparent; cursor: pointer; }
 
-    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin;
-                 cursor: default; }
-    .hud-panel[hidden] { display: none; }
+    select { width: 100%; margin-top: 4px; padding: 5px 7px; font: inherit; font-size: 12.5px;
+             color: var(--ink); background: var(--card); border: 1px solid #dfe6ea;
+             border-radius: 8px; cursor: pointer; }
 
-    /* 首行拖拽把手：标题 + 折叠按钮；拖动改位置，双击标题折叠 */
-    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
-                             display: flex; align-items: center; justify-content: space-between;
-                             gap: 8px; margin: -2px 0 8px; }
-    .hud-panel .panel-grip:active { cursor: grabbing; }
-    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
-    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em;
-                              color: var(--cyan); }
-    .hud-panel .grip-btn { width: 22px; height: 22px; padding: 0; line-height: 1; font-size: 12px;
-                           border-radius: 6px; cursor: pointer; }
+    .iso-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .scene-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .scene-btn { height: 30px; padding: 0 4px; border: 1px solid #dfe6ea; border-radius: 8px;
+                 background: var(--card); color: #33454f; font-family: inherit;
+                 font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .scene-btn:hover { background: #f7f9fa; border-color: #d3dce2; }
+    .scene-btn.active { background: var(--ink); border-color: var(--ink); color: #ffffff;
+                        font-weight: 700; }
 
-    .hud-panel h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
-                    color: var(--cyan); }
-    .panel-grip + h4 { margin-top: 0; }
+    .toggles { display: grid; gap: 2px; margin-top: 8px; }
+    .toggle { display: flex; align-items: center; gap: 7px; padding: 3px 0;
+              color: #33454f; font-size: 12px; line-height: 1.3; cursor: pointer;
+              user-select: none; }
+    .toggle input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto;
+                    accent-color: var(--accent); }
 
-    .field { margin-top: 7px; }
-    .field > label { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px;
-                     color: #b9cdd6; }
-    .field > label > span:last-child { color: var(--cyan); font-variant-numeric: tabular-nums; }
-    input[type="range"] { display: block; width: 100%; height: 16px; margin: 2px 0 0;
-                          accent-color: #22d3ee; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+               margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef2f4; }
+    .primary-btn { height: 32px; border: 1px solid #d8e0e5; border-radius: 8px;
+                   background: var(--card); color: var(--ink); font-family: inherit;
+                   font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .primary-btn:hover { background: #f7f9fa; }
+    .primary-btn.active { background: var(--ink); border-color: var(--ink); color: #ffffff; }
 
-    select { width: 100%; margin-top: 3px; padding: 4px 6px; font: inherit; font-size: 12px;
-             color: #eaf2f5; background: rgba(255,255,255,.08);
-             border: 1px solid rgba(255,255,255,.22); border-radius: 6px; }
+    /* —— 「?」抽屉：白卡，覆盖在参数卡的位置上 —— */
+    .drawer { position: absolute; z-index: 30; right: 20px; top: 14px; width: 310px;
+              max-height: calc(100% - 30px); overflow-y: auto; padding: 16px 18px;
+              background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              box-shadow: 0 22px 48px -12px rgba(22, 35, 43, .28), 0 2px 6px rgba(22, 35, 43, .06); }
+    .drawer[hidden] { display: none; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .drawer-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .drawer-close { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line);
+                    border-radius: 7px; background: var(--card); color: var(--muted);
+                    font-size: 16px; line-height: 1; cursor: pointer; }
+    .drawer-close:hover { background: #f4f6f8; color: var(--ink); }
+    .drawer h3 { margin: 14px 0 4px; color: #7c8d97; font-size: 12px;
+                 font-weight: 600; letter-spacing: .04em; }
+    .drawer-head + h3 { margin-top: 2px; }
+    .drawer p, .drawer li { color: #4a5f6a; font-size: 12.5px; line-height: 1.6; }
+    .drawer p { margin: 4px 0; }
+    .drawer ol { margin: 4px 0; padding-left: 16px; }
+    .drawer li { margin: 3px 0; }
+    .drawer .eq { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: #2f6f7a; }
+    .drawer p.warn { color: var(--amber); }
+    .drawer .k { color: var(--ink); font-weight: 700; }
+    .metric-value { font-weight: 700; color: var(--ink); }
 
-    .hud-panel button { font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
-                        cursor: pointer; color: #eaf2f5; background: rgba(255,255,255,.08);
-                        border: 1px solid rgba(255,255,255,.22); }
-    .hud-panel button:hover { background: rgba(255,255,255,.16); }
-    .hud-panel button.active, .hud-panel button.primary { background: var(--accent);
-                        border-color: var(--accent); color: #ffffff; }
-    .hud-panel button.active:hover, .hud-panel button.primary:hover { background: #0d665f; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .iso-grid, .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
-    .toggles { display: grid; gap: 6px; margin-top: 7px; }
-    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #b9cdd6;
-              cursor: pointer; }
-    .toggle input { width: 15px; height: 15px; accent-color: #22d3ee; }
-
-    /* 面板展开时折叠按钮在面板首行，此按钮只在折叠后出现 */
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
-                  display: none; }
-    .hud-toggle[aria-expanded="false"] { display: inline-block; }
-
-    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
-                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
-                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-more:hover { background: rgba(255,255,255,.16); }
-
-    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
-              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
-              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px;
-              scrollbar-width: thin; }
-    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: var(--cyan); }
-    .drawer h3:first-child { margin-top: 0; }
-    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
-    .drawer ol { margin: 4px 0; padding-left: 18px; }
-    .drawer .eq { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--cyan); }
-    .drawer p.warn { color: #ffd166; }
-
-    @media (max-width: 900px) {
-      .hud-panel { width: 210px; font-size: 12px; }
+    @media (max-width: 1200px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .workspace { padding: 12px 16px 14px; gap: 14px; }
+      .panel { width: 240px; padding: 12px; }
+      .drawer { right: 16px; top: 12px; width: 276px; max-height: calc(100% - 26px); }
+      .ro-item { padding: 3px 9px; }
+      .legend { gap: 14px; }
     }
 
-    /* 窄屏：面板收窄，避开 ② 偏转磁场区的右边界 */
-    @media (max-width: 1100px) {
-      .hud-panel { width: 246px; }
+    /* 窄而高的视口：画布让出参数卡宽度，避免右侧被裁 */
+    @media (min-width: 981px) and (max-width: 1180px) {
+      .stage-column { width: min(calc(100vw - 306px), calc(177.78vh - 266.67px)); }
     }
 
-    /* 短屏（如 1024×768 的 4:3 投影）：面板内容略收紧，保证参数全部可见 */
-    @media (max-height: 800px) {
-      .hud-panel { padding: 10px 12px; font-size: 12px; }
-      .hud-panel h4 { margin: 8px 0 2px; }
-      .field { margin-top: 5px; }
-      .toggles { gap: 4px; margin-top: 6px; }
-      .btn-row { margin-top: 7px; }
-    }
-
-    /* 4:3 投影（1024×768）：舞台只有 567px 高，再收紧一档，保证播放/重置不被截断 */
-    @media (max-width: 1100px) and (max-height: 800px) {
-      .hud-panel { padding: 8px 10px; }
-      .hud-panel h4 { margin: 6px 0 2px; }
-      .field { margin-top: 3px; }
-      .iso-grid, .segmented { margin-top: 4px; }
-      .toggles { gap: 3px; margin-top: 5px; }
-      .btn-row { margin-top: 5px; }
+    @media (max-width: 980px) {
+      html, body { height: auto; overflow: auto; }
+      .topbar { height: auto; min-height: 56px; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
+      .readout { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+      .top-actions { margin-left: auto; }
+      .workspace { height: auto; min-height: calc(100vh - 56px); flex-direction: column;
+                   align-items: center; padding: 12px; }
+      .stage-column { width: min(92vw, 720px); }
+      .panel { width: min(92vw, 360px); max-height: none; }
+      .drawer { right: 12px; top: 12px; width: min(92vw, 340px); max-height: 70vh; }
+      .legend { white-space: normal; text-align: center; }
     }
   </style>
 </head>
 <body>
-  <main class="app">
-    <div class="stage">
+  <header class="topbar">
+    <h1 class="brand">质谱仪</h1>
+
+    <div class="readout" aria-label="实时读数">
+      <span class="ro-item"><span class="ro-k">v</span><b id="mSpeed">—</b></span>
+      <span class="ro-item"><span class="ro-k">r₁</span><b class="ok" id="mRadius">—</b></span>
+      <span class="ro-item"><span class="ro-k">x₁</span><b class="ok" id="mLanding">—</b></span>
+      <span class="ro-item"><span class="ro-k">Δx</span><b class="amber" id="mDelta">—</b></span>
+    </div>
+
+    <div class="top-actions">
+      <button type="button" class="top-btn round" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="结论、假设与课堂问题">?</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="stage-column">
       <div class="stage-frame">
         <canvas id="spectrometerCanvas" width="960" height="540"></canvas>
+      </div>
 
-        <!-- 读数：左上角 ≤4 chips -->
-        <div class="hud hud-readout" aria-label="实时读数">
-          <span class="chip"><span class="k">v</span><b id="mSpeed">—</b></span>
-          <span class="chip"><span class="k">r₁</span><b class="ok" id="mRadius">—</b></span>
-          <span class="chip"><span class="k">x₁</span><b class="ok" id="mLanding">—</b></span>
-          <span class="chip"><span class="k">Δx</span><b class="amber" id="mDelta">—</b></span>
-        </div>
-
-        <!-- 图例：左下角一行 -->
-        <div class="hud hud-legend" id="legend" aria-label="图例">
-          <span><i class="sw sw-ion"></i>正离子</span>
-          <span><i class="sw sw-track"></i>离子轨迹</span>
-          <span><i class="sw sw-ghost"></i>对比同位素</span>
-          <span><i class="sw sw-rej"></i>被挡掉的离子</span>
-          <span><i class="sw sw-field"></i>电场 E</span>
-        </div>
-
-        <!-- 参数：可拖动 + 可折叠（首行把手） -->
-        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数调节">
-          <div class="panel-grip" id="panelGrip">
-            <span class="panel-name">参数</span>
-            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
-                    title="折叠（双击标题行也可）">◂</button>
-          </div>
-          <h4>电场与磁场</h4>
-          <div class="field">
-            <label for="eSlider"><span>选择器电场 E</span><span id="eValue">2.0×10⁴ V/m</span></label>
-            <input id="eSlider" type="range" min="1" max="3" step="0.1" value="2" />
-          </div>
-          <div class="field">
-            <label for="b1Slider"><span>选择器磁场 B₁</span><span id="b1Value">0.10 T</span></label>
-            <input id="b1Slider" type="range" min="0.08" max="0.20" step="0.01" value="0.10" />
-          </div>
-          <div class="field">
-            <label for="b2Slider"><span>偏转磁场 B₂</span><span id="b2Value">0.50 T</span></label>
-            <input id="b2Slider" type="range" min="0.30" max="0.90" step="0.05" value="0.50" />
-          </div>
-
-          <h4>离子与电荷</h4>
-          <div class="iso-grid">
-            <button type="button" class="iso-btn" data-iso="c12">¹²C⁺</button>
-            <button type="button" class="iso-btn" data-iso="c13">¹³C⁺</button>
-            <button type="button" class="iso-btn active" data-iso="ne20">²⁰Ne⁺</button>
-            <button type="button" class="iso-btn" data-iso="ne22">²²Ne⁺</button>
-          </div>
-          <div class="field">
-            <label for="massSlider"><span>主离子质量数 A</span><span id="massValue">A = 20</span></label>
-            <input id="massSlider" type="range" min="12" max="24" step="1" value="20" />
-          </div>
-          <div class="segmented">
-            <button type="button" class="charge-btn active" data-z="1">电荷 +e</button>
-            <button type="button" class="charge-btn" data-z="2">电荷 +2e</button>
-          </div>
-
-          <h4>量程与播放</h4>
-          <div class="field">
-            <label for="rangeSelect"><span>底片量程</span><span id="rangeValue">0–20 cm</span></label>
-            <select id="rangeSelect">
-              <option value="10">0 – 10 cm</option>
-              <option value="20" selected>0 – 20 cm</option>
-              <option value="40">0 – 40 cm</option>
-            </select>
-          </div>
-          <div class="toggles">
-            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>速度与受力矢量</span></label>
-            <label class="toggle"><input type="checkbox" id="showGhost" checked /><span>对比同位素</span></label>
-            <label class="toggle"><input type="checkbox" id="showRejected" checked /><span>被挡掉的离子</span></label>
-          </div>
-          <div class="btn-row">
-            <button type="button" class="primary" id="playBtn">播放</button>
-            <button type="button" id="resetBtn">重置</button>
-          </div>
-        </aside>
-
-        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数 ◂</button>
-        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="结论、假设与课堂问题">?</button>
-
-        <!-- 结论 / 读数明细 / 模型假设 / 课堂问题：默认折叠 -->
-        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂观察">
-          <h3>结论</h3>
-          <p>速度选择器只放行 v = E/B₁；进入 B₂ 后 r = mv/(qB₂)，落点 x = 2r。同速同电荷时落点 x ∝ m，越远质量越大。</p>
-          <p class="eq">x = 2mv/(qB₂) = 2mE/(qB₁B₂)　⇒　m = qB₁B₂x/(2E)</p>
-
-          <h3>装置与公式</h3>
-          <ol>
-            <li>① 速度选择器（E ⊥ B₁）：只放行 v = E/B₁ 的离子。</li>
-            <li>② 偏转磁场（B₂ ⊙ 垂直纸面向外）：半圆半径 r = mv/(qB₂)。</li>
-            <li>③ 照相底片（刻度 x / cm）：落点 x = 2r。</li>
-          </ol>
-          <p class="eq">v = E/B₁　r = mv/(qB₂)　x = 2r　m = qB₁B₂x/(2E)</p>
-
-          <h3>当前读数明细</h3>
-          <p>主离子 <b id="dIon1">²⁰Ne⁺</b>，m = <span id="dM1">—</span>；对比离子 <b id="dIon2">²²Ne⁺</b>，m = <span id="dM2">—</span></p>
-          <p>r₁ / r₂ = <span id="dR">—</span>；x₁ / x₂ = <span id="dX">—</span></p>
-          <p>底片量程 0–<span id="dSpan">20</span> cm，刻度 <span id="dStep">2</span> cm/格</p>
-          <p id="dNote">—</p>
-
-          <h3>模型假设</h3>
-          <p>忽略重力；非相对论（v ≪ c）；忽略边缘场与离子间相互作用；底片处为真空。本页只演示正离子：若换成负离子，电场力与洛伦兹力同时反向，v = E/B₁ 仍成立，但轨迹向上偏。</p>
-
-          <h3>课堂观察</h3>
-          <ol>
-            <li>把 B₂ 从 0.50 T 调到 0.90 T，速度 v 变不变？半径 r 与落点 x 怎样变化？</li>
-            <li>²⁰Ne⁺ 与 ²²Ne⁺ 进入偏转磁场时速度相同，为什么半径不同？质量大的落点更远还是更近？</li>
-            <li>把电荷量从 +e 换成 +2e，两个落点的间距会怎样变化？这与 r ∝ m/q 一致吗？</li>
-          </ol>
-        </section>
+      <div class="legend" id="legend" aria-label="图例">
+        <span class="lg"><i class="sw dot"></i>正离子</span>
+        <span class="lg"><i class="sw track"></i>离子轨迹</span>
+        <span class="lg"><i class="sw ghost"></i>对比同位素</span>
+        <span class="lg"><i class="sw rej"></i>被挡掉的离子</span>
+        <span class="lg"><i class="sw field"></i>电场 E</span>
       </div>
     </div>
+
+    <aside class="panel" id="ctrlPanel" aria-label="场景与参数">
+      <div class="group">
+        <p class="group-label">电场与磁场</p>
+        <div class="row"><label for="eSlider">选择器电场 E</label><b id="eValue">2.0×10⁴ V/m</b></div>
+        <input id="eSlider" type="range" min="1" max="3" step="0.1" value="2" aria-label="速度选择器电场 E" />
+
+        <div class="row"><label for="b1Slider">选择器磁场 B₁</label><b id="b1Value">0.10 T</b></div>
+        <input id="b1Slider" type="range" min="0.08" max="0.20" step="0.01" value="0.10" aria-label="速度选择器磁场 B1" />
+
+        <div class="row"><label for="b2Slider">偏转磁场 B₂</label><b id="b2Value">0.50 T</b></div>
+        <input id="b2Slider" type="range" min="0.30" max="0.90" step="0.05" value="0.50" aria-label="偏转磁场 B2" />
+      </div>
+
+      <div class="group">
+        <p class="group-label">离子与电荷</p>
+        <div class="iso-grid" role="group" aria-label="同位素">
+          <button type="button" class="scene-btn iso-btn" data-iso="c12">¹²C⁺</button>
+          <button type="button" class="scene-btn iso-btn" data-iso="c13">¹³C⁺</button>
+          <button type="button" class="scene-btn iso-btn active" data-iso="ne20">²⁰Ne⁺</button>
+          <button type="button" class="scene-btn iso-btn" data-iso="ne22">²²Ne⁺</button>
+        </div>
+
+        <div class="row"><label for="massSlider">主离子质量数 A</label><b id="massValue">A = 20</b></div>
+        <input id="massSlider" type="range" min="12" max="24" step="1" value="20" aria-label="主离子质量数" />
+
+        <div class="scene-row" role="group" aria-label="电荷量" style="margin-top:10px">
+          <button type="button" class="scene-btn charge-btn active" data-z="1">电荷 +e</button>
+          <button type="button" class="scene-btn charge-btn" data-z="2">电荷 +2e</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="group-label">量程与播放</p>
+        <div class="row"><label for="rangeSelect">底片量程</label><b id="rangeValue">0–20 cm</b></div>
+        <select id="rangeSelect" aria-label="底片量程">
+          <option value="10">0 – 10 cm</option>
+          <option value="20" selected>0 – 20 cm</option>
+          <option value="40">0 – 40 cm</option>
+        </select>
+
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>速度与受力矢量</span></label>
+          <label class="toggle"><input type="checkbox" id="showGhost" checked /><span>对比同位素</span></label>
+          <label class="toggle"><input type="checkbox" id="showRejected" checked /><span>被挡掉的离子</span></label>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="primary-btn" id="playBtn">播放</button>
+        <button type="button" class="primary-btn" id="resetBtn">重置</button>
+      </div>
+    </aside>
+
+    <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂观察">
+      <div class="drawer-head">
+        <h2>说明</h2>
+        <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭说明">×</button>
+      </div>
+
+      <h3>结论</h3>
+      <p>速度选择器只放行 v = E/B₁；进入 B₂ 后 r = mv/(qB₂)，落点 x = 2r。同速同电荷时落点 x ∝ m，越远质量越大。</p>
+      <p class="eq">x = 2mv/(qB₂) = 2mE/(qB₁B₂)　⇒　m = qB₁B₂x/(2E)</p>
+
+      <h3>装置与公式</h3>
+      <ol>
+        <li>① 速度选择器（E ⊥ B₁）：只放行 v = E/B₁ 的离子。</li>
+        <li>② 偏转磁场（B₂ ⊙ 垂直纸面向外）：半圆半径 r = mv/(qB₂)。</li>
+        <li>③ 照相底片（刻度 x / cm）：落点 x = 2r。</li>
+      </ol>
+      <p class="eq">v = E/B₁　r = mv/(qB₂)　x = 2r　m = qB₁B₂x/(2E)</p>
+
+      <h3>当前读数明细</h3>
+      <p>主离子 <b class="metric-value" id="dIon1">²⁰Ne⁺</b>，m = <span id="dM1">—</span>；对比离子 <b class="metric-value" id="dIon2">²²Ne⁺</b>，m = <span id="dM2">—</span></p>
+      <p>r₁ / r₂ = <span id="dR">—</span>；x₁ / x₂ = <span id="dX">—</span></p>
+      <p>底片量程 0–<span id="dSpan">20</span> cm，刻度 <span id="dStep">2</span> cm/格</p>
+      <p id="dNote">—</p>
+
+      <h3>模型假设</h3>
+      <p>忽略重力；非相对论（v ≪ c）；忽略边缘场与离子间相互作用；底片处为真空。本页只演示正离子：若换成负离子，电场力与洛伦兹力同时反向，v = E/B₁ 仍成立，但轨迹向上偏。</p>
+
+      <h3>课堂观察</h3>
+      <ol>
+        <li>把 B₂ 从 0.50 T 调到 0.90 T，速度 v 变不变？半径 r 与落点 x 怎样变化？</li>
+        <li>²⁰Ne⁺ 与 ²²Ne⁺ 进入偏转磁场时速度相同，为什么半径不同？质量大的落点更远还是更近？</li>
+        <li>把电荷量从 +e 换成 +2e，两个落点的间距会怎样变化？这与 r ∝ m/q 一致吗？</li>
+      </ol>
+
+      <p class="dim">快捷键：空格 播放/暂停 · R 重置 · ? 说明 · Esc 关闭说明</p>
+    </section>
   </main>
 
   <script>
@@ -297,8 +328,8 @@
         ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
       }
 
-      // 指针一律换算成逻辑坐标。本页没有画布指针交互（拖动只发生在 DOM 参数面板上），
-      // 保留这一个入口：以后给画布加叠加层/命中测试时直接用，禁止再写 canvas.width / rect.width
+      // 指针一律换算成逻辑坐标。本页没有画布指针交互，保留这个入口备用：
+      // 以后给画布加叠加层/命中测试时直接用，禁止再写 canvas.width / rect.width
       function toLogical(evt) {
         const r = canvas.getBoundingClientRect();
         return {
@@ -955,6 +986,7 @@
       function setPlaying(value) {
         state.playing = value;
         controls.playBtn.textContent = value ? "暂停" : "播放";
+        controls.playBtn.classList.toggle("active", value);
       }
 
       function restartPlayback() {
@@ -1006,7 +1038,7 @@
       });
 
       controls.isoButtons.forEach(function (btn) {
-        btn.addEventListener("click", function () {
+        btn.addEventListener("click", function (event) {
           const preset = ISOTOPES[btn.dataset.iso];
           if (!preset) { return; }
           state.A1 = preset.A1;
@@ -1014,30 +1046,34 @@
           state.A2 = preset.A1 + preset.dA;
           controls.massSlider.value = String(state.A1);
           syncIsoButtons();
+          if (event.detail > 0) { btn.blur(); }
           render();
         });
       });
 
       controls.chargeButtons.forEach(function (btn) {
-        btn.addEventListener("click", function () {
+        btn.addEventListener("click", function (event) {
           state.z = Number(btn.dataset.z);
           controls.chargeButtons.forEach(function (other) {
             other.classList.toggle("active", other === btn);
           });
+          if (event.detail > 0) { btn.blur(); }
           render();
         });
       });
 
-      controls.playBtn.addEventListener("click", function () {
+      controls.playBtn.addEventListener("click", function (event) {
         if (state.playing) {
           setPlaying(false);
+          if (event.detail > 0) { controls.playBtn.blur(); }
           render();
           return;
         }
         restartPlayback();
+        if (event.detail > 0) { controls.playBtn.blur(); }
       });
 
-      controls.resetBtn.addEventListener("click", function () {
+      controls.resetBtn.addEventListener("click", function (event) {
         state.E = DEFAULTS.E;
         state.B1 = DEFAULTS.B1;
         state.B2 = DEFAULTS.B2;
@@ -1065,6 +1101,7 @@
         syncIsoButtons();
         state.t = Number.POSITIVE_INFINITY;
         setPlaying(false);
+        if (event.detail > 0) { controls.resetBtn.blur(); }
         render();
       });
 
@@ -1077,7 +1114,7 @@
           const total = totalTime(m);
           state.t += dt;
           if (state.t >= total) {
-            state.t = total;
+            state.t = total;      // 播完停在底片落点上
             setPlaying(false);
           }
           render();
@@ -1088,133 +1125,45 @@
       // 窗口尺寸（或设备像素比）变化后：重设位图并重画
       window.addEventListener("resize", render);
 
-      // ---------------- 外壳交互：面板折叠 / 抽屉 / 键盘 ----------------
-      const shell = {
-        panel: document.getElementById("ctrlPanel"),
-        toggle: document.getElementById("ctrlToggle"),
-        more: document.getElementById("moreBtn"),
-        drawer: document.getElementById("drawer")
-      };
-
-      function setPanelOpen(open) {
-        shell.panel.hidden = !open;
-        shell.toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        shell.toggle.textContent = open ? "参数 ◂" : "参数 ▸";
-        if (open) { shell.panel.dispatchEvent(new CustomEvent("panel:open")); }
-      }
+      /* ---------- 外壳：说明抽屉 / 快捷键（不涉及物理逻辑） ---------- */
+      const drawer = document.getElementById("drawer");
+      const moreBtn = document.getElementById("moreBtn");
+      const drawerClose = document.getElementById("drawerClose");
 
       function setDrawerOpen(open) {
-        shell.drawer.hidden = !open;
-        shell.more.setAttribute("aria-expanded", open ? "true" : "false");
+        drawer.hidden = !open;
+        moreBtn.setAttribute("aria-expanded", String(open));
+        if (open) drawerClose.focus();
       }
 
-      shell.toggle.addEventListener("click", function () { setPanelOpen(shell.panel.hidden); });
-      shell.more.addEventListener("click", function () { setDrawerOpen(shell.drawer.hidden); });
+      moreBtn.addEventListener("click", function (event) {
+        setDrawerOpen(drawer.hidden);
+        if (event.detail > 0 && drawer.hidden) moreBtn.blur();
+      });
+      drawerClose.addEventListener("click", function () { setDrawerOpen(false); moreBtn.focus(); });
 
-      window.addEventListener("keydown", function (ev) {
-        const tag = ev.target && ev.target.tagName;
-        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON") { return; }
-        if (ev.code === "Space") {
-          ev.preventDefault();
-          controls.playBtn.click();
-        } else if (ev.key === "r" || ev.key === "R") {
-          ev.preventDefault();
-          controls.resetBtn.click();
-        } else if (ev.key === "p" || ev.key === "P") {
-          ev.preventDefault();
-          setPanelOpen(shell.panel.hidden);
-        } else if (ev.key === "?") {
-          ev.preventDefault();
-          setDrawerOpen(shell.drawer.hidden);
-        } else if (ev.key === "Escape") {
-          setDrawerOpen(false);
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          if (!drawer.hidden) { setDrawerOpen(false); moreBtn.focus(); }
+          return;
         }
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const el = event.target;
+        const tag = el && el.tagName;
+        if (event.key === " " || event.code === "Space") {
+          if (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A", "SUMMARY"].includes(tag)) return;
+          event.preventDefault();
+          controls.playBtn.click();
+          return;
+        }
+        const typing = tag === "TEXTAREA" || tag === "SELECT"
+          || (tag === "INPUT" && ["text", "number", "search", "email", "url", "password", "tel"].includes(el.type));
+        if (typing) return;
+        const key = event.key.toLowerCase();
+        if (key === "r") { event.preventDefault(); controls.resetBtn.click(); }
+        else if (event.key === "?" || (event.key === "/" && event.shiftKey)) { event.preventDefault(); setDrawerOpen(drawer.hidden); }
       });
 
-      // ---------------- 参数面板：拖动 + 位置记忆 ----------------
-      // 首行 .panel-grip 负责拖动；位置存 localStorage，刷新后恢复；双击标题行折叠/展开
-      (function initDraggablePanel() {
-        const panel = document.getElementById("ctrlPanel");
-        const grip = panel && panel.querySelector(".panel-grip");
-        const collapseBtn = document.getElementById("panelCollapse");
-        if (!panel || !grip) { return; }
-
-        const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
-        const MIN_VISIBLE_H = 220;   // 拖到画面下方时至少留这么高，超出部分面板内滚动
-
-        function readSaved() {
-          try { return JSON.parse(localStorage.getItem(KEY) || "null"); }
-          catch (err) { return null; }
-        }
-        function writeSaved(pos) {
-          try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch (err) { /* 隐私模式忽略 */ }
-        }
-
-        function place(x, y) {
-          const f = panel.parentElement.getBoundingClientRect();
-          const w = panel.offsetWidth;
-          const px = Math.min(Math.max(8, x), Math.max(8, f.width - w - 8));
-          const py = Math.min(Math.max(8, y), Math.max(8, f.height - MIN_VISIBLE_H - 8));
-          panel.style.left = px + "px";
-          panel.style.top = py + "px";
-          panel.style.right = "auto";
-          panel.style.maxHeight = Math.max(MIN_VISIBLE_H, f.height - py - 8) + "px";
-        }
-
-        const saved = readSaved();
-        if (saved && isFinite(saved.x) && isFinite(saved.y)) { place(saved.x, saved.y); }
-
-        let dx = 0, dy = 0, dragging = false;
-        grip.addEventListener("pointerdown", function (e) {
-          if (e.button !== 0) { return; }
-          const f = panel.parentElement.getBoundingClientRect();
-          const r = panel.getBoundingClientRect();
-          dx = e.clientX - r.left;
-          dy = e.clientY - r.top;
-          dragging = true;
-          panel.classList.add("dragging");
-          grip.setPointerCapture(e.pointerId);
-          panel.style.left = (r.left - f.left) + "px";
-          panel.style.top = (r.top - f.top) + "px";
-          panel.style.right = "auto";
-        });
-        grip.addEventListener("pointermove", function (e) {
-          if (!dragging) { return; }
-          const f = panel.parentElement.getBoundingClientRect();
-          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
-        });
-        function endDrag(e) {
-          if (!dragging) { return; }
-          dragging = false;
-          panel.classList.remove("dragging");
-          if (grip.hasPointerCapture(e.pointerId)) { grip.releasePointerCapture(e.pointerId); }
-          writeSaved({ x: parseFloat(panel.style.left), y: parseFloat(panel.style.top) });
-        }
-        grip.addEventListener("pointerup", endDrag);
-        grip.addEventListener("pointercancel", endDrag);
-
-        // 双击标题行 = 点折叠按钮；落在按钮上时交给按钮自己处理
-        grip.addEventListener("dblclick", function (e) {
-          if (e.target.closest("button")) { return; }
-          setPanelOpen(panel.hidden);
-        });
-        if (collapseBtn) {
-          collapseBtn.addEventListener("click", function () { setPanelOpen(false); });
-        }
-
-        // 窗口尺寸变化后把面板重新夹回舞台内
-        window.addEventListener("resize", function () {
-          if (panel.hidden || panel.style.left === "") { return; }
-          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
-        });
-        // 折叠期间改过窗口尺寸时，展开后同样重新夹回
-        panel.addEventListener("panel:open", function () {
-          if (panel.style.left === "") { return; }
-          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
-        });
-      })();
-
-      setPanelOpen(true);
       setDrawerOpen(false);
 
       state.A2 = state.A1 + state.dA;

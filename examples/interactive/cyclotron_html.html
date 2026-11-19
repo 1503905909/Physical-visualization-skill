@@ -1,356 +1,274 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>回旋加速器可视化资源</title>
   <link rel="icon" href="data:," />
+  <title>回旋加速器可视化资源</title>
   <style>
     :root {
-      --ink: #eaf2f5;
-      --muted: #9fb6c1;
-      --accent: #7fd6e4;
-      --accent-strong: #0f766e;
-      --warn: #f0b429;
+      --page: #f4f6f8;
+      --card: #ffffff;
+      --ink: #16232b;
+      --muted: #5d7480;
+      --line: #e3e8ec;
+      --stage: #0b141a;
+      --accent: #0f766e;
+      --warn: #b45309;
     }
 
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
-
     html, body { height: 100%; }
-    body { margin: 0; background: #070d11; overflow: hidden;
-           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+    body { margin: 0; background: var(--page); color: var(--ink); overflow: hidden;
+           font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+           -webkit-font-smoothing: antialiased; }
 
-    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+    /* —— 顶栏：白底，高 56px —— */
+    .topbar { height: 56px; display: flex; align-items: center; gap: 16px;
+              padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .brand { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 
-    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+    .readout { margin-left: auto; display: flex; align-items: center; min-width: 0;
+               padding: 3px 2px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 1px 2px rgba(22, 35, 43, .05); }
+    .ro-item { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px;
+               font-size: 12.5px; white-space: nowrap; }
+    .ro-item + .ro-item { border-left: 1px solid #eef2f4; }
+    .ro-k { color: var(--muted); font-size: 12.5px; }
+    .ro-item b { color: var(--ink); font-size: 12.5px; font-weight: 700;
+                 font-variant-numeric: tabular-nums; }
 
-    /* 16:9 等比舞台：同时受宽高约束 */
-    .stage-frame { position: relative; aspect-ratio: 16 / 9;
-                   width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+    .top-actions { margin-left: 4px; display: flex; gap: 8px; }
+    .top-btn { height: 30px; padding: 0 13px; border: 1px solid var(--line);
+               border-radius: 8px; background: var(--card); color: var(--ink);
+               font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1;
+               cursor: pointer; }
+    .top-btn:hover { background: #f7f9fa; border-color: #d5dde2; }
+    .top-btn.round { width: 30px; padding: 0; border-radius: 50%;
+                     color: var(--muted); font-weight: 700; font-size: 13px; }
+    .top-btn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #ffffff; }
 
+    /* —— 主体：左黑色画布窗口 + 右白色参数卡 —— */
+    .workspace { position: relative; height: calc(100vh - 56px); display: flex;
+                 align-items: flex-start; justify-content: center; gap: 18px;
+                 padding: 14px 20px 16px; }
+
+    .stage-column { flex: 0 0 auto; width: min(72vw, calc(177.78vh - 266.67px));
+                    display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9;
+                   overflow: hidden; background: var(--stage); border-radius: 14px;
+                   box-shadow: 0 14px 34px rgba(11, 20, 26, .2), 0 2px 6px rgba(11, 20, 26, .14); }
     .stage-frame > canvas { display: block; width: 100%; height: 100%; }
 
-    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
-           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
-           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+    .legend { display: flex; align-items: center; justify-content: center; gap: 16px;
+              padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 10px; font-size: 12px; color: var(--muted);
+              white-space: nowrap; overflow: hidden; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; }
+    .sw { display: inline-block; width: 18px; height: 2px; border-radius: 1px;
+          background: var(--ink); flex: 0 0 auto; }
+    .sw.thick { height: 3px; }
 
-    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
-                   padding: 6px 10px; font-size: 12.5px; }
-    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+    /* —— 右侧参数卡 —— */
+    .panel { flex: 0 0 auto; width: 280px; padding: 14px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 12px;
+             box-shadow: 0 1px 2px rgba(22, 35, 43, .04); }
+    .group + .group { margin-top: 14px; }
+    .group-label { margin: 0 0 8px; color: #7c8d97; font-size: 12px; letter-spacing: .04em; }
 
-    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
-                  color: #cfe3e9; }
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .particle-btn { height: 30px; padding: 0 4px; border: 1px solid #dfe6ea; border-radius: 8px;
+                    background: var(--card); color: #33454f; font-family: inherit;
+                    font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .particle-btn:hover { background: #f7f9fa; border-color: #d3dce2; }
+    .particle-btn.active { background: var(--ink); border-color: var(--ink); color: #ffffff; font-weight: 700; }
+    .footnote { margin: 8px 0 0; color: #7c8d97; font-size: 11px; line-height: 1.5; }
 
-    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
-    .hud-panel[hidden] { display: none; }
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 8px; margin-top: 10px; color: var(--muted); font-size: 11.5px; }
+    .row:first-of-type { margin-top: 0; }
+    .row b { color: var(--ink); font-size: 12.5px; font-weight: 700; white-space: nowrap;
+             font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 4px 0 0;
+                          accent-color: var(--accent); background: transparent; cursor: pointer; }
 
-    /* ---------- 面板可拖动（LAYOUT.md「参数面板必须可拖动」） ---------- */
-    .hud-panel { cursor: default; }
-    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
-                             justify-content: space-between; margin: -2px 0 8px; touch-action: none; }
-    .hud-panel .panel-grip:active { cursor: grabbing; }
-    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); z-index: 6; }
-    .panel-grip .grip-title { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
-    .panel-grip .grip-fold { border: 1px solid rgba(255,255,255,.22); border-radius: 6px;
-                             background: rgba(255,255,255,.08); color: var(--ink);
-                             font: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px;
-                             cursor: pointer; }
-    .panel-grip .grip-fold:hover { background: rgba(255,255,255,.18); }
+    .toggles { display: grid; gap: 2px; }
+    .toggle { display: flex; align-items: center; gap: 7px; padding: 2px 0;
+              color: #33454f; font-size: 12px; line-height: 1.4; cursor: pointer;
+              user-select: none; }
+    .toggle input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
 
-    /* ---------- 两列扁布局：宽度不变（258px），高度约减半，给 D 形盒让出空间 ---------- */
-    .hud-panel .panel-cols { display: grid; grid-template-columns: 1.32fr 1fr; gap: 10px;
-                             align-items: start; }
-    .hud-panel .panel-col { min-width: 0; }
-    .hud-panel .panel-cols .panel-title { margin-bottom: 4px; }
-    .hud-panel .panel-cols .panel-title + .toggles { margin-top: 0; }
-    .hud-panel .panel-cols .slider-field { margin-top: 6px; }
-    .hud-panel .panel-cols .slider-field:first-of-type { margin-top: 0; }
-    .hud-panel .panel-cols .segmented { grid-template-columns: 1fr; margin-top: 0; gap: 5px; }
-    .hud-panel .panel-cols .particle-btn { min-height: 30px; }
-    .hud-panel .panel-cols .panel-actions { margin-top: 8px; gap: 6px; }
-    .hud-panel .panel-cols .panel-actions button { min-height: 30px; font-size: 12px; padding: 0 4px; }
-    .hud-panel .panel-cols .toggles { margin-top: 8px; padding-top: 6px; gap: 4px; }
-    .hud-panel .panel-cols .toggle { font-size: 10.5px; gap: 6px; }
-    .hud-panel .panel-cols .toggle input { width: 13px; height: 13px; }
-    .hud-panel .footnote { margin-top: 7px; }
-
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 286px; }
-
-    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
-                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
-                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-
-    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
-              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
-              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
-    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
-    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
-
-    @media (max-width: 900px) {
-      .hud-panel { width: 210px; font-size: 12px; }
-      .hud-toggle[aria-expanded="true"] { right: 232px; }
-    }
-
-    /* ---------- 读数 chips（左上角，≤4 个） ---------- */
-    .hud-readout .tile { display: inline-flex; align-items: baseline; gap: 6px; }
-    .hud-readout .tile + .tile { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.14); }
-    .hud-readout .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
-    .hud-readout .tile-value { font-size: 14.5px; font-weight: 800; color: #f2f8fa; line-height: 1.2; }
-    .hud-readout .tile-unit { font-size: 10.5px; font-weight: 700; color: var(--accent); }
-    .hud-readout .tile-badge { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px;
-                               background: rgba(255,255,255,.12); color: #d7e6ec; white-space: nowrap; }
-    .hud-readout .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
-    .hud-readout .tile-badge.up   { background: rgba(248,113,113,.2); color: #fca5a5; }
-    .hud-readout .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
-    .hud-readout .tile-badge.na   { opacity: .45; }
-
-    /* ---------- 图例（左下角，默认一行） ---------- */
-    .lg { display: inline-flex; align-items: center; gap: 4px; margin-right: 9px; white-space: nowrap; }
-    .lg:last-child { margin-right: 0; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
-    .dot-red { background: #e73535; }
-    .dot-blue { background: #3558ff; }
-    .dot-green { background: #22c55e; }
-    .arrow-glyph { color: #b45309; font-weight: 900; }
-    .lg.warn { color: #fbbf24; font-weight: 700; }
-    .sw { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
-
-    /* ---------- 参数面板（右上角，可折叠） ---------- */
-    .panel-mode { margin: 0 0 8px; font-size: 11.5px; color: var(--muted); }
-    .panel-mode b { color: var(--accent); font-size: 12px; }
-    .panel-title { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted);
-                   text-transform: uppercase; margin-bottom: 2px; }
-    .panel-group + .panel-group { margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.16); }
-
-    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .mode-btn { display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
-                padding: 6px 7px; min-height: 50px; text-align: left; font: inherit;
-                border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
-                background: rgba(255,255,255,.06); color: var(--ink); cursor: pointer; }
-    .mode-btn .mode-title { font-size: 13px; font-weight: 800; line-height: 1.25; }
-    .mode-btn .mode-sub { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.3; }
-    .mode-btn:hover { background: rgba(255,255,255,.12); }
-    .mode-btn.active { border-color: transparent; background: var(--accent-strong); }
-    .mode-btn.active .mode-sub { color: rgba(255,255,255,.86); }
-    .mode-btn.active:hover { background: #0d665f; }
-
-    .slider-field { margin-top: 7px; }
-    .slider-field:first-of-type { margin-top: 0; }
-    .slider-field label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2px;
-                          font-size: 11.5px; font-weight: 700; color: #cfe3e9; }
-    .slider-field label span:last-child { color: var(--accent); white-space: nowrap; }
-    input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: #3fc1c9; }
-    input[type="range"]:disabled { opacity: .4; }
-
-    .footnote { margin: 4px 0 0; font-size: 10.5px; line-height: 1.45; color: #8fa6b1; }
-
-    .toggles { display: grid; gap: 5px; margin-top: 9px; padding-top: 8px;
-               border-top: 1px dashed rgba(255,255,255,.16); }
-    .panel-group .toggles { margin-top: 0; padding-top: 0; border-top: 0; }
-    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
-    .toggle input { width: 15px; height: 15px; margin: 0; accent-color: #3fc1c9; }
-
-    .panel-actions, .reset-row { display: flex; gap: 8px; margin-top: 9px; }
-    .panel-actions button, .reset-row button { flex: 1; }
-    .primary-btn { min-height: 32px; border: 1px solid var(--accent-strong); border-radius: 8px;
-                   background: var(--accent-strong); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+    .reset-row { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px;
+                 border-top: 1px solid #eef2f4; }
+    .primary-btn, .ghost-btn { flex: 1; height: 32px; border-radius: 8px; font-family: inherit;
+                               font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .primary-btn { background: var(--accent); border: 1px solid var(--accent); color: #ffffff; }
     .primary-btn:hover { background: #0d665f; }
-    .panel-actions button:not(.primary-btn) { min-height: 32px; border: 1px solid rgba(255,255,255,.24);
-                   border-radius: 8px; background: rgba(255,255,255,.08); color: var(--ink);
-                   font: inherit; font-weight: 700; cursor: pointer; }
-    .panel-actions button:not(.primary-btn):hover { background: rgba(255,255,255,.16); }
+    .ghost-btn { background: var(--card); border: 1px solid #d8e0e5; color: var(--ink); }
+    .ghost-btn:hover { background: #f7f9fa; }
 
-    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
-    .particle-btn { min-height: 32px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
-                    background: rgba(255,255,255,.06); color: var(--ink); font: inherit;
-                    font-size: 12.5px; font-weight: 700; cursor: pointer; }
-    .particle-btn:hover { background: rgba(255,255,255,.14); }
-    .particle-btn.active { border-color: transparent; background: var(--accent-strong); color: #fff; }
+    .panel-alert { margin: 10px 0 0; padding: 6px 8px; border-left: 3px solid #d97706;
+                   border-radius: 4px; background: #fef6e7; color: #92400e;
+                   font-size: 11px; line-height: 1.5; }
 
-    /* ---------- 抽屉内容 ---------- */
-    .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
-    .mode-tag { font-size: 12px; font-weight: 800; color: var(--accent); }
-    .mode-tag.warn { color: var(--warn); }
-    .drawer-close { border: 0; background: transparent; color: var(--muted); font-size: 18px;
-                    line-height: 1; cursor: pointer; padding: 0 4px; }
-    .drawer-close:hover { color: #fff; }
-    .conclusion-card { margin: 4px 0 6px; padding: 8px 10px; border-radius: 6px;
-                       border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); }
-    .conclusion-card.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); }
-    .conclusion-body { margin: 0 0 4px; font-size: 13px; line-height: 1.55; color: #e2eef2; }
-    .conclusion-key { margin: 0; font-size: 12.5px; font-weight: 700; color: #bfe9ee; }
-    .conclusion-formula { margin: 6px 0; padding: 6px 8px; border: 1px dashed rgba(255,255,255,.22);
-                          border-radius: 6px; font-size: 12px; line-height: 1.5; color: #dbe9ee; }
-    .conclusion-note { margin: 5px 0; font-size: 12px; line-height: 1.55; color: #a9bfc9; }
-    .drawer-eq { margin: 2px 0; font-size: 14px; font-weight: 800; color: #eaf2f5; }
-    .drawer .tile { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px; margin: 4px 0 8px;
-                    border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.04); }
-    .drawer .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
-    .drawer .tile-value { font-size: 16px; font-weight: 800; color: #f2f8fa; }
-    .drawer .tile-unit { font-size: 11px; font-weight: 700; color: var(--accent); }
-    .drawer .tile-badge { margin-left: auto; font-size: 10.5px; font-weight: 800; padding: 1px 6px;
-                          border-radius: 999px; background: rgba(255,255,255,.12); color: #d7e6ec; }
-    .drawer .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
-    .drawer .tile-badge.up { background: rgba(248,113,113,.2); color: #fca5a5; }
-    .drawer .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
-    .drawer .tile-badge.na { opacity: .45; }
-    .mode-hint { margin: 8px 0 0; padding: 7px 9px; border-radius: 6px; font-size: 12px; line-height: 1.55;
-                 border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); color: #bfe9ee; }
-    .mode-hint.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); color: #f9dda2; }
-    .q-list { margin: 4px 0; padding-left: 18px; }
-    .q-list li { margin: 3px 0; font-size: 12.5px; line-height: 1.55; color: #cfe3e9; }
-    .drawer-keys { margin-top: 10px; font-size: 11px; color: #7f95a0; }
+    /* —— 「?」抽屉：白卡，覆盖在参数卡的位置上 —— */
+    .drawer { position: absolute; z-index: 30; right: 20px; top: 14px; width: 320px;
+              max-height: calc(100% - 30px); overflow-y: auto; padding: 16px 18px;
+              background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              box-shadow: 0 22px 48px -12px rgba(22, 35, 43, .28), 0 2px 6px rgba(22, 35, 43, .06);
+              scrollbar-width: thin; scrollbar-color: #d7dee3 transparent;
+              overscroll-behavior: contain; }
+    .drawer::-webkit-scrollbar { width: 8px; }
+    .drawer::-webkit-scrollbar-thumb { background: #d7dee3; border-radius: 4px; }
+    .drawer::-webkit-scrollbar-track { background: transparent; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .drawer-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .drawer-close { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line);
+                    border-radius: 7px; background: var(--card); color: var(--muted);
+                    font-size: 16px; line-height: 1; cursor: pointer; }
+    .drawer-close:hover { background: #f4f6f8; color: var(--ink); }
+    .drawer h3 { margin: 14px 0 4px; color: #7c8d97; font-size: 12px; font-weight: 600;
+                 letter-spacing: .04em; }
+    .drawer p { margin: 4px 0; color: #4a5f6a; font-size: 12.5px; line-height: 1.6; }
+    .drawer-eq { margin: 2px 0; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+    .conclusion-formula { margin: 6px 0; padding: 7px 9px; border: 1px dashed #d6dee3;
+                          border-radius: 6px; background: #fafcfd; color: #33454f;
+                          font-size: 12px; line-height: 1.6; }
+    .q-list { margin: 4px 0; padding-left: 16px; }
+    .q-list li { margin: 3px 0; color: #4a5f6a; font-size: 12.5px; line-height: 1.6; }
+    .drawer-keys { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef2f4;
+                   font-size: 11.5px; color: #8a9aa4; }
 
-    /* ---------- 舞台提示（回旋加速器） ---------- */
-    .stage-alert { position: absolute; right: 58px; bottom: 12px; max-width: min(560px, 56%);
-                   padding: 7px 12px; border-radius: 8px; z-index: 3;
-                   background: rgba(10,13,20,.9); border: 1px solid rgba(255,209,102,.85);
-                   color: #ffd166; font-size: 12px; font-weight: 700; line-height: 1.45;
-                   text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,.4); pointer-events: none; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    @media (max-width: 1120px) {
-      .hud-panel { width: 210px; }
-      .hud-toggle[aria-expanded="true"] { right: 234px; }
-      .drawer { width: min(380px, 78%); }
-      /* 窄屏放不下一宽一窄两列：退回单列，保证标签不换行、按钮不挤 */
-      .hud-panel .panel-cols { grid-template-columns: 1fr; gap: 8px; }
-      .hud-panel .panel-cols .segmented { grid-template-columns: 1fr 1fr; }
-      .hud-panel .panel-cols .panel-actions { margin-top: 9px; }
-      .hud-panel .panel-cols .toggle { font-size: 11.5px; gap: 7px; }
-      .hud-panel .panel-cols .toggle input { width: 15px; height: 15px; }
-      .hud-panel .panel-cols .particle-btn { min-height: 32px; }
-      .hud-panel .panel-cols .panel-actions button { min-height: 32px; font-size: 12.5px; }
+    @media (max-width: 1200px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .workspace { padding: 12px 16px 14px; gap: 14px; }
+      .panel { width: 240px; padding: 12px; }
+      .drawer { right: 16px; top: 12px; width: 292px; max-height: calc(100% - 26px); }
+      .ro-item { padding: 3px 9px; }
+      .legend { gap: 12px; }
     }
-</style>
+
+    @media (max-width: 980px) {
+      html, body { height: auto; overflow: auto; }
+      .topbar { height: auto; min-height: 56px; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
+      .readout { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+      .top-actions { margin-left: auto; }
+      .workspace { height: auto; min-height: calc(100vh - 56px); flex-direction: column;
+                   align-items: center; padding: 12px; }
+      .stage-column { width: min(92vw, 720px); }
+      .panel { width: min(92vw, 360px); }
+      .drawer { right: 12px; top: 12px; width: min(92vw, 340px); max-height: 70vh; }
+      .legend { white-space: normal; flex-wrap: wrap; text-align: center; }
+    }
+  </style>
 </head>
 <body>
-  <main class="app">
-    <div class="stage">
+  <header class="topbar">
+    <h1 class="brand">回旋加速器</h1>
+
+    <div class="readout" aria-label="实时读数">
+      <span class="ro-item"><span class="ro-k">粒子</span><b id="stageParticle">质子</b></span>
+      <span class="ro-item"><span class="ro-k">加速</span><b id="stageBoosts">0 / 10</b></span>
+      <span class="ro-item"><span class="ro-k">状态</span><b id="stageStatus">暂停</b></span>
+      <span class="ro-item"><span class="ro-k">半径比 r末/r₁</span><b id="radiusValue">3.16</b></span>
+    </div>
+
+    <div class="top-actions">
+      <button type="button" class="top-btn round" id="moreBtn" aria-expanded="false"
+              aria-controls="drawer" aria-label="结论与说明">?</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="stage-column">
       <div class="stage-frame">
-
         <canvas id="cyclotronCanvas" width="960" height="540"></canvas>
+      </div>
 
-        <!-- 左上角实时读数：4 个 chips -->
-        <div class="hud hud-readout" aria-label="实时读数">
-          <div class="tile">
-            <span class="tile-label">粒子</span>
-            <span class="tile-value" id="stageParticle">质子</span>
-          </div>
-          <div class="tile">
-            <span class="tile-label">加速</span>
-            <span class="tile-value" id="stageBoosts">0 / 10</span>
-          </div>
-          <div class="tile">
-            <span class="tile-label">状态</span>
-            <span class="tile-value" id="stageStatus">暂停</span>
-          </div>
-          <div class="tile">
-            <span class="tile-value" id="radiusValue">r末 / r₁ = 3.16</span>
-          </div>
-        </div>
-
-        <!-- 左下角图例：一行 -->
-        <div class="hud hud-legend" aria-label="图例">
-          <span class="lg"><i class="sw" style="background:#ffd166"></i>轨道</span>
-          <span class="lg"><i class="sw" style="background:#f59e0b"></i>缝隙加速段</span>
-          <span class="lg"><i class="sw" style="background:#ffffff"></i>速度 v</span>
-          <span class="lg"><i class="sw" style="background:#7dd3fc"></i>洛伦兹力 F</span>
-          <span class="lg"><i class="sw" style="background:#34d399"></i>电场 E</span>
-          <span class="lg">· 磁场垂直屏面向外</span>
-        </div>
-
-        <!-- 右上角参数面板（可折叠） -->
-        <button class="hud-toggle" id="ctrlToggle" type="button" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
-
-        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
-          <div class="panel-grip" id="panelGrip">
-            <span class="grip-title">参数</span>
-            <button type="button" class="grip-fold" id="panelFoldBtn" aria-expanded="true" aria-controls="ctrlPanel" title="折叠 / 展开参数面板">折叠</button>
-          </div>
-
-          <div class="panel-cols">
-            <div class="panel-col">
-              <div class="panel-title">磁场与电压</div>
-              <div class="slider-field">
-                <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">1.2</span></label>
-                <input id="bSlider" type="range" min="0.7" max="2.0" value="1.2" step="0.1" />
-              </div>
-              <div class="slider-field">
-                <label for="uSlider"><span>缝隙电压 U</span><span id="uValue">1.5</span></label>
-                <input id="uSlider" type="range" min="0.6" max="2.4" value="1.5" step="0.1" />
-              </div>
-              <div class="panel-title" style="margin-top:8px">显示</div>
-              <div class="toggles">
-                <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>速度与洛伦兹力</span></label>
-                <label class="toggle"><input type="checkbox" id="showBField" checked /><span>磁场符号（出屏）</span></label>
-              </div>
-            </div>
-
-            <div class="panel-col">
-              <div class="panel-title">粒子类型</div>
-              <div class="segmented">
-                <button type="button" class="particle-btn active" data-particle="proton">质子</button>
-                <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
-              </div>
-              <div class="panel-actions">
-                <button type="button" class="primary-btn" id="playBtn">播放</button>
-                <button type="button" id="resetBtn">重置</button>
-              </div>
-            </div>
-          </div>
-
-          <p class="footnote">α 粒子 m/q = 2：同 B 下半径 √2 倍、周期 2 倍。</p>
-        </aside>
-
-        <!-- 底部提示（达到最大半径等） -->
-        <div class="stage-alert" id="stageAlert" hidden></div>
-
-        <!-- 右下角「?」抽屉 -->
-        <button class="hud-more" id="moreBtn" type="button" aria-expanded="false" aria-controls="drawer" title="结论与说明">?</button>
-
-        <section class="drawer" id="drawer" hidden aria-label="结论与说明">
-          <div class="drawer-head">
-            <span class="mode-tag">回旋加速器</span>
-            <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭抽屉">×</button>
-          </div>
-
-          <h3>半径变化（末端 / 初始）</h3>
-          <p class="conclusion-note" id="radiusNote">—</p>
-
-          <h3>周期关系</h3>
-          <p class="drawer-eq" id="periodValue">T = 2πm / qB</p>
-          <p class="conclusion-note" id="periodNote">—</p>
-
-          <h3>能量增量</h3>
-          <p class="drawer-eq" id="energyValue">ΔE_k = qU</p>
-          <p class="conclusion-note" id="energyNote">—</p>
-
-          <h3>核心关系</h3>
-          <p class="conclusion-formula">r = mv / qB　　T = 2πm / qB　　ΔE_k = qU　　r ∝ √n</p>
-
-          <h3>模型假设</h3>
-          <p class="conclusion-note">非相对论、匀强磁场、理想薄缝的简化模型。缝隙内无磁场、只有电场，粒子沿垂直缝边的直线被加速（每次 +qU，首段由缝口静止出发）；进入 D 形盒后只受洛伦兹力，做半圆运动，半圆的直径落在缝边线上——所以轨迹是“半圆 + 直线过缝”交替，而不是同心圆。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</p>
-
-          <h3>课堂观察</h3>
-          <ul class="q-list">
-            <li>缝隙里粒子的轨迹为什么是直线段？它在哪里被加速、在哪里只是偏转？</li>
-            <li>增大 B 后轨道为什么更紧？回旋周期 T 与速率有没有直接关系？</li>
-            <li>换成 α 粒子后，同样 B、U 下半径和周期为什么会改变？</li>
-          </ul>
-
-          <p class="drawer-keys">空格：播放/暂停 · R：重置 · P：参数 · ?：本抽屉</p>
-        </section>
-
+      <div class="legend" aria-label="图例">
+        <span class="lg"><i class="sw" style="background:#d9a000"></i>轨道</span>
+        <span class="lg"><i class="sw thick" style="background:#e2820a"></i>缝隙加速段</span>
+        <span class="lg"><i class="sw" style="background:#16232b"></i>速度 v</span>
+        <span class="lg"><i class="sw" style="background:#0ea5e9"></i>洛伦兹力 F</span>
+        <span class="lg"><i class="sw" style="background:#059669"></i>电场 E</span>
+        <span class="lg">· 磁场垂直屏面向外</span>
       </div>
     </div>
-  </main>
 
+    <aside class="panel" id="ctrlPanel" aria-label="粒子类型与参数">
+      <div class="group">
+        <p class="group-label">粒子类型</p>
+        <div class="segmented" role="group" aria-label="粒子类型">
+          <button type="button" class="particle-btn active" data-particle="proton" aria-pressed="true">质子</button>
+          <button type="button" class="particle-btn" data-particle="alpha" aria-pressed="false">α 粒子</button>
+        </div>
+        <p class="footnote">α 粒子 m/q = 2：同 B 下半径 √2 倍、周期 2 倍。</p>
+      </div>
+
+      <div class="group">
+        <p class="group-label">参数</p>
+        <div class="row"><label for="bSlider">磁感应强度 B</label><b id="bValue">1.2</b></div>
+        <input id="bSlider" type="range" min="0.7" max="2.0" value="1.2" step="0.1" aria-label="磁感应强度 B" />
+
+        <div class="row"><label for="uSlider">缝隙电压 U</label><b id="uValue">1.5</b></div>
+        <input id="uSlider" type="range" min="0.6" max="2.4" value="1.5" step="0.1" aria-label="缝隙电压 U" />
+      </div>
+
+      <div class="group">
+        <p class="group-label">显示</p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>速度与洛伦兹力</span></label>
+          <label class="toggle"><input type="checkbox" id="showBField" checked /><span>磁场符号（出屏）</span></label>
+        </div>
+      </div>
+
+      <div class="reset-row">
+        <button type="button" class="primary-btn" id="playBtn">播放</button>
+        <button type="button" class="ghost-btn" id="resetBtn">重置</button>
+      </div>
+
+      <p class="panel-alert" id="stageAlert" hidden></p>
+    </aside>
+
+    <section class="drawer" id="drawer" hidden aria-label="结论与说明">
+      <div class="drawer-head">
+        <h2>说明</h2>
+        <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭说明">×</button>
+      </div>
+
+      <h3>半径变化（末端 / 初始）</h3>
+      <p id="radiusNote">—</p>
+
+      <h3>周期关系</h3>
+      <p class="drawer-eq" id="periodValue">T = 2πm / qB</p>
+      <p id="periodNote">—</p>
+
+      <h3>能量增量</h3>
+      <p class="drawer-eq" id="energyValue">ΔE_k = qU</p>
+      <p id="energyNote">—</p>
+
+      <h3>核心关系</h3>
+      <p class="conclusion-formula">r = mv / qB　　T = 2πm / qB　　ΔE_k = qU　　r ∝ √n</p>
+
+      <h3>模型假设</h3>
+      <p>非相对论、匀强磁场、理想薄缝的简化模型。缝隙内无磁场、只有电场，粒子沿垂直缝边的直线被加速（每次 +qU，首段由缝口静止出发）；进入 D 形盒后只受洛伦兹力，做半圆运动，半圆的直径落在缝边线上——所以轨迹是“半圆 + 直线过缝”交替，而不是同心圆。动画角速度按 qB/m 缩放（已大幅放慢），v 箭头长度 ∝ v。</p>
+
+      <h3>课堂观察</h3>
+      <ul class="q-list">
+        <li>缝隙里粒子的轨迹为什么是直线段？它在哪里被加速、在哪里只是偏转？</li>
+        <li>增大 B 后轨道为什么更紧？回旋周期 T 与速率有没有直接关系？</li>
+        <li>换成 α 粒子后，同样 B、U 下半径和周期为什么会改变？</li>
+      </ul>
+
+      <h3>操作</h3>
+      <p>右侧参数卡：播放/暂停、质子 / α 粒子切换、B 与 U 滑块。画布只保留 D 形盒、螺旋轨迹与缝隙标注。</p>
+      <p class="drawer-keys">快捷键：空格 播放/暂停 · R 重置 · ? 本抽屉 · Esc 关闭</p>
+    </section>
+  </main>
 
   <script>
     const canvas = document.getElementById("cyclotronCanvas");
@@ -420,7 +338,7 @@
     const EDGE_R = GEOM.cx + GEOM.gap / 2;
 
     /* 轨道允许到达的“D 形盒可用半径”：留 14 px 安全边距，防止轨道压到盒壁 */
-    const R_AVAIL = GEOM.radius - 14;      // = 192 px
+    const R_AVAIL = GEOM.radius - 14;      // = 162 px
     const TARGET_PASSES = 10;              // 期望最多显示的加速次数
 
     /* 显示比例系数：r_px = R_SCALE · √(n·U·m/q) / B。
@@ -880,7 +798,7 @@
         : (finished ? (scene.hitLimit ? "已达最大半径" : "加速完成") : "暂停");
 
       /* 半径：比值只用实际画出的最大半径（第 passCount 段），并给出 √n 参照 */
-      output.radiusValue.textContent = `r末 / r₁ = ${ratio.toFixed(2)}`;
+      output.radiusValue.textContent = ratio.toFixed(2);
       const limitNote = scene.hitLimit
         ? `；已达 D 形盒可用半径 ${R_AVAIL} px，加速在第 ${scene.passCount} 次后停止`
         : "";
@@ -965,25 +883,32 @@
     controls.showBField.addEventListener("change", render);
 
     controls.particleButtons.forEach(button => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
         state.particle = button.dataset.particle;
-        controls.particleButtons.forEach(btn => btn.classList.toggle("active", btn === button));
+        controls.particleButtons.forEach(btn => {
+          const on = btn === button;
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-pressed", String(on));
+        });
+        if (event.detail > 0) button.blur();
         render();
       });
     });
 
-    controls.playBtn.addEventListener("click", () => {
+    controls.playBtn.addEventListener("click", (event) => {
       const scene = buildScene();
       if (!state.playing && state.phase >= scene.total - 1e-9) state.phase = 0;
       state.playing = !state.playing;
       controls.playBtn.textContent = state.playing ? "暂停" : "播放";
+      if (event.detail > 0) controls.playBtn.blur();
       render();
     });
 
-    controls.resetBtn.addEventListener("click", () => {
+    controls.resetBtn.addEventListener("click", (event) => {
       state.phase = 0;
       state.playing = false;
       controls.playBtn.textContent = "播放";
+      if (event.detail > 0) controls.resetBtn.blur();
       render();
     });
 
@@ -991,142 +916,58 @@
     render();
     animate();
   </script>
-<script>
-(function () {
-  var panel = document.getElementById("ctrlPanel");
-  var toggle = document.getElementById("ctrlToggle");
-  var drawer = document.getElementById("drawer");
-  var more = document.getElementById("moreBtn");
-  var closeBtn = document.getElementById("drawerClose");
-  var playBtn = document.getElementById("playBtn");
-  var resetBtn = document.getElementById("resetBtn");
-  var foldBtn = document.getElementById("panelFoldBtn");
 
-  function setPanel(open) {
-    panel.hidden = !open;
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    if (foldBtn) foldBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) setDrawer(false);
-  }
+  <script>
+    (function () {
+      "use strict";
 
-  function setDrawer(open) {
-    drawer.hidden = !open;
-    more.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) setPanel(false);
-  }
+      var moreBtn = document.getElementById("moreBtn");
+      var drawer = document.getElementById("drawer");
+      var drawerClose = document.getElementById("drawerClose");
+      var playBtn = document.getElementById("playBtn");
+      var resetBtn = document.getElementById("resetBtn");
 
-  toggle.addEventListener("click", function () { setPanel(panel.hidden); });
-  more.addEventListener("click", function () { setDrawer(drawer.hidden); });
-  closeBtn.addEventListener("click", function () { setDrawer(false); });
-  if (foldBtn) {
-    foldBtn.addEventListener("click", function () { setPanel(false); });
-    /* 折叠按钮上的按下不要被 grip 的拖动劫持（否则 pointer capture 会吞掉 click） */
-    foldBtn.addEventListener("pointerdown", function (event) { event.stopPropagation(); });
-    /* 双击折叠按钮不要冒泡到 grip 的 dblclick（否则会再折叠一次） */
-    foldBtn.addEventListener("dblclick", function (event) { event.stopPropagation(); });
-  }
+      function setDrawerOpen(open) {
+        drawer.hidden = !open;
+        moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open) drawerClose.focus();
+      }
 
-  document.addEventListener("keydown", function (event) {
-    var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : "";
-    if (event.key === "Escape") {
-      setDrawer(false);
-      return;
-    }
-    if (event.key === "p" || event.key === "P") {
-      event.preventDefault();
-      setPanel(panel.hidden);
-      return;
-    }
-    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
-      event.preventDefault();
-      setDrawer(drawer.hidden);
-      return;
-    }
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (event.key === " " || event.code === "Space") {
-      event.preventDefault();
-      playBtn.click();
-      return;
-    }
-    if (event.key === "r" || event.key === "R") {
-      event.preventDefault();
-      resetBtn.click();
-    }
-  });
-})();
-</script>
+      moreBtn.addEventListener("click", function (event) {
+        setDrawerOpen(drawer.hidden);
+        if (event.detail > 0 && drawer.hidden) moreBtn.blur();
+      });
+      drawerClose.addEventListener("click", function () {
+        setDrawerOpen(false);
+        moreBtn.focus();
+      });
 
-<script>
-// 面板拖动 + 位置记忆：所有仿真页面共用同一份实现（LAYOUT.md 原文照抄）
-(function initDraggablePanel(){
-  const panel = document.getElementById('ctrlPanel');
-  const grip  = panel && panel.querySelector('.panel-grip');
-  if (!panel || !grip) return;
-  const KEY = 'hud-panel-pos:' + location.pathname.split('/').pop();
-
-  function clampToFrame(x, y){
-    const f = panel.parentElement.getBoundingClientRect();
-    const r = panel.getBoundingClientRect();
-    return {
-      x: Math.min(Math.max(8, x), f.width  - r.width  - 8),
-      y: Math.min(Math.max(8, y), f.height - r.height - 8)
-    };
-  }
-  function place(x, y){
-    const p = clampToFrame(x, y);
-    panel.style.left = p.x + 'px';
-    panel.style.top  = p.y + 'px';
-    panel.style.right = 'auto';
-  }
-  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-  if (saved) place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
-
-  let dx = 0, dy = 0, dragging = false;
-  grip.addEventListener('pointerdown', e => {
-    const f = panel.parentElement.getBoundingClientRect();
-    const r = panel.getBoundingClientRect();
-    dx = e.clientX - r.left; dy = e.clientY - r.top;
-    dragging = true; panel.classList.add('dragging');
-    grip.setPointerCapture(e.pointerId);
-    panel.style.left = (r.left - f.left) + 'px';
-    panel.style.top  = (r.top  - f.top ) + 'px';
-    panel.style.right = 'auto';
-  });
-  grip.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const f = panel.parentElement.getBoundingClientRect();
-    place(e.clientX - f.left - dx, e.clientY - f.top - dy);
-  });
-  grip.addEventListener('pointerup', e => {
-    if (!dragging) return;
-    dragging = false; panel.classList.remove('dragging');
-    grip.releasePointerCapture(e.pointerId);
-    localStorage.setItem(KEY, JSON.stringify({
-      x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
-    }));
-  });
-  grip.addEventListener('dblclick', () => document.getElementById('ctrlToggle').click());
-})();
-
-// 面板上的指针事件不向画布穿透；窗口尺寸变化时把面板拉回舞台内
-(function guardPanel(){
-  const panel = document.getElementById('ctrlPanel');
-  if (!panel) return;
-  ['pointerdown', 'pointermove', 'pointerup', 'click'].forEach(function (type) {
-    panel.addEventListener(type, function (e) { e.stopPropagation(); });
-  });
-  window.addEventListener('resize', function () {
-    if (panel.hidden || !panel.style.left) return;
-    const f = panel.parentElement.getBoundingClientRect();
-    const r = panel.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const x = Math.min(Math.max(8, parseFloat(panel.style.left)), Math.max(8, f.width - r.width - 8));
-    const y = Math.min(Math.max(8, parseFloat(panel.style.top)), Math.max(8, f.height - r.height - 8));
-    panel.style.left = x + 'px';
-    panel.style.top = y + 'px';
-    panel.style.right = 'auto';
-  });
-})();
-</script>
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          if (!drawer.hidden) { setDrawerOpen(false); moreBtn.focus(); }
+          return;
+        }
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        var el = event.target;
+        var tag = el && el.tagName;
+        if (event.key === " " || event.code === "Space") {
+          if (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A", "SUMMARY"].indexOf(tag) >= 0) return;
+          event.preventDefault();
+          playBtn.click();
+          return;
+        }
+        var typing = tag === "TEXTAREA" || tag === "SELECT"
+          || (tag === "INPUT" && ["text", "number", "search", "email", "url", "password", "tel"].indexOf(el.type) >= 0);
+        if (typing) return;
+        if (event.key === "r" || event.key === "R") {
+          event.preventDefault();
+          resetBtn.click();
+        } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
+          event.preventDefault();
+          setDrawerOpen(drawer.hidden);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -1,224 +1,280 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>电势与等势面</title>
   <link rel="icon" href="data:," />
+  <title>电势与等势面</title>
   <style>
-    * { box-sizing: border-box; }
-
-    /* —— LAYOUT.md 必需样式 —— */
-    html, body { height: 100%; }
-    body { margin: 0; background: #070d11; overflow: hidden;
-           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
-
-    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
-
-    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
-
-    /* 16:9 等比舞台：同时受宽高约束 */
-    .stage-frame { position: relative; aspect-ratio: 16 / 9;
-                   width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #0b141a; }
-
-    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
-
-    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
-           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
-           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
-
-    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
-                   padding: 6px 10px; font-size: 12.5px; }
-    .hud-readout b { font-size: 14px; color: #7fd6e4; }
-
-    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
-                  color: #cfe3e9; }
-
-    /* 参数面板默认贴左下角（避开左上 chips、左下图例，也不压匀强场的两具极板）。
-       宽度 min(132px, 9.6vw, 17vh)：1366×768 下 131px，右缘 157px，仍在左极板左缘 164px 之外；
-       1024×768 下 98px、1920×1080 下 132px，同样不压极板。 */
-    .hud-panel { left: 12px; right: auto; top: auto; bottom: 52px;
-                 width: min(132px, 9.6vw, 17vh); max-height: calc(100% - 64px);
-                 overflow-y: auto; padding: 10px; font-size: 12px; cursor: default; }
-    .hud-panel[hidden] { display: none; }
-
-    /* 首行把手：标题 + 折叠按钮；拖动改位置，双击折叠（LAYOUT.md「参数面板必须可拖动」） */
-    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
-                             display: flex; align-items: center; justify-content: space-between;
-                             gap: 6px; margin: -2px 0 8px; }
-    .hud-panel .panel-grip:active { cursor: grabbing; }
-    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
-    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #7fd6e4; }
-    .hud-panel .grip-btn { width: 20px; height: 20px; padding: 0; line-height: 1; font-size: 12px;
-                           border-radius: 6px; cursor: pointer; color: #eaf2f5;
-                           background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); }
-    .hud-panel .grip-btn:hover { background: rgba(255,255,255,.18); }
-
-    /* 折叠后「参数」按钮才出现；展开时首行把手上已有折叠按钮 */
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
-                  font: inherit; font-size: 12.5px;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
-                  display: none; }
-    .hud-toggle[aria-expanded="false"] { display: inline-block; }
-
-    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
-                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
-                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-
-    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
-              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
-              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
-    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
-    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
-
-    @media (max-width: 900px) {
-      .hud-panel { padding: 8px; font-size: 11.5px; }
+    :root {
+      --page: #f4f6f8;
+      --card: #ffffff;
+      --ink: #16232b;
+      --muted: #5d7480;
+      --line: #e3e8ec;
+      --stage: #0b141a;
+      --accent: #0f766e;
+      --positive: #d92d2d;
+      --negative: #3558ff;
     }
 
-    /* —— 叠加层内部样式（只影响外观） —— */
-    .stage-frame > canvas { cursor: crosshair; touch-action: none; }
+    * { box-sizing: border-box; }
 
-    .hud-readout > span { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; color: #9fb6bf; }
-    .hud-readout > span + span { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.16); }
-    .hud-readout b { font-weight: 800; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--page); color: var(--ink); overflow: hidden;
+           font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+           -webkit-font-smoothing: antialiased; }
 
-    .hud-legend { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; overflow: hidden; }
-    .lg-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    /* —— 顶栏：白底，高 56px —— */
+    .topbar { height: 56px; display: flex; align-items: center; gap: 16px;
+              padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .brand { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .01em;
+             white-space: nowrap; }
+
+    .readout { margin-left: auto; display: flex; align-items: center; min-width: 0;
+               padding: 3px 2px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 1px 2px rgba(22, 35, 43, .05); }
+    .ro-item { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px;
+               font-size: 12.5px; white-space: nowrap; }
+    .ro-item + .ro-item { border-left: 1px solid #eef2f4; }
+    .ro-k { color: var(--muted); font-size: 12.5px; }
+    .ro-u { color: #8b9ba5; font-size: 11px; }
+    .ro-item b { color: var(--ink); font-size: 12.5px; font-weight: 700; }
+
+    .top-actions { margin-left: 4px; display: flex; gap: 8px; }
+    .top-btn { height: 30px; padding: 0 13px; border: 1px solid var(--line);
+               border-radius: 8px; background: var(--card); color: var(--ink);
+               font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1;
+               cursor: pointer; }
+    .top-btn:hover { background: #f7f9fa; border-color: #d5dde2; }
+    .top-btn.round { width: 30px; padding: 0; border-radius: 50%;
+                     color: var(--muted); font-weight: 700; font-size: 13px; }
+    .top-btn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #ffffff; }
+
+    /* —— 主体：左黑色画布窗口 + 右白色参数卡 —— */
+    .workspace { position: relative; height: calc(100vh - 56px); display: flex;
+                 align-items: flex-start; justify-content: center; gap: 18px;
+                 padding: 14px 20px 16px; }
+
+    .stage-column { flex: 0 0 auto; width: min(72vw, calc(177.78vh - 266.67px));
+                    display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9;
+                   overflow: hidden; background: var(--stage); border-radius: 14px;
+                   box-shadow: 0 14px 34px rgba(11, 20, 26, .2), 0 2px 6px rgba(11, 20, 26, .14); }
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    #potentialCanvas { cursor: crosshair; touch-action: none; }
+
+    .legend { display: flex; align-items: center; justify-content: center; gap: 18px;
+              padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 10px; font-size: 12px; color: var(--muted);
+              white-space: nowrap; overflow: hidden; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; }
     .lg-swatch { width: 18px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
     .lg-swatch.high { background: #d62456; }
     .lg-swatch.low { background: #1d4ed8; }
-    .lg-line { width: 16px; height: 10px; border-left: 2px solid rgba(255,255,255,.85); flex: 0 0 auto; }
-    .lg-arrow { width: 0; height: 0; border-left: 12px solid rgba(255,255,255,.78);
+    .lg-line { width: 14px; height: 10px; border-left: 2px solid #6f8791; flex: 0 0 auto; }
+    .lg-arrow { width: 0; height: 0; border-left: 10px solid #8fa2ab;
                 border-top: 4px solid transparent; border-bottom: 4px solid transparent; flex: 0 0 auto; }
+    .lg-probe { width: 10px; height: 10px; border-radius: 50%; background: #ffd166;
+                border: 1px solid #d09b12; flex: 0 0 auto; }
 
-    .hud-panel::-webkit-scrollbar, .drawer::-webkit-scrollbar { width: 6px; }
-    .hud-panel::-webkit-scrollbar-thumb, .drawer::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
+    /* —— 右侧参数卡：白底、圆角 12、细边框 —— */
+    .panel-col { position: relative; flex: 0 0 auto; width: 280px; }
+    .panel { width: 100%; padding: 14px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 12px;
+             box-shadow: 0 1px 2px rgba(22, 35, 43, .04);
+             max-height: calc(100vh - 56px - 30px); overflow-y: auto; }
+    .group + .group { margin-top: 14px; }
+    .group-label { margin: 0 0 8px; color: #7c8d97; font-size: 12px; letter-spacing: .04em; }
 
-    .panel-title { margin: 0 0 6px; font-size: 10.5px; letter-spacing: .08em; color: #8aa2ac; }
-    .hud button { font-family: inherit; cursor: pointer; }
-    /* 窄栏：场景按钮竖排，避免中文换行 */
-    .hud-panel .scene-buttons { display: grid; grid-template-columns: 1fr; gap: 5px; }
-    .hud-panel .scene-btn { min-height: 27px; padding: 0 4px; font-size: 12px; font-weight: 700; color: #dbe9ee;
-                            background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); border-radius: 7px; }
-    .hud-panel .scene-btn:hover { background: rgba(255,255,255,.12); }
-    .hud-panel .scene-btn.active { background: #0f766e; border-color: #0f766e; color: #fff; }
-    .hud-panel .field { margin-top: 9px; }
-    .hud-panel .field label { display: flex; flex-wrap: wrap; justify-content: space-between;
-                              gap: 0 6px; font-size: 11.5px; color: #cfe3e9; }
-    .hud-panel .field label b { color: #7fd6e4; font-weight: 700; }
-    .hud-panel input[type="range"] { width: 100%; margin: 4px 0 0; accent-color: #7fd6e4; }
-    .hud-panel .toggles { display: grid; gap: 5px; margin-top: 9px; }
-    .hud-panel .toggle { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
-    .hud-panel .toggle input { width: 14px; height: 14px; accent-color: #7fd6e4; flex: 0 0 auto; }
-    .hud-panel .btn-row { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 9px; }
-    .hud-panel .btn-row button { min-height: 30px; border-radius: 8px; font-size: 12px; font-weight: 700;
-                                 border: 1px solid #0f766e; background: #0f766e; color: #fff; }
-    .hud-panel .btn-row button:hover { background: #0d665f; }
-    .hud-panel .ctl-hint { margin: 7px 0 0; font-size: 10.5px; line-height: 1.45; color: #9fb6bf; }
+    .scene-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .scene-btn { height: 30px; padding: 0 2px; border: 1px solid #dfe6ea; border-radius: 8px;
+                 background: var(--card); color: #33454f; font-family: inherit;
+                 font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .scene-btn:hover { background: #f7f9fa; border-color: #d3dce2; }
+    .scene-btn.active { background: var(--ink); border-color: var(--ink); color: #ffffff;
+                        font-weight: 700; }
 
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 8px; margin-top: 8px; color: var(--muted); font-size: 11.5px; }
+    .row b { color: var(--ink); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 4px 0 0;
+                          accent-color: var(--accent); background: transparent; cursor: pointer; }
+
+    .toggles { display: grid; gap: 2px; }
+    .toggle { display: flex; align-items: center; gap: 7px; padding: 3px 0;
+              color: #33454f; font-size: 12px; line-height: 1.3; cursor: pointer;
+              user-select: none; }
+    .toggle input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto;
+                    accent-color: var(--accent); }
+
+    .reset-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef2f4; }
+    .primary-btn { width: 100%; height: 32px; border: 1px solid #d8e0e5; border-radius: 8px;
+                   background: var(--card); color: var(--ink); font-family: inherit;
+                   font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .primary-btn:hover { background: #f7f9fa; }
+
+    /* —— 「?」抽屉：白卡，贴在参数卡上方把它整块盖住 —— */
+    .drawer { position: absolute; z-index: 30; right: -10px; top: 0; width: calc(100% + 20px);
+              max-height: calc(100vh - 84px); overflow-y: auto; padding: 16px 18px;
+              background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              box-shadow: 0 22px 48px -12px rgba(22, 35, 43, .28), 0 2px 6px rgba(22, 35, 43, .06); }
+    .drawer[hidden] { display: none; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .drawer-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .drawer-close { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line);
+                    border-radius: 7px; background: var(--card); color: var(--muted);
+                    font-size: 16px; line-height: 1; cursor: pointer; }
+    .drawer-close:hover { background: #f4f6f8; color: var(--ink); }
+    .drawer h3 { margin: 14px 0 4px; color: #7c8d97; font-size: 12px;
+                 font-weight: 600; letter-spacing: .04em; }
+    .drawer-head + h3 { margin-top: 2px; }
+    .drawer p, .drawer li { color: #4a5f6a; font-size: 12.5px; line-height: 1.6; }
+    .drawer p { margin: 4px 0; }
+    .drawer ul { margin: 4px 0; padding-left: 16px; }
+    .drawer li { margin: 3px 0; }
     .drawer .formula-line { margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px;
-                            background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; }
-    .drawer ul { margin: 4px 0 0; padding-left: 18px; }
-    .drawer .note { font-size: 12px; color: #9fb6bf; }
-    .metric-value { font-weight: 800; }
-    .metric-value.positive { color: #ff9a9a; }
-    .metric-value.negative { color: #9aa8ff; }
-    .metric-value.neutral { color: #7fd6e4; }
+                            background: #f1f6f7; color: #2b4a53; font-size: 12.5px; }
+    .drawer .note { font-size: 12px; color: #6b7f89; }
+    .metric-value { font-weight: 700; color: var(--ink); }
+    .metric-value.positive { color: var(--positive); }
+    .metric-value.negative { color: var(--negative); }
+    .metric-value.neutral { color: var(--accent); }
+
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    @media (max-width: 1200px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .workspace { padding: 12px 16px 14px; gap: 14px; }
+      .panel-col { width: 240px; }
+      .panel { padding: 12px; }
+      .scene-btn { font-size: 11.5px; }
+      .drawer { max-height: calc(100vh - 76px); }
+      .ro-item { padding: 3px 9px; }
+      .legend { gap: 12px; }
+    }
+
+    @media (max-width: 980px) {
+      html, body { height: auto; overflow: auto; }
+      .topbar { height: auto; min-height: 56px; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
+      .readout { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+      .top-actions { margin-left: auto; }
+      .workspace { height: auto; min-height: calc(100vh - 56px); flex-direction: column;
+                   align-items: center; padding: 12px; }
+      .stage-column { width: min(92vw, 720px); }
+      .panel-col { width: min(92vw, 360px); }
+      .panel { max-height: none; }
+      .drawer { max-height: 70vh; }
+      .legend { white-space: normal; text-align: center; }
+    }
   </style>
 </head>
 <body>
-  <main class="app">
-    <div class="stage">
+  <header class="topbar">
+    <h1 class="brand">电势与等势面</h1>
+
+    <div class="readout" aria-label="实时读数">
+      <span class="ro-item"><span class="ro-k">场景</span><b id="stageScene">正点电荷</b></span>
+      <span class="ro-item"><span class="ro-k">探针</span><b id="stageV">较高电势区</b></span>
+      <span class="ro-item"><span class="ro-k">电场</span><b id="stageE">--</b></span>
+      <span class="ro-item"><span class="ro-k">φ</span><b id="probePhi">--</b><span class="ro-u">kQ₀/R₀</span></span>
+    </div>
+
+    <div class="top-actions">
+      <button type="button" class="top-btn round" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="说明与课堂问题">?</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="stage-column">
       <div class="stage-frame">
         <canvas id="potentialCanvas" width="960" height="540"></canvas>
+      </div>
 
-        <div class="hud hud-readout">
-          <span>场景 <b id="stageScene">正点电荷</b></span>
-          <span>探针 <b id="stageV">中等电势区</b></span>
-          <span>电场 <b id="stageE">--</b></span>
-          <span>φ <b id="probePhi">--</b> kQ₀/R₀</span>
+      <div class="legend" id="legend" aria-label="图例">
+        <span class="lg"><i class="lg-swatch high"></i>高电势</span>
+        <span class="lg"><i class="lg-swatch low"></i>低电势</span>
+        <span class="lg"><i class="lg-line"></i>等势线</span>
+        <span class="lg"><i class="lg-arrow"></i>电场方向·等长</span>
+        <span class="lg"><i class="lg-probe"></i>黄色探针 V 可拖动</span>
+      </div>
+    </div>
+
+    <div class="panel-col">
+      <aside class="panel" id="ctrlPanel" aria-label="场景与参数">
+        <div class="group">
+          <p class="group-label">场景</p>
+          <div class="scene-row" role="group" aria-label="电势场景">
+            <button type="button" class="scene-btn active" data-scene="singlePositive" aria-pressed="true">正点电荷</button>
+            <button type="button" class="scene-btn" data-scene="dipole" aria-pressed="false">等量异种</button>
+            <button type="button" class="scene-btn" data-scene="uniform" aria-pressed="false">匀强电场</button>
+          </div>
         </div>
 
-        <div class="hud hud-legend" id="legend" aria-hidden="true">
-          <span class="lg-item"><span class="lg-swatch high"></span>高电势</span>
-          <span class="lg-item"><span class="lg-swatch low"></span>低电势</span>
-          <span class="lg-item"><span class="lg-line"></span>等势线</span>
-          <span class="lg-item"><span class="lg-arrow"></span>电场方向·等长</span>
+        <div class="group">
+          <p class="group-label">参数</p>
+          <div class="row"><label for="levelSlider">等势线条数</label><b id="levelValue">共 9 条</b></div>
+          <input id="levelSlider" type="range" min="5" max="13" value="9" step="2" aria-label="等势线条数" />
+
+          <div class="row"><label for="scaleSlider">电势色阶</label><b id="scaleValue">1.0</b></div>
+          <input id="scaleSlider" type="range" min="0.5" max="2.5" value="1" step="0.1" aria-label="电势色阶" />
         </div>
 
-        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
-          <div class="panel-grip" id="panelGrip" title="拖动可移动面板（双击折叠）">
-            <span class="panel-name">参数</span>
-            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
-                    title="折叠（双击标题行也可）">◂</button>
-          </div>
-          <p class="panel-title">场景</p>
-          <div class="scene-buttons" role="group" aria-label="电势场景">
-            <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
-            <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
-            <button type="button" class="scene-btn" data-scene="uniform">匀强电场</button>
-          </div>
-
-          <div class="field">
-            <label for="levelSlider"><span>等势线条数</span><b id="levelValue">共 9 条</b></label>
-            <input id="levelSlider" type="range" min="5" max="13" value="9" step="2" />
-          </div>
-          <div class="field">
-            <label for="scaleSlider"><span>电势色阶</span><b id="scaleValue">1.0</b></label>
-            <input id="scaleSlider" type="range" min="0.5" max="2.5" value="1" step="0.1" />
-          </div>
-
+        <div class="group">
+          <p class="group-label">显示选项</p>
           <div class="toggles">
             <label class="toggle"><input type="checkbox" id="showHeat" checked /><span>电势颜色图</span></label>
             <label class="toggle"><input type="checkbox" id="showEquipotential" checked /><span>等势线</span></label>
             <label class="toggle"><input type="checkbox" id="showField" checked /><span>电场方向</span></label>
           </div>
+        </div>
 
-          <div class="btn-row">
-            <button type="button" class="primary-btn" id="resetBtn">重置探针</button>
-          </div>
-          <p class="ctl-hint">拖动黄色探针 V 测电势</p>
-        </aside>
+        <div class="reset-row">
+          <button type="button" class="primary-btn" id="resetBtn">重置探针</button>
+        </div>
+      </aside>
 
-        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
-        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+      <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂问题">
+        <div class="drawer-head">
+          <h2>说明</h2>
+          <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭说明">×</button>
+        </div>
 
-        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂问题">
-          <h3>结论</h3>
-          <p>等势线是等势面的剖面图；电场线与等势线垂直，并由电势高处指向电势低处。</p>
-          <p class="formula-line">φ = E<sub>p</sub> / q，等势线 ⟂ 电场线</p>
+        <h3>结论</h3>
+        <p>等势线是等势面的剖面图；电场线与等势线垂直，并由电势高处指向电势低处。</p>
+        <p class="formula-line">φ = E<sub>p</sub> / q，等势线 ⟂ 电场线</p>
 
-          <h3>实时量值</h3>
-          <p>场景：<span class="metric-value neutral" id="sceneName">正点电荷</span></p>
-          <p>探针电势：<span class="metric-value neutral" id="probeV">中等电势区</span></p>
-          <p class="note" id="probeVNote">—</p>
-          <p>电场方向：<span id="probeE">从高电势指向低电势</span></p>
+        <h3>实时量值</h3>
+        <p>场景：<span class="metric-value neutral" id="sceneName">正点电荷</span></p>
+        <p>探针电势：<span class="metric-value neutral" id="probeV">中等电势区</span></p>
+        <p class="note" id="probeVNote">—</p>
+        <p>电场方向：<span id="probeE">从高电势指向低电势</span></p>
 
-          <h3>等势线量级</h3>
-          <p class="note" id="levelNote">—</p>
+        <h3>等势线量级</h3>
+        <p class="note" id="levelNote">—</p>
 
-          <h3>模型假设与单位</h3>
-          <p class="note">电势一律按归一化单位显示：φ/(kQ₀/R₀)。取 Q₀ = 1 nC、R₀ = 1 m（1 世界单位 = 1 m），k = 8.99×10⁹ N·m²/C²，则 kQ₀/R₀ = 8.99 V，读数乘 8.99 即伏特；场强归一化为 E/(kQ₀/R₀²)，乘 8.99 V/m 即 SI 值。点电荷电势按 φ = Σ k·Q_i/√(r_i² + a²) 计算（a = 0.283 m，用于避免电荷中心发散；+Q = 1 nC，−Q = −1 nC）。</p>
+        <h3>模型假设与单位</h3>
+        <p class="note">电势一律按归一化单位显示：φ/(kQ₀/R₀)。取 Q₀ = 1 nC、R₀ = 1 m（1 世界单位 = 1 m），k = 8.99×10⁹ N·m²/C²，则 kQ₀/R₀ = 8.99 V，读数乘 8.99 即伏特；场强归一化为 E/(kQ₀/R₀²)，乘 8.99 V/m 即 SI 值。点电荷电势按 φ = Σ k·Q_i/√(r_i² + a²) 计算（a = 0.283 m，用于避免电荷中心发散；+Q = 1 nC，−Q = −1 nC）。</p>
 
-          <h3>课堂观察</h3>
-          <ul>
-            <li>沿同一条等势线移动探针，电势读数是否明显变化？</li>
-            <li>等势线密的地方，电场方向箭头和颜色变化有什么特点？</li>
-            <li>匀强电场中，相邻等势线间距改变时，E 与 U/d 的关系如何理解？</li>
-          </ul>
+        <h3>课堂观察</h3>
+        <ul>
+          <li>沿同一条等势线移动探针，电势读数是否明显变化？</li>
+          <li>等势线密的地方，电场方向箭头和颜色变化有什么特点？</li>
+          <li>匀强电场中，相邻等势线间距改变时，E 与 U/d 的关系如何理解？</li>
+        </ul>
 
-          <h3>教学提示</h3>
-          <p id="teachingTip">等势线是等势面的剖面图。电场线与等势线垂直，并由电势高处指向电势低处。</p>
-          <p class="note">拖动黄色探针 V 移动测点。快捷键：R 重置探针 · P 折叠参数 · ? 打开/关闭本说明</p>
-        </section>
-      </div>
+        <h3>教学提示</h3>
+        <p id="teachingTip">等势线是等势面的剖面图。电场线与等势线垂直，并由电势高处指向电势低处。</p>
+        <p class="note">拖动黄色探针 V 移动测点。快捷键：R 重置探针 · ? 打开/关闭本说明 · Esc 关闭说明</p>
+      </section>
     </div>
   </main>
 
   <script>
-    const canvas = document.getElementById("potentialCanvas");
+const canvas = document.getElementById("potentialCanvas");
     const ctx = canvas.getContext("2d");
     const heatCanvas = document.createElement("canvas");
     const heatCtx = heatCanvas.getContext("2d");
@@ -769,132 +825,46 @@
       render();
     });
 
-    // —— 外壳交互：参数折叠 / 「?」抽屉 / 快捷键（不改变物理与绘图逻辑）——
-    const panel = document.getElementById("ctrlPanel");
-    const ctrlToggle = document.getElementById("ctrlToggle");
+    // —— 外壳交互：「?」抽屉（参数固定在白卡里，不再拖动、不再记忆位置） ——
     const moreBtn = document.getElementById("moreBtn");
     const drawer = document.getElementById("drawer");
+    const drawerClose = document.getElementById("drawerClose");
 
-    function setPanel(open) {
-      panel.hidden = !open;
-      ctrlToggle.setAttribute("aria-expanded", String(open));
-    }
-
-    // 打开「?」抽屉时收起参数面板，避免两块叠加层互相遮挡；关闭时恢复原状态。
-    let restorePanelOnDrawerClose = false;
-
-    function setDrawer(open) {
+    function setDrawerOpen(open) {
       drawer.hidden = !open;
       moreBtn.setAttribute("aria-expanded", String(open));
-      if (open && !panel.hidden) {
-        restorePanelOnDrawerClose = true;
-        setPanel(false);
-      } else if (!open && restorePanelOnDrawerClose) {
-        restorePanelOnDrawerClose = false;
-        setPanel(true);
-      }
+      if (open) drawerClose.focus();
     }
 
-    ctrlToggle.addEventListener("click", () => setPanel(panel.hidden));
-    moreBtn.addEventListener("click", () => setDrawer(drawer.hidden));
+    moreBtn.addEventListener("click", (event) => {
+      setDrawerOpen(drawer.hidden);
+      if (event.detail > 0 && drawer.hidden) moreBtn.blur();
+    });
+    drawerClose.addEventListener("click", () => { setDrawerOpen(false); moreBtn.focus(); });
+
+    // 场景按钮的 aria-pressed 跟 .active 同步（物理逻辑仍只切 class）
+    const sceneBtns = Array.from(document.querySelectorAll(".scene-btn"));
+    function syncSceneAria() {
+      sceneBtns.forEach(btn => btn.setAttribute("aria-pressed", String(btn.classList.contains("active"))));
+    }
+    sceneBtns.forEach(btn => btn.addEventListener("click", syncSceneAria));
+    syncSceneAria();
 
     document.addEventListener("keydown", (event) => {
-      const tag = event.target && event.target.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (event.key === "Escape") {
+        if (!drawer.hidden) { setDrawerOpen(false); moreBtn.focus(); }
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const el = event.target;
+      const tag = el && el.tagName;
+      const typing = tag === "TEXTAREA" || tag === "SELECT"
+        || (tag === "INPUT" && ["text", "number", "search", "email", "url", "password", "tel"].includes(el.type));
+      if (typing) return;
       const key = event.key.toLowerCase();
-      if (key === "p") {
-        setPanel(panel.hidden);
-        event.preventDefault();
-      } else if (event.key === "?") {
-        setDrawer(drawer.hidden);
-        event.preventDefault();
-      } else if (key === "escape") {
-        setDrawer(false);
-      } else if (key === "r") {
-        controls.resetBtn.click();
-        event.preventDefault();
-      }
+      if (key === "r") { event.preventDefault(); controls.resetBtn.click(); }
+      else if (event.key === "?" || (event.key === "/" && event.shiftKey)) { event.preventDefault(); setDrawerOpen(drawer.hidden); }
     });
-
-    // —— 参数面板：拖动 + 位置记忆（LAYOUT.md「参数面板必须可拖动」）——
-    // 首行 .panel-grip 拖动改位置，位置写 localStorage 刷新后恢复；双击把手等同折叠。
-    // 指针被 grip 的 setPointerCapture 捕获，拖动全程不会落到画布上，因此不会误拖探针。
-    (function initDraggablePanel() {
-      const panelEl = document.getElementById("ctrlPanel");
-      const grip = panelEl && panelEl.querySelector(".panel-grip");
-      const collapseBtn = document.getElementById("panelCollapse");
-      if (!panelEl || !grip) return;
-      const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
-      // 默认位置由 CSS 以 bottom 锚定（贴在左下图例上方）；拖动后改为 left + top 锚定。
-
-      function clampToFrame(x, y) {
-        const f = panelEl.parentElement.getBoundingClientRect();
-        const r = panelEl.getBoundingClientRect();
-        return {
-          x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
-          y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
-        };
-      }
-      function place(x, y) {
-        const p = clampToFrame(x, y);
-        panelEl.style.left = p.x + "px";
-        panelEl.style.top = p.y + "px";
-        panelEl.style.right = "auto";
-        panelEl.style.bottom = "auto";
-      }
-
-      let saved = null;
-      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (err) { saved = null; }
-      if (saved && isFinite(saved.x) && isFinite(saved.y)) place(saved.x, saved.y);
-
-      let dx = 0, dy = 0, dragging = false, moved = false;
-      grip.addEventListener("pointerdown", (e) => {
-        if (e.button !== 0 || e.target.closest("button")) return;   // 把手上的折叠按钮自己处理点击
-        const f = panelEl.parentElement.getBoundingClientRect();
-        const r = panelEl.getBoundingClientRect();
-        dx = e.clientX - r.left; dy = e.clientY - r.top;
-        dragging = true; moved = false;
-        panelEl.classList.add("dragging");
-        grip.setPointerCapture(e.pointerId);
-        panelEl.style.left = (r.left - f.left) + "px";
-        panelEl.style.top = (r.top - f.top) + "px";
-        panelEl.style.right = "auto";
-        panelEl.style.bottom = "auto";
-      });
-      grip.addEventListener("pointermove", (e) => {
-        if (!dragging) return;
-        const f = panelEl.parentElement.getBoundingClientRect();
-        const nx = e.clientX - f.left - dx;
-        const ny = e.clientY - f.top - dy;
-        if (Math.abs(nx - parseFloat(panelEl.style.left)) > 1 ||
-            Math.abs(ny - parseFloat(panelEl.style.top)) > 1) moved = true;
-        place(nx, ny);
-      });
-      function endDrag(e) {
-        if (!dragging) return;
-        dragging = false;
-        panelEl.classList.remove("dragging");
-        if (grip.hasPointerCapture(e.pointerId)) grip.releasePointerCapture(e.pointerId);
-        if (!moved) return;   // 只是点了一下把手，不写脏位置
-        try {
-          localStorage.setItem(KEY, JSON.stringify({
-            x: parseFloat(panelEl.style.left), y: parseFloat(panelEl.style.top)
-          }));
-        } catch (err) { /* 隐私模式下忽略 */ }
-      }
-      grip.addEventListener("pointerup", endDrag);
-      grip.addEventListener("pointercancel", endDrag);
-      if (collapseBtn) collapseBtn.addEventListener("click", () => setPanel(false));
-      grip.addEventListener("dblclick", (e) => {
-        if (e.target.closest("button")) return;
-        ctrlToggle.click();
-      });
-      // 窗口尺寸变化后把面板重新夹回舞台内
-      window.addEventListener("resize", () => {
-        if (panelEl.hidden || !panelEl.style.left) return;
-        place(parseFloat(panelEl.style.left), parseFloat(panelEl.style.top));
-      });
-    })();
 
     window.addEventListener("resize", render);
     render();

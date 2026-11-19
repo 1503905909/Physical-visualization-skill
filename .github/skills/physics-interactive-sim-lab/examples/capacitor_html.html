@@ -7,346 +7,332 @@
   <link rel="icon" href="data:," />
   <style>
     :root {
-      --ink: #eaf2f5;
-      --muted: #9fb6c1;
-      --accent: #7fd6e4;
-      --accent-strong: #0f766e;
-      --warn: #f0b429;
+      --page: #f4f6f8;
+      --card: #ffffff;
+      --ink: #16232b;
+      --muted: #5d7480;
+      --line: #e3e8ec;
+      --stage: #0b141a;
+      --accent: #0f766e;
+      --warn: #b45309;
     }
 
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
 
     html, body { height: 100%; }
-    body { margin: 0; background: #070d11; overflow: hidden;
-           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+    body { margin: 0; background: var(--page); color: var(--ink); overflow: hidden;
+           font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+           -webkit-font-smoothing: antialiased; }
 
-    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+    /* —— 顶栏：白底，高 56px —— */
+    .topbar { height: 56px; display: flex; align-items: center; gap: 16px;
+              padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .brand { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .01em;
+             white-space: nowrap; }
 
-    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+    /* 读数条：≤4 项，标签灰 + 数值深色加粗 + 情形徽标 */
+    .readout { margin-left: auto; display: flex; align-items: center; min-width: 0;
+               padding: 3px 2px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 1px 2px rgba(22, 35, 43, .05); }
+    .readout .tile { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 11px;
+                     font-size: 12.5px; white-space: nowrap; }
+    .readout .tile + .tile { border-left: 1px solid #eef2f4; }
+    .tile-label { color: var(--muted); font-size: 12.5px; }
+    .tile-value { color: var(--ink); font-size: 13.5px; font-weight: 700;
+                  font-variant-numeric: tabular-nums; }
+    .tile-unit { color: #7c8d97; font-size: 11.5px; font-weight: 600; }
+    .tile-badge { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 999px;
+                  background: #f0f4f6; color: #7c8d97; white-space: nowrap; }
+    .tile-badge.same { background: #fdf3dd; color: #8a5a00; }
+    .tile-badge.up   { background: #fdeaea; color: #a52a2a; }
+    .tile-badge.down { background: #e8f1fd; color: #1f4f8f; }
+    .tile-badge.na   { opacity: .45; }
 
-    /* 16:9 等比舞台：同时受宽高约束 */
-    .stage-frame { position: relative; aspect-ratio: 16 / 9;
-                   width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+    .top-actions { margin-left: 4px; display: flex; gap: 8px; }
+    .top-btn { height: 30px; padding: 0 13px; border: 1px solid var(--line);
+               border-radius: 8px; background: var(--card); color: var(--ink);
+               font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1;
+               cursor: pointer; }
+    .top-btn:hover { background: #f7f9fa; border-color: #d5dde2; }
+    .top-btn.round { width: 30px; padding: 0; border-radius: 50%;
+                     color: var(--muted); font-weight: 700; font-size: 13px; }
+    .top-btn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #ffffff; }
 
+    /* —— 主体：左黑色画布窗口 + 右白色参数卡 —— */
+    .workspace { position: relative; height: calc(100vh - 56px); display: flex;
+                 align-items: flex-start; justify-content: center; gap: 18px;
+                 padding: 14px 20px 16px; }
+
+    .stage-column { flex: 0 0 auto; width: min(72vw, calc(177.78vh - 266.67px));
+                    display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9;
+                   overflow: hidden; background: var(--stage); border-radius: 14px;
+                   box-shadow: 0 14px 34px rgba(11, 20, 26, .2), 0 2px 6px rgba(11, 20, 26, .14); }
     .stage-frame > canvas { display: block; width: 100%; height: 100%; }
 
-    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
-           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
-           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
-
-    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
-                   padding: 6px 10px; font-size: 12.5px; }
-    .hud-readout b { font-size: 14px; color: #7fd6e4; }
-
-    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
-                  color: #cfe3e9; }
-
-    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
-    .hud-panel[hidden] { display: none; }
-
-    /* ---------- 面板可拖动（LAYOUT.md「参数面板必须可拖动」） ---------- */
-    .hud-panel { cursor: default; }
-    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
-                             justify-content: space-between; margin: -2px 0 8px; touch-action: none; }
-    .hud-panel .panel-grip:active { cursor: grabbing; }
-    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); z-index: 6; }
-    .panel-grip .grip-title { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
-    .panel-grip .grip-fold { border: 1px solid rgba(255,255,255,.22); border-radius: 6px;
-                             background: rgba(255,255,255,.08); color: var(--ink);
-                             font: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px;
-                             cursor: pointer; }
-    .panel-grip .grip-fold:hover { background: rgba(255,255,255,.18); }
-
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 286px; }
-
-    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
-                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
-                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-
-    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
-              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
-              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
-    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
-    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
-
-    @media (max-width: 900px) {
-      .hud-panel { width: 210px; font-size: 12px; }
-      .hud-toggle[aria-expanded="true"] { right: 232px; }
-    }
-
-    /* ---------- 读数 chips（左上角，≤4 个） ---------- */
-    .hud-readout .tile { display: inline-flex; align-items: baseline; gap: 6px; }
-    .hud-readout .tile + .tile { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.14); }
-    .hud-readout .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
-    .hud-readout .tile-value { font-size: 14.5px; font-weight: 800; color: #f2f8fa; line-height: 1.2; }
-    .hud-readout .tile-unit { font-size: 10.5px; font-weight: 700; color: var(--accent); }
-    .hud-readout .tile-badge { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px;
-                               background: rgba(255,255,255,.12); color: #d7e6ec; white-space: nowrap; }
-    .hud-readout .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
-    .hud-readout .tile-badge.up   { background: rgba(248,113,113,.2); color: #fca5a5; }
-    .hud-readout .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
-    .hud-readout .tile-badge.na   { opacity: .45; }
-
-    /* ---------- 图例（左下角，默认一行） ---------- */
-    .lg { display: inline-flex; align-items: center; gap: 4px; margin-right: 9px; white-space: nowrap; }
-    .lg:last-child { margin-right: 0; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
-    .dot-red { background: #e73535; }
+    /* —— 画布下方一行图例 —— */
+    .legend { display: flex; align-items: center; justify-content: center; gap: 16px;
+              padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 10px; font-size: 12px; color: var(--muted);
+              white-space: nowrap; overflow: hidden; }
+    .lg { display: inline-flex; align-items: center; gap: 5px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+    .dot-red { background: #d92d2d; }
     .dot-blue { background: #3558ff; }
-    .dot-green { background: #22c55e; }
+    .dot-green { background: #15803d; }
     .arrow-glyph { color: #b45309; font-weight: 900; }
-    .lg.warn { color: #fbbf24; font-weight: 700; }
-    .sw { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+    .lg.warn { color: var(--warn); font-weight: 700; }
 
-    /* ---------- 参数面板（右上角，可折叠） ---------- */
-    .panel-mode { margin: 0 0 8px; font-size: 11.5px; color: var(--muted); }
-    .panel-mode b { color: var(--accent); font-size: 12px; }
-    .panel-title { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted);
-                   text-transform: uppercase; margin-bottom: 2px; }
-    .panel-group + .panel-group { margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.16); }
+    /* —— 右侧参数卡：白底、圆角 12、细边框 —— */
+    .panel { flex: 0 0 auto; width: 280px; padding: 14px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 12px;
+             box-shadow: 0 1px 2px rgba(22, 35, 43, .04); }
+    .group + .group { margin-top: 14px; }
+    .group-label { margin: 0 0 8px; color: #7c8d97; font-size: 12px; letter-spacing: .04em; }
+    .group-label b { color: var(--ink); font-size: 12px; font-weight: 700; }
 
     .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .mode-btn { display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
-                padding: 6px 7px; min-height: 50px; text-align: left; font: inherit;
-                border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
-                background: rgba(255,255,255,.06); color: var(--ink); cursor: pointer; }
-    .mode-btn .mode-title { font-size: 13px; font-weight: 800; line-height: 1.25; }
+                padding: 6px 7px; min-height: 48px; text-align: left; font-family: inherit;
+                border: 1px solid #dfe6ea; border-radius: 8px; background: var(--card);
+                color: var(--ink); cursor: pointer; }
+    .mode-btn .mode-title { font-size: 12.5px; font-weight: 700; line-height: 1.25; }
     .mode-btn .mode-sub { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.3; }
-    .mode-btn:hover { background: rgba(255,255,255,.12); }
-    .mode-btn.active { border-color: transparent; background: var(--accent-strong); }
-    .mode-btn.active .mode-sub { color: rgba(255,255,255,.86); }
-    .mode-btn.active:hover { background: #0d665f; }
+    .mode-btn:hover { background: #f7f9fa; border-color: #d3dce2; }
+    .mode-btn.active { border-color: var(--ink); background: var(--ink); }
+    .mode-btn.active .mode-title { color: #ffffff; }
+    .mode-btn.active .mode-sub { color: rgba(255, 255, 255, .8); }
 
-    .slider-field { margin-top: 7px; }
-    .slider-field:first-of-type { margin-top: 0; }
-    .slider-field label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2px;
-                          font-size: 11.5px; font-weight: 700; color: #cfe3e9; }
-    .slider-field label span:last-child { color: var(--accent); white-space: nowrap; }
-    input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: #3fc1c9; }
-    input[type="range"]:disabled { opacity: .4; }
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 8px; margin-top: 8px; color: var(--muted); font-size: 11.5px; }
+    .row b { color: var(--ink); font-size: 11.5px; font-weight: 700; white-space: nowrap;
+             font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 4px 0 0;
+                          accent-color: var(--accent); background: transparent; cursor: pointer; }
+    input[type="range"]:disabled { opacity: .4; cursor: default; }
+    .footnote { margin: 5px 0 0; font-size: 10.5px; line-height: 1.5; color: #8a9aa3; }
 
-    .footnote { margin: 4px 0 0; font-size: 10.5px; line-height: 1.45; color: #8fa6b1; }
+    .toggles { display: grid; gap: 4px; }
+    .toggle { display: flex; align-items: center; gap: 7px; color: #33454f;
+              font-size: 12px; line-height: 1.3; cursor: pointer; user-select: none; }
+    .toggle input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto;
+                    accent-color: var(--accent); }
 
-    .toggles { display: grid; gap: 5px; margin-top: 9px; padding-top: 8px;
-               border-top: 1px dashed rgba(255,255,255,.16); }
-    .panel-group .toggles { margin-top: 0; padding-top: 0; border-top: 0; }
-    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
-    .toggle input { width: 15px; height: 15px; margin: 0; accent-color: #3fc1c9; }
+    .reset-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef2f4; }
+    .primary-btn { width: 100%; height: 32px; border: 1px solid #d8e0e5; border-radius: 8px;
+                   background: var(--card); color: var(--ink); font-family: inherit;
+                   font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .primary-btn:hover { background: #f7f9fa; }
 
-    .panel-actions, .reset-row { display: flex; gap: 8px; margin-top: 9px; }
-    .panel-actions button, .reset-row button { flex: 1; }
-    .primary-btn { min-height: 32px; border: 1px solid var(--accent-strong); border-radius: 8px;
-                   background: var(--accent-strong); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-    .primary-btn:hover { background: #0d665f; }
-    .panel-actions button:not(.primary-btn) { min-height: 32px; border: 1px solid rgba(255,255,255,.24);
-                   border-radius: 8px; background: rgba(255,255,255,.08); color: var(--ink);
-                   font: inherit; font-weight: 700; cursor: pointer; }
-    .panel-actions button:not(.primary-btn):hover { background: rgba(255,255,255,.16); }
-
-    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
-    .particle-btn { min-height: 32px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
-                    background: rgba(255,255,255,.06); color: var(--ink); font: inherit;
-                    font-size: 12.5px; font-weight: 700; cursor: pointer; }
-    .particle-btn:hover { background: rgba(255,255,255,.14); }
-    .particle-btn.active { border-color: transparent; background: var(--accent-strong); color: #fff; }
-
-    /* ---------- 抽屉内容 ---------- */
-    .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
-    .mode-tag { font-size: 12px; font-weight: 800; color: var(--accent); }
+    /* —— 「?」抽屉：白卡，覆盖在参数卡位置 —— */
+    .drawer { position: absolute; z-index: 30; right: 20px; top: 14px; width: 340px;
+              max-height: calc(100% - 30px); overflow-y: auto; padding: 16px 18px;
+              background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              box-shadow: 0 22px 48px -12px rgba(22, 35, 43, .28), 0 2px 6px rgba(22, 35, 43, .06); }
+    .drawer[hidden] { display: none; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between;
+                   gap: 8px; margin-bottom: 8px; }
+    .drawer-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .drawer-head > div { display: flex; align-items: center; gap: 8px; }
+    .mode-tag { font-size: 12px; font-weight: 700; color: var(--accent); }
     .mode-tag.warn { color: var(--warn); }
-    .drawer-close { border: 0; background: transparent; color: var(--muted); font-size: 18px;
-                    line-height: 1; cursor: pointer; padding: 0 4px; }
-    .drawer-close:hover { color: #fff; }
+    .drawer-close { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line);
+                    border-radius: 7px; background: var(--card); color: var(--muted);
+                    font-size: 16px; line-height: 1; cursor: pointer; }
+    .drawer-close:hover { background: #f4f6f8; color: var(--ink); }
+    .drawer h3 { margin: 14px 0 4px; color: #7c8d97; font-size: 12px;
+                 font-weight: 600; letter-spacing: .04em; }
+    .drawer-head + h3 { margin-top: 2px; }
+    .drawer p, .drawer li { color: #4a5f6a; font-size: 12.5px; line-height: 1.6; margin: 4px 0; }
+    .drawer ul { margin: 4px 0; padding-left: 16px; }
+    .drawer li { margin: 3px 0; }
+
     .conclusion-card { margin: 4px 0 6px; padding: 8px 10px; border-radius: 6px;
-                       border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); }
-    .conclusion-card.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); }
-    .conclusion-body { margin: 0 0 4px; font-size: 13px; line-height: 1.55; color: #e2eef2; }
-    .conclusion-key { margin: 0; font-size: 12.5px; font-weight: 700; color: #bfe9ee; }
-    .conclusion-formula { margin: 6px 0; padding: 6px 8px; border: 1px dashed rgba(255,255,255,.22);
-                          border-radius: 6px; font-size: 12px; line-height: 1.5; color: #dbe9ee; }
-    .conclusion-note { margin: 5px 0; font-size: 12px; line-height: 1.55; color: #a9bfc9; }
-    .drawer-eq { margin: 2px 0; font-size: 14px; font-weight: 800; color: #eaf2f5; }
-    .drawer .tile { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px; margin: 4px 0 8px;
-                    border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.04); }
+                       border-left: 3px solid #2dd4bf; background: #f0faf8; }
+    .conclusion-card.warn { border-left-color: #d97706; background: #fdf6e8; }
+    .conclusion-body { margin: 0 0 4px; font-size: 12.5px; line-height: 1.55; color: #2c4a52; }
+    .conclusion-key { margin: 0; font-size: 12.5px; font-weight: 700; color: #175e58; }
+    .conclusion-formula { margin: 6px 0; padding: 6px 8px; border: 1px dashed #d4dee3;
+                          border-radius: 6px; font-size: 12px; line-height: 1.5; color: #33454f; }
+    .conclusion-note { margin: 5px 0; font-size: 12px; line-height: 1.55; color: #6b7f89; }
+    .mode-hint { margin: 8px 0 0; padding: 7px 9px; border-radius: 6px; font-size: 12px;
+                 line-height: 1.55; border-left: 3px solid #2dd4bf; background: #f0faf8;
+                 color: #2c5a63; }
+    .mode-hint.warn { border-left-color: #d97706; background: #fdf6e8; color: #7a5410; }
+    .q-list { margin: 4px 0; padding-left: 16px; }
+    .drawer-keys { margin-top: 10px; font-size: 11px; color: #8a9aa3; }
+
+    /* 抽屉里的「电场能」读数块 */
+    .drawer .tile { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px;
+                    margin: 4px 0 8px; border: 1px solid var(--line); border-radius: 8px;
+                    background: #f8fafb; }
     .drawer .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
-    .drawer .tile-value { font-size: 16px; font-weight: 800; color: #f2f8fa; }
+    .drawer .tile-value { font-size: 16px; font-weight: 700; color: var(--ink); }
     .drawer .tile-unit { font-size: 11px; font-weight: 700; color: var(--accent); }
-    .drawer .tile-badge { margin-left: auto; font-size: 10.5px; font-weight: 800; padding: 1px 6px;
-                          border-radius: 999px; background: rgba(255,255,255,.12); color: #d7e6ec; }
-    .drawer .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
-    .drawer .tile-badge.up { background: rgba(248,113,113,.2); color: #fca5a5; }
-    .drawer .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
+    .drawer .tile-badge { margin-left: auto; font-size: 10.5px; font-weight: 700;
+                          padding: 1px 6px; border-radius: 999px; background: #f0f4f6; color: #7c8d97; }
+    .drawer .tile-badge.same { background: #fdf3dd; color: #8a5a00; }
+    .drawer .tile-badge.up { background: #fdeaea; color: #a52a2a; }
+    .drawer .tile-badge.down { background: #e8f1fd; color: #1f4f8f; }
     .drawer .tile-badge.na { opacity: .45; }
-    .mode-hint { margin: 8px 0 0; padding: 7px 9px; border-radius: 6px; font-size: 12px; line-height: 1.55;
-                 border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); color: #bfe9ee; }
-    .mode-hint.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); color: #f9dda2; }
-    .q-list { margin: 4px 0; padding-left: 18px; }
-    .q-list li { margin: 3px 0; font-size: 12.5px; line-height: 1.55; color: #cfe3e9; }
-    .drawer-keys { margin-top: 10px; font-size: 11px; color: #7f95a0; }
 
-    /* ---------- 舞台提示（回旋加速器） ---------- */
-    .stage-alert { position: absolute; right: 58px; bottom: 12px; max-width: min(560px, 56%);
-                   padding: 7px 12px; border-radius: 8px; z-index: 3;
-                   background: rgba(10,13,20,.9); border: 1px solid rgba(255,209,102,.85);
-                   color: #ffd166; font-size: 12px; font-weight: 700; line-height: 1.45;
-                   text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,.4); pointer-events: none; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    @media (max-width: 1120px) {
-      .hud-panel { width: 210px; }
-      .hud-toggle[aria-expanded="true"] { right: 234px; }
-      .drawer { width: min(380px, 78%); }
+    @media (max-width: 1200px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .workspace { padding: 12px 16px 14px; gap: 14px; }
+      .panel { width: 240px; padding: 12px; }
+      .drawer { right: 16px; top: 12px; width: 300px; max-height: calc(100% - 26px); }
+      .readout .tile { padding: 3px 9px; }
+      .legend { gap: 12px; }
     }
-</style>
+
+    @media (max-width: 980px) {
+      html, body { height: auto; overflow: auto; }
+      .topbar { height: auto; min-height: 56px; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
+      .readout { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+      .top-actions { margin-left: auto; }
+      .workspace { height: auto; min-height: calc(100vh - 56px); flex-direction: column;
+                   align-items: center; padding: 12px; }
+      .stage-column { width: min(92vw, 720px); }
+      .panel { width: min(92vw, 360px); }
+      .drawer { right: 12px; top: 12px; width: min(92vw, 340px); max-height: 70vh; }
+      .legend { gap: 10px; flex-wrap: wrap; white-space: normal; text-align: center; }
+    }
+  </style>
 </head>
 <body>
-  <main class="app">
-    <div class="stage">
-      <div class="stage-frame">
+  <header class="topbar">
+    <h1 class="brand">平行板电容器</h1>
 
-        <canvas id="capCanvas" width="1600" height="900"></canvas>
-
-        <!-- 左上角实时读数：4 个 chips（C、Q、U、E） -->
-        <div class="hud hud-readout" aria-label="实时读数">
-          <div class="tile" id="tileC">
-            <span class="tile-label">C</span>
-            <span class="tile-value">—</span>
-            <span class="tile-unit"></span>
-            <span class="tile-badge na">—</span>
-          </div>
-          <div class="tile" id="tileQ">
-            <span class="tile-label">Q</span>
-            <span class="tile-value">—</span>
-            <span class="tile-unit"></span>
-            <span class="tile-badge na">—</span>
-          </div>
-          <div class="tile" id="tileU">
-            <span class="tile-label">U</span>
-            <span class="tile-value">—</span>
-            <span class="tile-unit"></span>
-            <span class="tile-badge na">—</span>
-          </div>
-          <div class="tile" id="tileE">
-            <span class="tile-label">E</span>
-            <span class="tile-value">—</span>
-            <span class="tile-unit"></span>
-            <span class="tile-badge na">—</span>
-          </div>
-        </div>
-
-        <!-- 左下角图例：一行 -->
-        <div class="hud hud-legend" aria-label="图例">
-          <span class="lg"><i class="dot dot-red"></i>正电荷</span>
-          <span class="lg"><i class="dot dot-blue"></i>负电荷</span>
-          <span class="lg"><b class="arrow-glyph">→</b>E：正极板→负极板</span>
-          <span class="lg"><i class="dot dot-green"></i>板间距 d</span>
-          <span class="lg warn" id="breakdownChip" hidden>E 接近空气击穿（拓展）</span>
-        </div>
-
-        <!-- 右上角参数面板（可折叠） -->
-        <button class="hud-toggle" id="ctrlToggle" type="button" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
-
-        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
-          <div class="panel-grip" id="panelGrip">
-            <span class="grip-title">参数</span>
-            <button type="button" class="grip-fold" id="panelFoldBtn" aria-expanded="true" aria-controls="ctrlPanel" title="折叠 / 展开参数面板">折叠</button>
-          </div>
-
-          <p class="panel-mode">情形：<b id="stageMode">接通电源（U 不变）</b></p>
-
-          <div class="mode-switch" role="group" aria-label="电源开关">
-            <button type="button" class="mode-btn active" data-mode="uconst" aria-pressed="true">
-              <span class="mode-title">接通电源</span>
-              <span class="mode-sub">U 不变 · Q 随 C 变</span>
-            </button>
-            <button type="button" class="mode-btn" data-mode="qconst" aria-pressed="false">
-              <span class="mode-title">断开电源</span>
-              <span class="mode-sub">Q 不变 · U 随 C 变</span>
-            </button>
-          </div>
-
-          <div class="slider-field">
-            <label for="areaSlider"><span>极板面积 S</span><span id="areaValue">300 cm²</span></label>
-            <input id="areaSlider" type="range" min="100" max="1000" value="300" step="10" />
-          </div>
-          <div class="slider-field">
-            <label for="gapSlider"><span>极板间距 d</span><span id="gapValue">3.0 mm</span></label>
-            <input id="gapSlider" type="range" min="0.5" max="10" value="3" step="0.1" />
-          </div>
-          <div class="slider-field">
-            <label for="erSlider"><span>相对介电常数 εᵣ</span><span id="erValue">1.0</span></label>
-            <input id="erSlider" type="range" min="1" max="5" value="1" step="0.1" />
-          </div>
-          <div class="slider-field">
-            <label for="voltSlider"><span>电压 U</span><span id="voltValue">300 V</span></label>
-            <input id="voltSlider" type="range" min="0" max="1000" value="300" step="10" />
-            <p class="footnote" id="voltHint">接通电源时 U 由电源提供。</p>
-          </div>
-
-          <div class="toggles">
-            <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示板间场线</span></label>
-            <label class="toggle"><input type="checkbox" id="showCharge" checked /><span>显示极板电荷</span></label>
-            <label class="toggle"><input type="checkbox" id="showFlow" checked /><span>箭头流动（标方向）</span></label>
-          </div>
-          <div class="reset-row">
-            <button type="button" class="primary-btn" id="resetBtn">重置</button>
-          </div>
-        </aside>
-
-        <!-- 右下角「?」抽屉 -->
-        <button class="hud-more" id="moreBtn" type="button" aria-expanded="false" aria-controls="drawer" title="结论与说明">?</button>
-
-        <section class="drawer" id="drawer" hidden aria-label="结论与说明">
-          <div class="drawer-head">
-            <span class="mode-tag" id="modeTag">U 不变</span>
-            <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭抽屉">×</button>
-          </div>
-
-          <h3>实时结论</h3>
-          <div class="conclusion-card" id="conclusionCard">
-            <p class="conclusion-body" id="conclusionBody">—</p>
-            <p class="conclusion-key" id="conclusionKey">—</p>
-          </div>
-          <p class="conclusion-formula" id="conclusionFormula">—</p>
-          <p class="conclusion-note" id="conclusionExtra">—</p>
-          <p class="mode-hint" id="modeHint">接通电源：极板两端电压由电源决定，始终等于 U。</p>
-
-          <h3>读数明细</h3>
-          <div class="tile" id="tileW">
-            <span class="tile-label">电场能 E_C</span>
-            <span class="tile-value">—</span>
-            <span class="tile-unit"></span>
-            <span class="tile-badge na">—</span>
-          </div>
-          <p class="conclusion-note" id="unitNote">—</p>
-          <p class="conclusion-note" id="extraNote">E_C 为电场能（拓展内容，避免与功的符号 W 混淆）。教材中平行板电容写作 C = εᵣS/(4πkd)，其中 ε₀ = 1/(4πk)，与这里的 C = ε₀εᵣS/d 完全等价。</p>
-          <p class="conclusion-note">板间场线：<span id="stageLines">0 条</span>；极板电荷：<span id="stageState">由电源补充</span>。</p>
-
-          <h3>模型假设</h3>
-          <p class="conclusion-note">理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场。极板高度随 S、电荷符号个数随 Q 单调变化，但都只是示意（非线性），不按真实比例绘制。</p>
-
-          <h3>课堂观察</h3>
-          <ul class="q-list">
-            <li>保持「接通电源」，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
-            <li>先接通电源充好电，再切到「断开电源」，只改变 d：E 的读数和场线疏密为什么几乎不变？此时 U 与 d 成什么关系？</li>
-            <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、E_C 也变小？</li>
-          </ul>
-
-          <h3>关于 ↑↓ 徽标</h3>
-          <p class="conclusion-note" id="deltaHint">—</p>
-
-          <p class="drawer-keys">空格：箭头流动 · R：重置 · P：参数 · ?：本抽屉</p>
-        </section>
-
+    <div class="readout" aria-label="实时读数">
+      <div class="tile" id="tileC">
+        <span class="tile-label">C</span><span class="tile-value">—</span><span class="tile-unit"></span><span class="tile-badge na">—</span>
+      </div>
+      <div class="tile" id="tileQ">
+        <span class="tile-label">Q</span><span class="tile-value">—</span><span class="tile-unit"></span><span class="tile-badge na">—</span>
+      </div>
+      <div class="tile" id="tileU">
+        <span class="tile-label">U</span><span class="tile-value">—</span><span class="tile-unit"></span><span class="tile-badge na">—</span>
+      </div>
+      <div class="tile" id="tileE">
+        <span class="tile-label">E</span><span class="tile-value">—</span><span class="tile-unit"></span><span class="tile-badge na">—</span>
       </div>
     </div>
-  </main>
 
+    <div class="top-actions">
+      <button type="button" class="top-btn round" id="moreBtn" aria-expanded="false"
+              aria-controls="drawer" aria-label="结论与说明">?</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="stage-column">
+      <div class="stage-frame">
+        <canvas id="capCanvas" width="1600" height="900"></canvas>
+      </div>
+
+      <div class="legend" aria-label="图例">
+        <span class="lg"><i class="dot dot-red"></i>正电荷</span>
+        <span class="lg"><i class="dot dot-blue"></i>负电荷</span>
+        <span class="lg"><b class="arrow-glyph">→</b>E：正极板→负极板</span>
+        <span class="lg"><i class="dot dot-green"></i>板间距 d</span>
+        <span class="lg warn" id="breakdownChip" hidden>E 接近空气击穿（拓展）</span>
+      </div>
+    </div>
+
+    <aside class="panel" id="ctrlPanel" aria-label="参数与开关">
+      <div class="group">
+        <p class="group-label">情形：<b id="stageMode">接通电源（U 不变）</b></p>
+        <div class="mode-switch" role="group" aria-label="电源开关">
+          <button type="button" class="mode-btn active" data-mode="uconst" aria-pressed="true">
+            <span class="mode-title">接通电源</span>
+            <span class="mode-sub">U 不变 · Q 随 C 变</span>
+          </button>
+          <button type="button" class="mode-btn" data-mode="qconst" aria-pressed="false">
+            <span class="mode-title">断开电源</span>
+            <span class="mode-sub">Q 不变 · U 随 C 变</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="group-label">参数</p>
+        <div class="row"><label for="areaSlider">极板面积 S</label><b id="areaValue">300 cm²</b></div>
+        <input id="areaSlider" type="range" min="100" max="1000" value="300" step="10" />
+
+        <div class="row"><label for="gapSlider">极板间距 d</label><b id="gapValue">3.0 mm</b></div>
+        <input id="gapSlider" type="range" min="0.5" max="10" value="3" step="0.1" />
+
+        <div class="row"><label for="erSlider">相对介电常数 εᵣ</label><b id="erValue">1.0</b></div>
+        <input id="erSlider" type="range" min="1" max="5" value="1" step="0.1" />
+
+        <div class="row"><label for="voltSlider">电压 U</label><b id="voltValue">300 V</b></div>
+        <input id="voltSlider" type="range" min="0" max="1000" value="300" step="10" />
+        <p class="footnote" id="voltHint">接通电源时 U 由电源提供。</p>
+      </div>
+
+      <div class="group">
+        <p class="group-label">显示</p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示板间场线</span></label>
+          <label class="toggle"><input type="checkbox" id="showCharge" checked /><span>显示极板电荷</span></label>
+          <label class="toggle"><input type="checkbox" id="showFlow" checked /><span>箭头流动（标方向）</span></label>
+        </div>
+      </div>
+
+      <div class="reset-row">
+        <button type="button" class="primary-btn" id="resetBtn">重置</button>
+      </div>
+    </aside>
+
+    <section class="drawer" id="drawer" hidden aria-label="结论与说明">
+      <div class="drawer-head">
+        <h2>说明</h2>
+        <div>
+          <span class="mode-tag" id="modeTag">U 不变</span>
+          <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭抽屉">×</button>
+        </div>
+      </div>
+
+      <h3>实时结论</h3>
+      <div class="conclusion-card" id="conclusionCard">
+        <p class="conclusion-body" id="conclusionBody">—</p>
+        <p class="conclusion-key" id="conclusionKey">—</p>
+      </div>
+      <p class="conclusion-formula" id="conclusionFormula">—</p>
+      <p class="conclusion-note" id="conclusionExtra">—</p>
+      <p class="mode-hint" id="modeHint">接通电源：极板两端电压由电源决定，始终等于 U。</p>
+
+      <h3>读数明细</h3>
+      <div class="tile" id="tileW">
+        <span class="tile-label">电场能 E_C</span>
+        <span class="tile-value">—</span>
+        <span class="tile-unit"></span>
+        <span class="tile-badge na">—</span>
+      </div>
+      <p class="conclusion-note" id="unitNote">—</p>
+      <p class="conclusion-note" id="extraNote">E_C 为电场能（拓展内容，避免与功的符号 W 混淆）。教材中平行板电容写作 C = εᵣS/(4πkd)，其中 ε₀ = 1/(4πk)，与这里的 C = ε₀εᵣS/d 完全等价。</p>
+      <p class="conclusion-note">板间场线：<span id="stageLines">0 条</span>；极板电荷：<span id="stageState">由电源补充</span>。</p>
+
+      <h3>模型假设</h3>
+      <p class="conclusion-note">理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场。极板高度随 S、电荷符号个数随 Q 单调变化，但都只是示意（非线性），不按真实比例绘制。</p>
+
+      <h3>课堂观察</h3>
+      <ul class="q-list">
+        <li>保持「接通电源」，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
+        <li>先接通电源充好电，再切到「断开电源」，只改变 d：E 的读数和场线疏密为什么几乎不变？此时 U 与 d 成什么关系？</li>
+        <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、E_C 也变小？</li>
+      </ul>
+
+      <h3>关于 ↑↓ 徽标</h3>
+      <p class="conclusion-note" id="deltaHint">—</p>
+
+      <p class="drawer-keys">快捷键：空格 箭头流动 · R 重置 · ? 打开/关闭本说明 · Esc 关闭说明</p>
+    </section>
+  </main>
 
   <script>
     const canvas = document.getElementById("capCanvas");
@@ -1025,8 +1011,9 @@
     });
 
     el.modeButtons.forEach(function (btn) {
-      btn.addEventListener("click", function () {
+      btn.addEventListener("click", function (event) {
         setMode(btn.dataset.mode);
+        if (event.detail > 0) btn.blur();
       });
     });
 
@@ -1045,7 +1032,7 @@
       render();
     });
 
-    el.resetBtn.addEventListener("click", function () {
+    el.resetBtn.addEventListener("click", function (event) {
       state.S = DEFAULTS.S;
       state.d = DEFAULTS.d;
       state.er = DEFAULTS.er;
@@ -1066,6 +1053,7 @@
       });
       updateModeText();
       syncLabels();
+      if (event.detail > 0) el.resetBtn.blur();
       render();
     });
 
@@ -1079,142 +1067,52 @@
     render();
     animate();
   </script>
-<script>
-(function () {
-  var panel = document.getElementById("ctrlPanel");
-  var toggle = document.getElementById("ctrlToggle");
-  var drawer = document.getElementById("drawer");
-  var more = document.getElementById("moreBtn");
-  var closeBtn = document.getElementById("drawerClose");
-  var foldBtn = document.getElementById("panelFoldBtn");
+  <script>
+    /* —— 外壳交互：「?」抽屉 / 快捷键（参数卡固定常显，不再折叠或拖动）—— */
+    (function () {
+      var drawer = document.getElementById("drawer");
+      var more = document.getElementById("moreBtn");
+      var closeBtn = document.getElementById("drawerClose");
 
-  function setPanel(open) {
-    panel.hidden = !open;
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    if (foldBtn) foldBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) setDrawer(false);
-  }
+      function setDrawer(open) {
+        drawer.hidden = !open;
+        more.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open) closeBtn.focus();
+      }
 
-  function setDrawer(open) {
-    drawer.hidden = !open;
-    more.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) setPanel(false);
-  }
+      more.addEventListener("click", function (event) {
+        setDrawer(drawer.hidden);
+        if (event.detail > 0 && drawer.hidden) more.blur();
+      });
+      closeBtn.addEventListener("click", function () { setDrawer(false); more.focus(); });
 
-  toggle.addEventListener("click", function () { setPanel(panel.hidden); });
-  more.addEventListener("click", function () { setDrawer(drawer.hidden); });
-  closeBtn.addEventListener("click", function () { setDrawer(false); });
-  if (foldBtn) {
-    foldBtn.addEventListener("click", function () { setPanel(false); });
-    /* 折叠按钮上的按下不要被 grip 的拖动劫持（否则 pointer capture 会吞掉 click） */
-    foldBtn.addEventListener("pointerdown", function (event) { event.stopPropagation(); });
-    /* 双击折叠按钮不要冒泡到 grip 的 dblclick（否则会再折叠一次） */
-    foldBtn.addEventListener("dblclick", function (event) { event.stopPropagation(); });
-  }
-
-  document.addEventListener("keydown", function (event) {
-    var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : "";
-    if (event.key === "Escape") {
-      setDrawer(false);
-      return;
-    }
-    if (event.key === "p" || event.key === "P") {
-      event.preventDefault();
-      setPanel(panel.hidden);
-      return;
-    }
-    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
-      event.preventDefault();
-      setDrawer(drawer.hidden);
-      return;
-    }
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (event.key === "r" || event.key === "R") {
-      event.preventDefault();
-      document.getElementById("resetBtn").click();
-      return;
-    }
-    if (event.key === " " || event.code === "Space") {
-      event.preventDefault();
-      var flow = document.getElementById("showFlow");
-      flow.checked = !flow.checked;
-      flow.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-  });
-})();
-</script>
-
-<script>
-// 面板拖动 + 位置记忆：所有仿真页面共用同一份实现（LAYOUT.md 原文照抄）
-(function initDraggablePanel(){
-  const panel = document.getElementById('ctrlPanel');
-  const grip  = panel && panel.querySelector('.panel-grip');
-  if (!panel || !grip) return;
-  const KEY = 'hud-panel-pos:' + location.pathname.split('/').pop();
-
-  function clampToFrame(x, y){
-    const f = panel.parentElement.getBoundingClientRect();
-    const r = panel.getBoundingClientRect();
-    return {
-      x: Math.min(Math.max(8, x), f.width  - r.width  - 8),
-      y: Math.min(Math.max(8, y), f.height - r.height - 8)
-    };
-  }
-  function place(x, y){
-    const p = clampToFrame(x, y);
-    panel.style.left = p.x + 'px';
-    panel.style.top  = p.y + 'px';
-    panel.style.right = 'auto';
-  }
-  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-  if (saved) place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
-
-  let dx = 0, dy = 0, dragging = false;
-  grip.addEventListener('pointerdown', e => {
-    const f = panel.parentElement.getBoundingClientRect();
-    const r = panel.getBoundingClientRect();
-    dx = e.clientX - r.left; dy = e.clientY - r.top;
-    dragging = true; panel.classList.add('dragging');
-    grip.setPointerCapture(e.pointerId);
-    panel.style.left = (r.left - f.left) + 'px';
-    panel.style.top  = (r.top  - f.top ) + 'px';
-    panel.style.right = 'auto';
-  });
-  grip.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const f = panel.parentElement.getBoundingClientRect();
-    place(e.clientX - f.left - dx, e.clientY - f.top - dy);
-  });
-  grip.addEventListener('pointerup', e => {
-    if (!dragging) return;
-    dragging = false; panel.classList.remove('dragging');
-    grip.releasePointerCapture(e.pointerId);
-    localStorage.setItem(KEY, JSON.stringify({
-      x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
-    }));
-  });
-  grip.addEventListener('dblclick', () => document.getElementById('ctrlToggle').click());
-})();
-
-// 面板上的指针事件不向画布穿透；窗口尺寸变化时把面板拉回舞台内
-(function guardPanel(){
-  const panel = document.getElementById('ctrlPanel');
-  if (!panel) return;
-  ['pointerdown', 'pointermove', 'pointerup', 'click'].forEach(function (type) {
-    panel.addEventListener(type, function (e) { e.stopPropagation(); });
-  });
-  window.addEventListener('resize', function () {
-    if (panel.hidden || !panel.style.left) return;
-    const f = panel.parentElement.getBoundingClientRect();
-    const r = panel.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const x = Math.min(Math.max(8, parseFloat(panel.style.left)), Math.max(8, f.width - r.width - 8));
-    const y = Math.min(Math.max(8, parseFloat(panel.style.top)), Math.max(8, f.height - r.height - 8));
-    panel.style.left = x + 'px';
-    panel.style.top = y + 'px';
-    panel.style.right = 'auto';
-  });
-})();
-</script>
+      document.addEventListener("keydown", function (event) {
+        var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : "";
+        if (event.key === "Escape") {
+          if (!drawer.hidden) { setDrawer(false); more.focus(); }
+          return;
+        }
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+          event.preventDefault();
+          setDrawer(drawer.hidden);
+          return;
+        }
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        if (event.key === "r" || event.key === "R") {
+          event.preventDefault();
+          document.getElementById("resetBtn").click();
+          return;
+        }
+        if (event.key === " " || event.code === "Space") {
+          if (tag === "BUTTON" || tag === "A" || tag === "SUMMARY") return;
+          event.preventDefault();
+          var flow = document.getElementById("showFlow");
+          flow.checked = !flow.checked;
+          flow.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

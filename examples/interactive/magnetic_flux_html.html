@@ -3,228 +3,271 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
   <title>磁通量与电磁感应现象</title>
   <style>
     :root {
-      --accent: #2dd4bf;
-      --accent-deep: #0f766e;
-      --hud-w: 300px;
+      --page: #f4f6f8;
+      --card: #ffffff;
+      --ink: #16232b;
+      --muted: #5d7480;
+      --line: #e3e8ec;
+      --stage: #0b141a;
+      --accent: #0f766e;
     }
 
-    html, body { height: 100%; }
-    body { margin: 0; background: #070d11; overflow: hidden;
-           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
-
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--page); color: var(--ink); overflow: hidden;
+           font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+           -webkit-font-smoothing: antialiased; }
 
-    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+    /* —— 顶栏：白底，高 56px —— */
+    .topbar { height: 56px; display: flex; align-items: center; gap: 16px;
+              padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .brand { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 
-    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+    .readout { margin-left: auto; display: flex; align-items: center; min-width: 0;
+               padding: 3px 2px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 1px 2px rgba(22, 35, 43, .05); }
+    .ro-item { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px;
+               font-size: 12.5px; white-space: nowrap; }
+    .ro-item + .ro-item { border-left: 1px solid #eef2f4; }
+    .ro-k { color: var(--muted); font-size: 12.5px; }
+    .ro-item b { color: var(--ink); font-size: 12.5px; font-weight: 700;
+                 font-variant-numeric: tabular-nums; }
+    .ro-item.on b { color: #b45309; }
 
-    /* 16:9 等比舞台：同时受宽高约束 */
-    .stage-frame { position: relative; aspect-ratio: 16 / 9;
-                   width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+    .top-actions { margin-left: 4px; display: flex; gap: 8px; }
+    .top-btn { height: 30px; padding: 0 13px; border: 1px solid var(--line);
+               border-radius: 8px; background: var(--card); color: var(--ink);
+               font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1;
+               cursor: pointer; }
+    .top-btn:hover { background: #f7f9fa; border-color: #d5dde2; }
+    .top-btn.round { width: 30px; padding: 0; border-radius: 50%;
+                     color: var(--muted); font-weight: 700; font-size: 13px; }
+    .top-btn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #ffffff; }
 
+    /* —— 主体：左黑色画布窗口 + 右白色参数卡 —— */
+    .workspace { position: relative; height: calc(100vh - 56px); display: flex;
+                 align-items: flex-start; justify-content: center; gap: 18px;
+                 padding: 14px 20px 16px; }
+
+    .stage-column { flex: 0 0 auto; width: min(72vw, calc(177.78vh - 266.67px));
+                    display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9;
+                   overflow: hidden; background: var(--stage); border-radius: 14px;
+                   box-shadow: 0 14px 34px rgba(11, 20, 26, .2), 0 2px 6px rgba(11, 20, 26, .14); }
     .stage-frame > canvas { display: block; width: 100%; height: 100%; }
-
     #fluxCanvas { cursor: grab; touch-action: none; }
     #fluxCanvas.dragging { cursor: grabbing; }
 
-    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
-           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
-           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+    .legend { display: flex; align-items: center; justify-content: center; gap: 16px;
+              padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 10px; font-size: 12px; color: var(--muted);
+              white-space: nowrap; overflow: hidden; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; }
+    .sw { display: inline-block; width: 18px; height: 2px; border-radius: 1px;
+          background: var(--ink); flex: 0 0 auto; }
+    .sw.dot { width: 9px; height: 9px; border-radius: 50%; background: #34d399;
+              border: 1px solid #0f9f74; }
 
-    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
-                   padding: 6px 10px; font-size: 12.5px; }
-    .hud-readout b { font-size: 14px; color: #7fd6e4; }
-    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
-    .hud-readout .chip + .chip { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.16); }
-    .hud-readout .chip.on b { color: #ffd166; }
+    /* —— 右侧参数卡 —— */
+    .panel { flex: 0 0 auto; width: 280px; padding: 14px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 12px;
+             box-shadow: 0 1px 2px rgba(22, 35, 43, .04); }
+    .group + .group { margin-top: 14px; }
+    .group-label { margin: 0 0 8px; color: #7c8d97; font-size: 12px; letter-spacing: .04em; }
 
-    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
-                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; white-space: nowrap;
-                  overflow: hidden; text-overflow: ellipsis; }
-    .hud-legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+    .scene-list { display: grid; gap: 6px; }
+    .scene-btn { height: 30px; padding: 0 6px; border: 1px solid #dfe6ea; border-radius: 8px;
+                 background: var(--card); color: #33454f; font-family: inherit;
+                 font-size: 12px; cursor: pointer; white-space: nowrap; overflow: hidden;
+                 text-overflow: ellipsis; }
+    .scene-btn:hover { background: #f7f9fa; border-color: #d3dce2; }
+    .scene-btn.active { background: var(--ink); border-color: var(--ink); color: #ffffff;
+                        font-weight: 700; }
 
-    /* 面板压成两列短卡片：高度低于线圈上沿，任何时刻都不遮物理主体 */
-    .hud-panel { right: 12px; top: 12px; width: var(--hud-w); max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 6px 10px; font-size: 12px; }
-    .hud-panel[hidden] { display: none; }
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 8px; margin-top: 10px; color: var(--muted); font-size: 11.5px; }
+    .row:first-of-type { margin-top: 0; }
+    .row b { color: var(--ink); font-size: 12.5px; font-weight: 700; white-space: nowrap;
+             font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 4px 0 0;
+                          accent-color: var(--accent); background: transparent; cursor: pointer; }
 
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-    .hud-toggle[aria-expanded="true"] { right: 324px; }   /* 面板展开时让到面板左边 */
+    .toggles { display: grid; gap: 2px; }
+    .toggle { display: flex; align-items: center; gap: 7px; padding: 2px 0;
+              color: #33454f; font-size: 12px; line-height: 1.4; cursor: pointer;
+              user-select: none; }
+    .toggle input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
 
-    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
-                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
-                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
-                font-family: inherit; font-size: 15px; line-height: 1; }
-    .hud-more[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+    .reset-row { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px;
+                 border-top: 1px solid #eef2f4; }
+    .primary-btn, .ghost-btn { flex: 1; height: 32px; border-radius: 8px; font-family: inherit;
+                               font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .primary-btn { background: var(--accent); border: 1px solid var(--accent); color: #ffffff; }
+    .primary-btn:hover { background: #0d665f; }
+    .primary-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .ghost-btn { background: var(--card); border: 1px solid #d8e0e5; color: var(--ink); }
+    .ghost-btn:hover { background: #f7f9fa; }
 
-    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
-              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
-              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
-    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
-    .drawer h3:first-child { margin-top: 0; }
-    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
-    .drawer ul { margin: 4px 0; padding-left: 18px; }
-    .drawer .dim { color: #93a6ae; font-size: 12px; }
-    .drawer .metric-value { font-size: 16px; font-weight: 700; }
-    .drawer .metric-value.active { color: #ffd166; }
-    .drawer .metric-value.neutral { color: #7fd6e4; }
-    .drawer .metric-value.idle { color: #94a3b8; }
-    .drawer #phiChart { display: block; width: 100%; height: auto; border-radius: 6px;
-                        background: #0a1018; margin: 8px 0 4px; }
+    /* —— 「?」抽屉：白卡，覆盖在参数卡的位置上 —— */
+    .drawer { position: absolute; z-index: 30; right: 20px; top: 14px; width: 340px;
+              max-height: calc(100% - 30px); overflow-y: auto; padding: 16px 18px;
+              background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              box-shadow: 0 22px 48px -12px rgba(22, 35, 43, .28), 0 2px 6px rgba(22, 35, 43, .06);
+              scrollbar-width: thin; scrollbar-color: #d7dee3 transparent;
+              overscroll-behavior: contain; }
+    .drawer::-webkit-scrollbar { width: 8px; }
+    .drawer::-webkit-scrollbar-thumb { background: #d7dee3; border-radius: 4px; }
+    .drawer::-webkit-scrollbar-track { background: transparent; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .drawer-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .drawer-close { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line);
+                    border-radius: 7px; background: var(--card); color: var(--muted);
+                    font-size: 16px; line-height: 1; cursor: pointer; }
+    .drawer-close:hover { background: #f4f6f8; color: var(--ink); }
+    .drawer h3 { margin: 14px 0 4px; color: #7c8d97; font-size: 12px; font-weight: 600;
+                 letter-spacing: .04em; }
+    .drawer p { margin: 4px 0; color: #4a5f6a; font-size: 12.5px; line-height: 1.6; }
+    .drawer li { margin: 3px 0; color: #4a5f6a; font-size: 12.5px; line-height: 1.6; }
+    .drawer ul { margin: 4px 0; padding-left: 16px; }
+    .drawer .dim { color: #7c8d97; font-size: 11.5px; }
+    .drawer .metric-value { font-size: 13.5px; font-weight: 700; }
+    .drawer .metric-value.active { color: #b45309; }
+    .drawer .metric-value.neutral { color: var(--accent); }
+    .drawer .metric-value.idle { color: #7c8d97; }
+    .drawer #phiChart { display: block; width: 100%; height: auto; margin: 8px 0 4px;
+                        border: 1px solid var(--line); border-radius: 6px; }
 
-    /* ---- 面板内部：两列紧凑卡片 ---- */
-    .hud-panel .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
-    .hud-panel .field { margin-top: 5px; }
-    .hud-panel .field:first-child { margin-top: 0; }
-    .field-label { margin-bottom: 3px; color: #cfe3e9; font-size: 11.5px; }
-    .field label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 1px;
-                   color: #cfe3e9; font-size: 11.5px; line-height: 1.35; }
-    .field label b { color: #7fd6e4; font-weight: 700; white-space: nowrap; }
-    input[type="range"] { width: 100%; height: 16px; accent-color: var(--accent); display: block; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .scene-buttons { display: grid; gap: 5px; }
-
-    .hud-panel button { min-height: 26px; padding: 2px 6px; border-radius: 7px; font-family: inherit;
-                        border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
-                        color: #eaf2f5; font-size: 11.5px; font-weight: 600; cursor: pointer;
-                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .hud-panel button:hover { background: rgba(255,255,255,.15); }
-    .hud-panel button:disabled { opacity: .45; cursor: not-allowed; }
-    .scene-btn.active, .hud-panel button.primary { background: var(--accent-deep); border-color: var(--accent); color: #ffffff; }
-
-    .toggles { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; }
-    .toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
-    .toggle input { width: 14px; height: 14px; accent-color: var(--accent); }
-
-    .row { display: flex; gap: 6px; margin-top: 6px; }
-    .row button { flex: 1; }
-
-    /* ---- 参数面板：首行拖动条（可拖动、可记忆位置） ---- */
-    .hud-panel { cursor: default; }
-    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
-                             justify-content: space-between; margin: -2px 0 6px; }
-    .hud-panel .panel-grip:active { cursor: grabbing; }
-    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
-    .panel-grip .grip-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #9fe8de; }
-    .hud-panel .grip-collapse { flex: 0 0 auto; width: 24px; height: 18px; min-height: 18px; padding: 0;
-                                font-size: 14px; line-height: 1; background: transparent; }
-
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-
-    @media (max-width: 1100px) {
-      .hud-panel { width: 272px; }
-      .hud-toggle[aria-expanded="true"] { right: 296px; }
+    @media (max-width: 1200px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .workspace { padding: 12px 16px 14px; gap: 14px; }
+      .panel { width: 240px; padding: 12px; }
+      .drawer { right: 16px; top: 12px; width: 300px; max-height: calc(100% - 26px); }
+      .ro-item { padding: 3px 9px; }
+      .legend { gap: 12px; }
     }
 
-    @media (max-width: 900px) {
-      .hud-panel { width: 250px; font-size: 11.5px; }
-      .hud-toggle[aria-expanded="true"] { right: 274px; }
-      .hud-legend { gap: 8px; font-size: 11px; }
+    @media (max-width: 980px) {
+      html, body { height: auto; overflow: auto; }
+      .topbar { height: auto; min-height: 56px; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
+      .readout { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+      .top-actions { margin-left: auto; }
+      .workspace { height: auto; min-height: calc(100vh - 56px); flex-direction: column;
+                   align-items: center; padding: 12px; }
+      .stage-column { width: min(92vw, 720px); }
+      .panel { width: min(92vw, 360px); }
+      .drawer { right: 12px; top: 12px; width: min(92vw, 340px); max-height: 70vh; }
+      .legend { white-space: normal; flex-wrap: wrap; text-align: center; }
     }
   </style>
 </head>
 <body>
-  <main class="app">
-    <div class="stage">
+  <header class="topbar">
+    <h1 class="brand">磁场与磁通量</h1>
+
+    <div class="readout" aria-label="实时读数">
+      <span class="ro-item"><span class="ro-k">场景</span><b id="stageScene">线圈平移进出磁场</b></span>
+      <span class="ro-item"><span class="ro-k">Φ</span><b id="stageFlux">2.25 mWb →</b></span>
+      <span class="ro-item"><span class="ro-k">θ</span><b id="stageTheta">0°</b></span>
+      <span class="ro-item" id="currentChip"><span class="ro-k">电流</span><b id="stageCurrent">无感应电流</b></span>
+    </div>
+
+    <div class="top-actions">
+      <button type="button" class="top-btn round" id="moreBtn" aria-expanded="false"
+              aria-controls="drawer" aria-label="结论与课堂问题">?</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="stage-column">
       <div class="stage-frame">
         <canvas id="fluxCanvas" width="1600" height="900"></canvas>
+      </div>
 
-        <div class="hud hud-readout" aria-label="实时读数">
-          <span class="chip">场景 <b id="stageScene">线圈平移进出磁场</b></span>
-          <span class="chip">Φ <b id="stageFlux">2.25 mWb →</b></span>
-          <span class="chip">θ <b id="stageTheta">0°</b></span>
-          <span class="chip" id="currentChip">电流 <b id="stageCurrent">无感应电流</b></span>
-        </div>
-
-        <div class="hud hud-legend" id="legend">
-          <span>Φ = B·S·cosθ</span>
-          <span><i class="swatch" style="background:#34d399"></i>线圈</span>
-          <span><i class="swatch" style="background:#ffd166"></i>有感应电流</span>
-          <span>×/⊙：B 向里/向外</span>
-          <span>θ：n 与 B 的夹角</span>
-        </div>
-
-        <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
-          <div class="panel-grip" id="panelGrip">
-            <span class="grip-title">参数</span>
-            <button type="button" class="grip-collapse" id="panelCollapse" title="收起参数（P）" aria-label="收起参数">−</button>
-          </div>
-
-          <div class="cols">
-            <div>
-              <div class="field">
-                <label for="bSlider">磁场 B <b id="bValue">150 mT</b></label>
-                <input id="bSlider" type="range" min="20" max="300" step="10" value="150" />
-              </div>
-              <div class="field">
-                <label for="sSlider">面积 S <b id="sValue">150 cm²</b></label>
-                <input id="sSlider" type="range" min="60" max="300" step="10" value="150" />
-              </div>
-              <div class="field">
-                <label for="thetaSlider">夹角 θ <b id="thetaValue">0°</b></label>
-                <input id="thetaSlider" type="range" min="0" max="90" step="1" value="0" />
-              </div>
-            </div>
-            <div>
-              <div class="field-label">场景</div>
-              <div class="scene-buttons" role="group" aria-label="磁通量场景">
-                <button type="button" class="scene-btn active" data-scene="translate">线圈平移进出磁场</button>
-                <button type="button" class="scene-btn" data-scene="rotate">线圈绕轴转动</button>
-                <button type="button" class="scene-btn" data-scene="static">线圈静止在磁场中</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="toggles">
-            <label class="toggle"><input type="checkbox" id="bOutToggle" /><span>B 取向外（⊙）</span></label>
-            <label class="toggle"><input type="checkbox" id="showAxis" checked /><span>显示转轴与法线</span></label>
-          </div>
-
-          <div class="row">
-            <button type="button" class="primary" id="playBtn">暂停动画</button>
-            <button type="button" id="resetBtn">重置</button>
-          </div>
-        </aside>
-
-        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
-
-        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
-
-        <section class="drawer" id="drawer" aria-label="结论与课堂问题" hidden>
-          <h3>结论</h3>
-          <p><b>穿过回路的磁通量发生变化，回路中才有感应电流。</b> Φ = B·S·cosθ，B、S、θ 任一变化都可能改变 Φ。</p>
-
-          <h3>当前判定</h3>
-          <p><span id="currentValue" class="metric-value neutral">无感应电流</span></p>
-          <p id="currentNote">穿过回路的磁通量没有变化。</p>
-          <p class="dim">Φ = <span id="phiValue">2.25 mWb</span>　<span id="phiTrend">变化趋势：几乎不变 →</span>　S⊥ = Φ/B = <span id="areaValue">150 cm²</span></p>
-          <p class="dim" id="areaNote">线圈全部处于磁场中，S⊥ = S·cosθ。</p>
-
-          <h3>Φ–t 曲线（最近 6 s）</h3>
-          <canvas id="phiChart" width="600" height="220"></canvas>
-
-          <h3>模型假设</h3>
-          <p>匀强磁场；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；线圈电阻恒定，不讨论电流的定量大小，只判断感应电流的有无和相对强弱。本课不讨论感应电流的方向（楞次定律）。</p>
-
-          <h3>课堂观察</h3>
-          <ul>
-            <li>线圈整体在匀强磁场中平移时，Φ 变不变？灯泡亮不亮？</li>
-            <li>把 θ 从 0° 慢慢转到 90°，Φ 怎样变化？灯泡在什么阶段最亮？</li>
-            <li>线圈静止在场中，只改变 B 或 S，灯泡会不会亮？由此归纳产生感应电流的条件。</li>
-          </ul>
-
-          <h3>当前场景</h3>
-          <p id="sceneTip">线圈在匀强磁场中水平平移：完全在磁场内时 Φ 不变，灯泡不亮；进入或离开边界时 Φ 变化，灯泡被点亮。</p>
-          <p class="dim">快捷键：空格 播放/暂停 · R 重置 · P 参数 · ? 说明</p>
-        </section>
+      <div class="legend" aria-label="图例">
+        <span class="lg"><i class="sw dot"></i>线圈（可拖动）</span>
+        <span class="lg"><i class="sw" style="background:#b45309"></i>有感应电流 / 灯泡亮</span>
+        <span class="lg">× / ⊙：B 向里 / 向外</span>
+        <span class="lg">θ：法线 n 与 B 的夹角</span>
+        <span class="lg">Φ = B·S·cosθ</span>
       </div>
     </div>
+
+    <aside class="panel" id="ctrlPanel" aria-label="场景与参数">
+      <div class="group">
+        <p class="group-label">场景</p>
+        <div class="scene-list" role="group" aria-label="磁通量场景">
+          <button type="button" class="scene-btn active" data-scene="translate" aria-pressed="true">线圈平移进出磁场</button>
+          <button type="button" class="scene-btn" data-scene="rotate" aria-pressed="false">线圈绕轴转动</button>
+          <button type="button" class="scene-btn" data-scene="static" aria-pressed="false">线圈静止在磁场中</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="group-label">参数</p>
+        <div class="row"><label for="bSlider">磁场 B</label><b id="bValue">150 mT</b></div>
+        <input id="bSlider" type="range" min="20" max="300" step="10" value="150" aria-label="磁场 B" />
+
+        <div class="row"><label for="sSlider">面积 S</label><b id="sValue">150 cm²</b></div>
+        <input id="sSlider" type="range" min="60" max="300" step="10" value="150" aria-label="面积 S" />
+
+        <div class="row"><label for="thetaSlider">夹角 θ</label><b id="thetaValue">0°</b></div>
+        <input id="thetaSlider" type="range" min="0" max="90" step="1" value="0" aria-label="夹角 θ" />
+      </div>
+
+      <div class="group">
+        <p class="group-label">显示</p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="bOutToggle" /><span>B 取向外（⊙）</span></label>
+          <label class="toggle"><input type="checkbox" id="showAxis" checked /><span>显示转轴与法线</span></label>
+        </div>
+      </div>
+
+      <div class="reset-row">
+        <button type="button" class="primary-btn" id="playBtn">暂停动画</button>
+        <button type="button" class="ghost-btn" id="resetBtn">重置</button>
+      </div>
+    </aside>
+
+    <section class="drawer" id="drawer" hidden aria-label="结论与课堂问题">
+      <div class="drawer-head">
+        <h2>说明</h2>
+        <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭说明">×</button>
+      </div>
+
+      <h3>结论</h3>
+      <p><b>穿过回路的磁通量发生变化，回路中才有感应电流。</b> Φ = B·S·cosθ，B、S、θ 任一变化都可能改变 Φ。</p>
+
+      <h3>当前判定</h3>
+      <p><span id="currentValue" class="metric-value neutral">无感应电流</span></p>
+      <p id="currentNote">穿过回路的磁通量没有变化。</p>
+      <p class="dim">Φ = <span id="phiValue">2.25 mWb</span>　<span id="phiTrend">变化趋势：几乎不变 →</span>　S⊥ = Φ/B = <span id="areaValue">150 cm²</span></p>
+      <p class="dim" id="areaNote">线圈全部处于磁场中，S⊥ = S·cosθ。</p>
+
+      <h3>Φ–t 曲线（最近 6 s）</h3>
+      <canvas id="phiChart" width="600" height="220"></canvas>
+
+      <h3>模型假设</h3>
+      <p>匀强磁场；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；线圈电阻恒定，不讨论电流的定量大小，只判断感应电流的有无和相对强弱。本课不讨论感应电流的方向（楞次定律）。</p>
+
+      <h3>课堂观察</h3>
+      <ul>
+        <li>线圈整体在匀强磁场中平移时，Φ 变不变？灯泡亮不亮？</li>
+        <li>把 θ 从 0° 慢慢转到 90°，Φ 怎样变化？灯泡在什么阶段最亮？</li>
+        <li>线圈静止在场中，只改变 B 或 S，灯泡会不会亮？由此归纳产生感应电流的条件。</li>
+      </ul>
+
+      <h3>当前场景</h3>
+      <p id="sceneTip">线圈在匀强磁场中水平平移：完全在磁场内时 Φ 不变，灯泡不亮；进入或离开边界时 Φ 变化，灯泡被点亮。</p>
+      <p class="drawer-keys dim">快捷键：空格 播放/暂停 · R 重置 · ? 本抽屉 · Esc 关闭 · 线圈可直接拖动</p>
+    </section>
   </main>
 
   <script>
@@ -761,7 +804,7 @@
         var padB = 30;
 
         cctx.clearRect(0, 0, W, H);
-        cctx.fillStyle = "#0a1018";
+        cctx.fillStyle = "#f7f9fa";
         cctx.fillRect(0, 0, W, H);
 
         var tNow = state.time;
@@ -775,10 +818,10 @@
           return H - padB - clamp(p, 0, maxPhi) / maxPhi * (H - padT - padB);
         }
 
-        cctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
+        cctx.strokeStyle = "rgba(22, 35, 43, 0.10)";
         cctx.lineWidth = 1;
         cctx.font = "22px 'Microsoft YaHei', Arial";
-        cctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+        cctx.fillStyle = "rgba(93, 116, 128, 0.95)";
         cctx.textAlign = "right";
         cctx.textBaseline = "middle";
         var marks = [0, 4, 8, 12];
@@ -797,7 +840,7 @@
         cctx.fillText("t/s", W - padR, H - 8);
 
         if (chartHist.length > 1) {
-          cctx.strokeStyle = "#ffd166";
+          cctx.strokeStyle = "#b45309";
           cctx.lineWidth = 3;
           cctx.lineJoin = "round";
           cctx.beginPath();
@@ -817,7 +860,7 @@
           cctx.stroke();
 
           var lastPt = chartHist[chartHist.length - 1];
-          cctx.fillStyle = "#fff3c4";
+          cctx.fillStyle = "#b45309";
           cctx.beginPath();
           cctx.arc(xOf(lastPt.t), yOf(lastPt.phi * 1000), 5, 0, Math.PI * 2);
           cctx.fill();
@@ -930,7 +973,9 @@
         }
         state.playing = name !== "static";
         ui.sceneButtons.forEach(function (btn) {
-          btn.classList.toggle("active", btn.dataset.scene === name);
+          var on = btn.dataset.scene === name;
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
         });
         ui.sceneTip.textContent = SCENES[name].tip;
         ui.stageScene.textContent = SCENES[name].name;
@@ -977,8 +1022,9 @@
       });
 
       ui.sceneButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
+        button.addEventListener("click", function (event) {
           setScene(button.dataset.scene);
+          if (event.detail > 0) button.blur();
         });
       });
 
@@ -1009,7 +1055,7 @@
         state.showAxis = ui.showAxis.checked;
       });
 
-      ui.playBtn.addEventListener("click", function () {
+      ui.playBtn.addEventListener("click", function (event) {
         if (state.scene === "static") return;
         state.playing = !state.playing;
         if (state.playing) {
@@ -1017,9 +1063,10 @@
           resetDynamics();
         }
         syncPlayButton();
+        if (event.detail > 0) ui.playBtn.blur();
       });
 
-      ui.resetBtn.addEventListener("click", function () {
+      ui.resetBtn.addEventListener("click", function (event) {
         state.B = DEFAULTS.bmT / 1000;
         state.S = DEFAULTS.scm2 * 1e-4;
         state.theta = DEFAULTS.thetaDeg * DEG;
@@ -1034,166 +1081,53 @@
         ui.bOutToggle.checked = false;
         ui.showAxis.checked = true;
         setScene(DEFAULTS.scene);
+        if (event.detail > 0) ui.resetBtn.blur();
       });
 
-      /* ---------- 外壳：参数面板折叠 / 说明抽屉 / 快捷键 ---------- */
+      /* ---------- 外壳：「?」说明抽屉 + 快捷键（参数卡固定显示，不再拖动） ---------- */
 
-      var ctrlPanel = document.getElementById("ctrlPanel");
-      var ctrlToggle = document.getElementById("ctrlToggle");
       var drawer = document.getElementById("drawer");
       var moreBtn = document.getElementById("moreBtn");
-
-      /* ---------- 参数面板：拖动 + 位置记忆（拖动事件只落在 grip 上，不进入画布） ---------- */
-
-      function initDraggablePanel() {
-        var panel = ctrlPanel;
-        var grip = panel && panel.querySelector(".panel-grip");
-        var collapseBtn = document.getElementById("panelCollapse");
-        if (!panel || !grip) return function () {};
-        var KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
-        var dragged = false;
-
-        function clampToFrame(x, y) {
-          var f = panel.parentElement.getBoundingClientRect();
-          var r = panel.getBoundingClientRect();
-          return {
-            x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
-            y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
-          };
-        }
-
-        function place(x, y) {
-          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-          var p = clampToFrame(x, y);
-          panel.style.left = p.x + "px";
-          panel.style.top = p.y + "px";
-          panel.style.right = "auto";
-        }
-
-        function readSaved() {
-          try {
-            return JSON.parse(localStorage.getItem(KEY) || "null");
-          } catch (err) {
-            return null;
-          }
-        }
-
-        var saved = readSaved();
-        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-          dragged = true;
-          place(saved.x, saved.y);          // 恢复上次位置；无记录则用 CSS 默认角落
-        }
-
-        var dx = 0;
-        var dy = 0;
-        var dragging = false;
-
-        grip.addEventListener("pointerdown", function (e) {
-          if (e.button !== 0) return;
-          if (e.target.closest && e.target.closest("button")) return;   // 折叠按钮不触发拖动
-          var f = panel.parentElement.getBoundingClientRect();
-          var r = panel.getBoundingClientRect();
-          dx = e.clientX - r.left;
-          dy = e.clientY - r.top;
-          dragging = true;
-          panel.classList.add("dragging");
-          grip.setPointerCapture(e.pointerId);
-          panel.style.left = (r.left - f.left) + "px";
-          panel.style.top = (r.top - f.top) + "px";
-          panel.style.right = "auto";
-          e.preventDefault();
-        });
-
-        grip.addEventListener("pointermove", function (e) {
-          if (!dragging) return;
-          var f = panel.parentElement.getBoundingClientRect();
-          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
-        });
-
-        function endDrag(e) {
-          if (!dragging) return;
-          dragging = false;
-          panel.classList.remove("dragging");
-          if (grip.hasPointerCapture && grip.hasPointerCapture(e.pointerId)) {
-            grip.releasePointerCapture(e.pointerId);
-          }
-          try {
-            localStorage.setItem(KEY, JSON.stringify({
-              x: parseFloat(panel.style.left),
-              y: parseFloat(panel.style.top)
-            }));
-          } catch (err) { /* 隐私模式下无法写入时忽略 */ }
-          dragged = true;
-        }
-
-        grip.addEventListener("pointerup", endDrag);
-        grip.addEventListener("pointercancel", endDrag);
-
-        grip.addEventListener("dblclick", function (e) {
-          if (e.target.closest && e.target.closest("button")) return;
-          document.getElementById("ctrlToggle").click();
-        });
-
-        if (collapseBtn) {
-          collapseBtn.addEventListener("click", function () {
-            ctrlToggle.click();
-          });
-        }
-
-        function reclamp() {
-          if (!dragged || panel.hidden) return;
-          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
-        }
-        window.addEventListener("resize", reclamp);
-        return reclamp;
-      }
-
-      var reclampPanel = initDraggablePanel();
-
-      function setPanelOpen(open) {
-        ctrlPanel.hidden = !open;
-        ctrlToggle.setAttribute("aria-expanded", open ? "true" : "false");
-        ctrlToggle.title = open ? "收起参数（P）" : "展开参数（P）";
-        if (open) reclampPanel();
-      }
+      var drawerClose = document.getElementById("drawerClose");
 
       function setDrawerOpen(open) {
         drawer.hidden = !open;
         moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
-        moreBtn.textContent = open ? "×" : "?";
-        moreBtn.title = open ? "收起说明" : "结论与课堂问题";
+        if (open) drawerClose.focus();
       }
 
-      ctrlToggle.addEventListener("click", function () {
-        setPanelOpen(ctrlPanel.hidden);
+      moreBtn.addEventListener("click", function (event) {
+        setDrawerOpen(drawer.hidden);
+        if (event.detail > 0 && drawer.hidden) moreBtn.blur();
       });
 
-      moreBtn.addEventListener("click", function () {
-        setDrawerOpen(drawer.hidden);
+      drawerClose.addEventListener("click", function () {
+        setDrawerOpen(false);
+        moreBtn.focus();
       });
 
       document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          if (!drawer.hidden) { setDrawerOpen(false); moreBtn.focus(); }
+          return;
+        }
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         var tag = event.target && event.target.tagName;
-        var onControl = tag === "INPUT" || tag === "BUTTON" || tag === "SELECT" || tag === "TEXTAREA";
-        if (event.key === " " && !onControl) {
+        if (event.key === " " || event.code === "Space") {
+          if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return;
           event.preventDefault();
           ui.playBtn.click();
-        } else if ((event.key === "r" || event.key === "R") && !onControl) {
+          return;
+        }
+        if (event.key === "r" || event.key === "R") {
           event.preventDefault();
           ui.resetBtn.click();
-        } else if (event.key === "p" || event.key === "P") {
+        } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
           event.preventDefault();
-          ctrlToggle.click();
-        } else if (event.key === "?") {
-          event.preventDefault();
-          moreBtn.click();
-        } else if (event.key === "Escape") {
-          setDrawerOpen(false);
+          setDrawerOpen(drawer.hidden);
         }
       });
 
-      setPanelOpen(true);
       setDrawerOpen(false);
 
       /* ---------- 主循环 ---------- */

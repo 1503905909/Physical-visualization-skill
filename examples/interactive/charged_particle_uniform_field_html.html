@@ -6,300 +6,332 @@
   <title>带电粒子先加速再偏转（教材第 5 题 · 真实 SI 单位）</title>
   <link rel="icon" href="data:," />
   <style>
-    * { box-sizing: border-box; }
-
-    /* —— LAYOUT.md 必需样式 —— */
-    html, body { height: 100%; }
-    body { margin: 0; background: #070d11; overflow: hidden;
-           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
-
-    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
-
-    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
-
-    /* 16:9 等比舞台：同时受宽高约束 */
-    .stage-frame { position: relative; aspect-ratio: 16 / 9;
-                   width: min(100%, calc((100vh - 16px) * 16 / 9));
-                   border-radius: 12px; overflow: hidden; background: #0b141a; }
-
-    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
-
-    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
-           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
-           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
-
-    /* 左上角叠加：读数 + 教材预设说明上下排列，互不重叠 */
-    .hud-stack { position: absolute; left: 12px; top: 12px; z-index: 3;
-                 display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-                 max-width: min(650px, calc(100% - 280px)); pointer-events: none; }
-    .hud-stack .hud { position: static; }
-
-    .hud-readout { display: grid; grid-template-columns: repeat(4, minmax(0, auto));
-                   gap: 3px 18px; padding: 7px 12px; font-size: 12.5px; }
-    .hud-readout > span { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; color: #9fb6bf; }
-    .hud-readout b { font-size: 14px; font-weight: 800; color: #7fd6e4;
-                     font-variant-numeric: tabular-nums; }
-    .hud-readout b#stageHit { color: #9fe3b5; }
-    .hud-readout b#stageHit.hit { color: #ff8a8a; }
-    /* 下标（v_y、v出 等）在读数、图例与抽屉里统一排版 */
-    .hud-readout sub, .hud-legend sub, .drawer sub { font-size: .72em; line-height: 0; }
-
-    .hud-preset { display: flex; flex-direction: column; gap: 1px; padding: 7px 11px;
-                  max-width: 100%; font-size: 11.5px; line-height: 1.45;
-                  border-left: 3px solid #ffd166; }
-    .hud-preset[hidden] { display: none; }
-    .hud-preset b { color: #ffd166; }
-    .hud-preset .given { color: #e4edf2; }
-    .hud-preset .web { color: #9fc6d2; }
-    .hud-preset .warn { color: #ffc46b; }
-
-    .hud-legend { left: 12px; bottom: 12px; max-width: 66%; padding: 6px 10px; font-size: 12px;
-                  color: #cfe3e9; }
-
-    /* 参数面板默认贴右上角：画布右侧 260px 留作面板列；面板可拖动并记忆位置。 */
-    .hud-panel { right: 12px; left: auto; top: 12px; bottom: auto;
-                 width: 236px; max-height: calc(100% - 24px);
-                 overflow-y: auto; padding: 10px; font-size: 12px; cursor: default; }
-    .hud-panel[hidden] { display: none; }
-
-    /* 首行把手：标题 + 折叠按钮；拖动改位置，双击折叠（LAYOUT.md「参数面板必须可拖动」） */
-    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
-                             display: flex; align-items: center; justify-content: space-between;
-                             gap: 6px; margin: -2px 0 8px; }
-    .hud-panel .panel-grip:active { cursor: grabbing; }
-    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
-    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #7fd6e4; }
-    .hud-panel .grip-btn { width: 20px; height: 20px; padding: 0; line-height: 1; font-size: 12px;
-                           border-radius: 6px; cursor: pointer; color: #eaf2f5;
-                           background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); }
-    .hud-panel .grip-btn:hover { background: rgba(255,255,255,.18); }
-
-    /* 折叠后「参数」按钮才出现；展开时首行把手上已有折叠按钮 */
-    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
-                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
-                  font: inherit; font-size: 12.5px;
-                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
-                  display: none; }
-    .hud-toggle[aria-expanded="false"] { display: inline-block; }
-
-    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
-                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
-                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
-
-    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(430px, 74%);
-              max-height: 62%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
-              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
-    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
-    .drawer h3:first-child { margin-top: 0; }
-    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
-    .drawer .tag-given { color: #ffd166; }
-    .drawer .tag-web { color: #9fc6d2; }
-
-    @media (max-width: 900px) {
-      .hud-panel { width: 206px; padding: 8px; font-size: 11.5px; }
-      .hud-stack { max-width: calc(100% - 236px); }
+    :root {
+      --page: #f4f6f8;
+      --card: #ffffff;
+      --ink: #16232b;
+      --muted: #5d7480;
+      --line: #e3e8ec;
+      --stage: #0b141a;
+      --accent: #0f766e;
     }
 
-    /* —— 叠加层内部样式（只影响外观） —— */
-    .hud-legend { display: flex; align-items: center; gap: 11px; flex-wrap: nowrap; overflow: hidden; }
-    .lg-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-    .lg-line { width: 18px; height: 4px; border-radius: 999px; background: #ffd166; flex: 0 0 auto; }
-    .lg-arrow { width: 0; height: 0; border-left: 11px solid rgba(255,209,102,.85);
-                border-top: 4px solid transparent; border-bottom: 4px solid transparent; flex: 0 0 auto; }
-    .lg-plate { width: 14px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, #ff3030 50%, #5363ff 50%); flex: 0 0 auto; }
-    .lg-dim { width: 18px; height: 3px; border-radius: 2px; background: #7ee0a1; flex: 0 0 auto; }
+    * { box-sizing: border-box; }
 
-    .hud-panel::-webkit-scrollbar, .drawer::-webkit-scrollbar { width: 6px; }
-    .hud-panel::-webkit-scrollbar-thumb, .drawer::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--page); color: var(--ink); overflow: hidden;
+           font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+           -webkit-font-smoothing: antialiased; }
 
-    .hud button { font-family: inherit; cursor: pointer; }
-    .hud-panel .field { margin-top: 7px; }
-    .hud-panel .field label { display: flex; flex-wrap: wrap; justify-content: space-between;
-                              gap: 0 6px; font-size: 11.5px; color: #cfe3e9; }
-    .hud-panel .field label b { color: #7fd6e4; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .hud-panel input[type="range"] { width: 100%; margin: 3px 0 0; accent-color: #7fd6e4; }
+    /* —— 顶栏：白底，高 56px —— */
+    .topbar { height: 56px; display: flex; align-items: center; gap: 16px;
+              padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .brand { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .01em;
+             white-space: nowrap; }
 
-    /* 教材第 5 题预设：一个按钮 + 一段“题给 / 画图设置”说明 */
-    .hud-panel .preset-btn { width: 100%; margin-top: 2px; min-height: 30px; border-radius: 8px;
-                             font-size: 12px; font-weight: 800; color: #ffd166;
-                             border: 1px solid rgba(255,209,102,.5); background: rgba(255,209,102,.08); }
-    .hud-panel .preset-btn:hover { background: rgba(255,209,102,.16); }
-    .hud-panel .preset-btn.active { background: #ffd166; color: #231a05; border-color: #ffd166; }
-    .hud-panel .preset-note { margin-top: 4px; padding: 5px 8px; border-radius: 7px;
-                              background: rgba(255,209,102,.07); border: 1px dashed rgba(255,209,102,.4);
-                              font-size: 10.5px; line-height: 1.5; color: #d8e3e8; }
-    .hud-panel .preset-note[hidden] { display: none; }
-    .hud-panel .preset-note p { margin: 0 0 3px; }
-    .hud-panel .preset-note p:last-child { margin-bottom: 0; }
-    .hud-panel .preset-note b { color: #ffd166; }
-    .hud-panel .preset-note .warn { color: #ffb0b0; }
+    /* 读数条：≤4 项，标签灰 + 数值深色加粗 */
+    .readout { margin-left: auto; display: flex; align-items: center; min-width: 0;
+               padding: 3px 2px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 10px; box-shadow: 0 1px 2px rgba(22, 35, 43, .05); }
+    .ro-item { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px;
+               font-size: 12.5px; white-space: nowrap; }
+    .ro-item + .ro-item { border-left: 1px solid #eef2f4; }
+    .ro-k { color: var(--muted); font-size: 12.5px; }
+    .ro-item b { color: var(--ink); font-size: 13.5px; font-weight: 700;
+                 font-variant-numeric: tabular-nums; }
+    .ro-item b.hit { color: #c0392b; }
+    .readout sub, .panel sub, .drawer sub, .legend sub { font-size: .72em; line-height: 0; }
 
-    .hud-panel .segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-    .hud-panel .segmented button { min-height: 27px; padding: 0 2px; font-size: 11.5px; font-weight: 700; color: #dbe9ee;
-                                   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); border-radius: 7px; }
-    .hud-panel .segmented button:hover { background: rgba(255,255,255,.12); }
-    .hud-panel .segmented button.active { background: #0f766e; border-color: #0f766e; color: #fff; }
-    .hud-panel .toggles { display: grid; gap: 5px; margin-top: 10px; }
-    .hud-panel .toggle { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
-    .hud-panel .toggle input { width: 14px; height: 14px; accent-color: #7fd6e4; flex: 0 0 auto; }
-    .hud-panel .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-    .hud-panel .btn-row button { min-height: 30px; border-radius: 8px; font-size: 12px; font-weight: 700;
-                                 border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #eaf2f5; }
-    .hud-panel .btn-row button:hover { background: rgba(255,255,255,.14); }
-    .hud-panel .btn-row button.primary-btn { background: #0f766e; border-color: #0f766e; color: #fff; }
-    .hud-panel .btn-row button.primary-btn:hover { background: #0d665f; }
-    .hud-panel .ctl-hint { margin: 6px 0 0; font-size: 10.5px; line-height: 1.45; color: #8aa2ac; }
+    .top-actions { margin-left: 4px; display: flex; gap: 8px; }
+    .top-btn { height: 30px; padding: 0 13px; border: 1px solid var(--line);
+               border-radius: 8px; background: var(--card); color: var(--ink);
+               font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1;
+               cursor: pointer; }
+    .top-btn:hover { background: #f7f9fa; border-color: #d5dde2; }
+    .top-btn.round { width: 30px; padding: 0; border-radius: 50%;
+                     color: var(--muted); font-weight: 700; font-size: 13px; }
+    .top-btn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: #ffffff; }
 
-    .drawer .formula-line { margin: 6px 0 6px; padding: 7px 10px; border-radius: 8px;
-                            background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; line-height: 1.6; }
-    .drawer ul { margin: 4px 0 0; padding-left: 18px; }
-    .drawer .note { font-size: 12px; color: #9fb6bf; }
-    .drawer .formula-note { color: #93acb6; font-size: 11.5px; }
-    .drawer .formula-live { background: rgba(255,196,84,.10); color: #ffd98a; }
-    .drawer details.derive { margin: 2px 0 8px; font-size: 12px; color: #9fb6bf; }
-    .drawer details.derive summary { cursor: pointer; color: #7fd6e4; outline: none; }
+    /* —— 主体：左黑色画布窗口 + 右白色参数卡 —— */
+    .workspace { position: relative; height: calc(100vh - 56px); display: flex;
+                 align-items: flex-start; justify-content: center; gap: 18px;
+                 padding: 14px 20px 16px; }
+
+    .stage-column { flex: 0 0 auto; width: min(72vw, calc(177.78vh - 266.67px));
+                    display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+    .stage-frame { position: relative; width: 100%; aspect-ratio: 16 / 9;
+                   overflow: hidden; background: var(--stage); border-radius: 14px;
+                   box-shadow: 0 14px 34px rgba(11, 20, 26, .2), 0 2px 6px rgba(11, 20, 26, .14); }
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    /* —— 画布下方一行图例 —— */
+    .legend { display: flex; align-items: center; justify-content: center; gap: 16px;
+              padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 10px; font-size: 12px; color: var(--muted);
+              white-space: nowrap; overflow: hidden; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; }
+    .sw { display: inline-block; width: 18px; height: 3px; border-radius: 2px;
+          background: #33454f; flex: 0 0 auto; }
+    .sw.traj { height: 4px; background: #b45309; }
+    .sw.force { width: 0; height: 0; border-left: 9px solid #b45309;
+                border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+                background: none; border-radius: 0; }
+    .sw.vx { background: #33454f; }
+    .sw.vy { background: #be185d; }
+    .sw.plate { width: 14px; height: 10px; border-radius: 3px;
+                background: linear-gradient(90deg, #d92d2d 50%, #3558ff 50%); }
+    .sw.dim { background: #15803d; }
+
+    /* —— 右侧参数卡：白底、圆角 12、细边框 —— */
+    .panel { flex: 0 0 auto; width: 280px; padding: 14px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 12px;
+             box-shadow: 0 1px 2px rgba(22, 35, 43, .04); }
+    .group + .group { margin-top: 14px; }
+    .group-label { margin: 0 0 8px; color: #7c8d97; font-size: 12px; letter-spacing: .04em; }
+
+    /* 教材第 5 题预设：按钮 + “题给 / 画图设置”小字说明 */
+    .preset-btn { display: block; width: 100%; height: 30px; margin: 0;
+                  border: 1px solid #cbe0dc; border-radius: 8px; background: #f1faf7;
+                  color: #0f6f66; font-family: inherit; font-size: 12px; font-weight: 700;
+                  cursor: pointer; }
+    .preset-btn:hover { background: #e6f6f1; border-color: #b7d6d0; }
+    .preset-btn.active { background: var(--ink); border-color: var(--ink); color: #ffffff; }
+    .preset-note { margin-top: 6px; padding: 6px 8px; border: 1px dashed #e6d5b8;
+                   border-radius: 7px; background: #fdf9f0; font-size: 10.5px;
+                   line-height: 1.5; color: #5d4a2a; }
+    .preset-note p { margin: 0 0 2px; }
+    .preset-note p:last-child { margin-bottom: 0; }
+    .preset-note b { color: #8a5a00; }
+    .preset-note .warn { color: #a33a2a; }
+
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 8px; margin-top: 8px; color: var(--muted); font-size: 11.5px; }
+    .row b { color: var(--ink); font-size: 11.5px; font-weight: 700; white-space: nowrap;
+             font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 4px 0 0;
+                          accent-color: var(--accent); background: transparent; cursor: pointer; }
+    input[type="range"]:disabled { opacity: .4; cursor: default; }
+
+    .segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .segmented button { height: 30px; padding: 0 2px; border: 1px solid #dfe6ea;
+                        border-radius: 8px; background: var(--card); color: #33454f;
+                        font-family: inherit; font-size: 12px; cursor: pointer; }
+    .segmented button:hover { background: #f7f9fa; border-color: #d3dce2; }
+    .segmented button.active { background: var(--ink); border-color: var(--ink);
+                               color: #ffffff; font-weight: 700; }
+
+    .toggles { display: grid; gap: 4px; }
+    .toggle { display: flex; align-items: center; gap: 7px; color: #33454f;
+              font-size: 12px; line-height: 1.3; cursor: pointer; user-select: none; }
+    .toggle input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto;
+                    accent-color: var(--accent); }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px;
+               padding-top: 12px; border-top: 1px solid #eef2f4; }
+    .btn-row button { height: 32px; border: 1px solid #d8e0e5; border-radius: 8px;
+                      background: var(--card); color: var(--ink); font-family: inherit;
+                      font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .btn-row button:hover { background: #f7f9fa; }
+    .btn-row button.primary-btn { background: var(--ink); border-color: var(--ink); color: #ffffff; }
+    .btn-row button.primary-btn:hover { background: #20323c; }
+    .ctl-hint { margin: 10px 0 0; font-size: 10.5px; line-height: 1.5; color: #8a9aa3; }
+
+    /* —— 「?」抽屉：白卡，覆盖在参数卡位置 —— */
+    .drawer { position: absolute; z-index: 30; right: 20px; top: 14px; width: 340px;
+              max-height: calc(100% - 30px); overflow-y: auto; padding: 16px 18px;
+              background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              box-shadow: 0 22px 48px -12px rgba(22, 35, 43, .28), 0 2px 6px rgba(22, 35, 43, .06); }
+    .drawer[hidden] { display: none; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .drawer-head h2 { margin: 0; font-size: 13px; font-weight: 700; }
+    .drawer-close { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line);
+                    border-radius: 7px; background: var(--card); color: var(--muted);
+                    font-size: 16px; line-height: 1; cursor: pointer; }
+    .drawer-close:hover { background: #f4f6f8; color: var(--ink); }
+    .drawer h3 { margin: 14px 0 4px; color: #7c8d97; font-size: 12px;
+                 font-weight: 600; letter-spacing: .04em; }
+    .drawer-head + h3 { margin-top: 2px; }
+    .drawer p, .drawer li { color: #4a5f6a; font-size: 12.5px; line-height: 1.6; margin: 4px 0; }
+    .drawer ul { margin: 4px 0; padding-left: 16px; }
+    .drawer li { margin: 3px 0; }
+
+    .drawer .formula-line { margin: 6px 0; padding: 7px 10px; border-radius: 8px;
+                            background: #f2f7f8; color: #2c5a63; font-size: 12.5px; line-height: 1.6; }
+    .drawer .note { font-size: 12px; color: #6b7f89; }
+    .drawer .tag-given { color: #8a5a00; }
+    .drawer .tag-web { color: #2f6470; }
+    .drawer details.derive { margin: 2px 0 8px; font-size: 12px; color: #5d7480; }
+    .drawer details.derive summary { cursor: pointer; color: var(--accent); outline: none; }
     .drawer details.derive p { margin: 6px 0 0; line-height: 1.7; }
-    .metric-value { font-weight: 800; color: #7fd6e4; font-variant-numeric: tabular-nums; }
-    .metric-value.warm { color: #ffb0b0; }
-    .metric-value.cool { color: #a8b4ff; }
+    .metric-value { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .metric-value.warm { color: #b03a2e; }
+    .metric-value.cool { color: #3558ff; }
+
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    @media (max-width: 1200px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .workspace { padding: 12px 16px 14px; gap: 14px; }
+      .panel { width: 240px; padding: 12px; }
+      .drawer { right: 16px; top: 12px; width: 300px; max-height: calc(100% - 26px); }
+      .ro-item { padding: 3px 9px; }
+      .legend { gap: 12px; }
+    }
+
+    @media (max-width: 980px) {
+      html, body { height: auto; overflow: auto; }
+      .topbar { height: auto; min-height: 56px; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
+      .readout { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+      .top-actions { margin-left: auto; }
+      .workspace { height: auto; min-height: calc(100vh - 56px); flex-direction: column;
+                   align-items: center; padding: 12px; }
+      .stage-column { width: min(92vw, 720px); }
+      .panel { width: min(92vw, 360px); }
+      .drawer { right: 12px; top: 12px; width: min(92vw, 340px); max-height: 70vh; }
+      .legend { gap: 10px; flex-wrap: wrap; white-space: normal; text-align: center; }
+    }
   </style>
 </head>
 <body>
-  <main class="app">
-    <div class="stage">
+  <header class="topbar">
+    <h1 class="brand">带电粒子先加速再偏转</h1>
+
+    <div class="readout" aria-label="实时读数">
+      <span class="ro-item"><span class="ro-k">粒子</span><b id="stageParticle">电子</b></span>
+      <span class="ro-item"><span class="ro-k">v₀</span><b id="stageV0">1.88×10⁷ m/s</b></span>
+      <span class="ro-item"><span class="ro-k">|y|</span><b id="stageY">4.5 mm</b></span>
+      <span class="ro-item"><span class="ro-k">状态</span><b id="stageHit">已离开电场</b></span>
+    </div>
+
+    <div class="top-actions">
+      <button type="button" class="top-btn round" id="moreBtn" aria-expanded="false"
+              aria-controls="drawer" aria-label="预设说明、结论与课堂问题">?</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="stage-column">
       <div class="stage-frame">
         <canvas id="motionCanvas" width="960" height="540"></canvas>
+      </div>
 
-        <div class="hud-stack">
-          <div class="hud hud-readout" aria-live="polite">
-            <span>粒子 <b id="stageParticle">电子</b></span>
-            <span>v₀ <b id="stageV0">1.88×10⁷ m/s</b></span>
-            <span>v<sub>y</sub> <b id="stageVy">2.81×10⁶ m/s</b></span>
-            <span>v出 <b id="stageVout">1.90×10⁷ m/s</b></span>
-            <span>θ <b id="stageTheta">8.53°</b></span>
-            <span>|y| <b id="stageY">4.5 mm</b></span>
-            <span>状态 <b id="stageHit">已离开电场</b></span>
-          </div>
-
-          <div class="hud hud-preset" id="presetChip" hidden>
-            <b>教材第 5 题</b>
-            <span class="given">题给 电子｜U₀ 1000 V｜E 5000 N/C｜L 6 cm</span>
-            <span class="web">画图设置 d 2 cm、U 100 V（仅为按 E = U/d 凑出）</span>
-            <span class="warn">d 不是题给条件：题目没有给出板距</span>
-          </div>
-        </div>
-
-        <div class="hud hud-legend" id="legend" aria-hidden="true">
-          <span class="lg-item"><span class="lg-line"></span>轨迹</span>
-          <span class="lg-item"><span class="lg-arrow"></span>F = qE</span>
-          <span class="lg-item"><span class="lg-line" style="background:rgba(255,255,255,.8)"></span>vₓ</span>
-          <span class="lg-item"><span class="lg-line" style="background:#ff8fb0"></span>v<sub>y</sub></span>
-          <span class="lg-item"><span class="lg-plate"></span>极板（红正蓝负）</span>
-          <span class="lg-item"><span class="lg-dim"></span>L / d 标尺</span>
-        </div>
-
-        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
-          <div class="panel-grip" id="panelGrip" title="拖动可移动面板（双击折叠）">
-            <span class="panel-name">参数</span>
-            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
-                    title="折叠（双击标题行也可）">▸</button>
-          </div>
-
-          <button type="button" class="preset-btn" id="presetBtn" aria-pressed="false">教材第 5 题</button>
-          <div class="preset-note" id="presetNote" hidden>
-            <p class="warn">d 为网页画图设定，不是题给条件</p>
-          </div>
-
-          <div class="field">
-            <label for="u0Slider"><span>加速电压 U₀</span><b id="u0Value">1000 V</b></label>
-            <input id="u0Slider" type="range" min="200" max="2000" step="10" value="1000" />
-          </div>
-          <div class="field">
-            <label for="uSlider"><span>偏转电压 U</span><b id="uValue">+100 V</b></label>
-            <input id="uSlider" type="range" min="-400" max="400" step="10" value="100" />
-          </div>
-          <div class="field">
-            <label for="lSlider"><span>板长 L</span><b id="lValue">6.0 cm</b></label>
-            <input id="lSlider" type="range" min="2" max="10" step="0.1" value="6" />
-          </div>
-          <div class="field">
-            <label for="dSlider"><span>板距 d</span><b id="dValue">2.0 cm</b></label>
-            <input id="dSlider" type="range" min="1" max="5" step="0.1" value="2" />
-          </div>
-
-          <div class="segmented" role="group" aria-label="粒子种类">
-            <button type="button" class="particle-btn active" data-particle="electron">电子</button>
-            <button type="button" class="particle-btn" data-particle="proton">质子</button>
-            <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
-          </div>
-
-          <div class="toggles">
-            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>力和速度箭头</span></label>
-            <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>中线与出板辅助线</span></label>
-          </div>
-
-          <div class="btn-row">
-            <button type="button" class="primary-btn" id="playBtn">播放</button>
-            <button type="button" id="resetBtn" title="回到完整轨迹；重新观看请按播放">重置</button>
-          </div>
-
-          <p class="ctl-hint">板间 E = U/d（U &gt; 0 时上板为正、场强向下）。加速区极性随粒子电性自动翻转。</p>
-        </aside>
-
-        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
-        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="预设说明、结论与课堂问题">?</button>
-
-        <section class="drawer" id="drawer" hidden aria-label="预设说明、结论、模型假设与课堂问题">
-          <h3>教材第 5 题：题给条件 ≠ 网页设置</h3>
-          <p><b class="tag-given">题给</b>电子，由静止经 U₀ = 1000 V 加速，垂直进入 E = 5000 N/C 的匀强电场，偏转电极长 L = 6 cm。</p>
-          <p><b class="tag-web">画图设置</b>d = 2 cm、U = 100 V。设这两个量只是为了让网页按 E = U/d 画出 5000 N/C 的场；<b>题目没有给出板距</b>，d 不是题给条件，U 也不是。</p>
-          <p class="note">点参数面板里的「教材第 5 题」按钮即回到这组参数。读数栏只给数值，逐步推导由 Manim 动画承担。</p>
-
-          <h3>一句结论</h3>
-          <p>在<b>同一加速电压 U₀、同一偏转电压 U</b> 下，电子、质子、α 粒子进入同一偏转电场后的<b>偏转位移大小</b>相同：|y| = |U|·L²/(4dU₀)（E = U/d），只由 U、d、L、U₀ 决定，与粒子种类、电荷量大小无关。</p>
-          <p>但<b>方向不能一概而论</b>：偏转方向由电荷正负与场强方向共同决定；同一偏转电场中电子与质子／α 粒子的偏转方向<b>相反</b>，所以“相同”只指位移的<b>大小</b>。</p>
-          <p>加速区极性随粒子电性自动翻转：负粒子→左板负、右板正（E 向左，受力向右）；正粒子→左板正、右板负（E 向右，受力向右）。任何粒子都由静止向右加速，再进入偏转区。</p>
-
-          <h3>实时量值</h3>
-          <p>偏转场 E = <span class="metric-value" id="valE">—</span>；加速度 a = <span class="metric-value" id="valA">—</span></p>
-          <p>加速后 v₀ = <span class="metric-value" id="valV0">—</span>；偏转时间 t = <span class="metric-value" id="valT">—</span></p>
-          <p>v<sub>y</sub> = <span class="metric-value" id="valVy">—</span>，v出 = <span class="metric-value" id="valVout">—</span>，θ = <span class="metric-value" id="valTheta">—</span></p>
-          <p><span id="deflectionLabel">离开电场时 |y|</span> = <span class="metric-value" id="deflectionValue">—</span>（占半板距 <span id="deflectionPct">—</span>）</p>
-          <p class="note" id="deflectionNote"></p>
-          <p class="note" id="motionNote"></p>
-          <p class="note">读数为“离开电场时”的值；打板时取撞板瞬间。画面上的速度箭头按统一比例缩放，v<sub>y</sub>/vₓ 与真实的正切一致；F 箭头按对数缩放，只表示力的量级与方向。板间飞行时角弧标 θ(t)（当前时刻），出板时与读数 θ 相同。精确数值以上面各项为准。</p>
-
-          <h3>推导（折叠）</h3>
-          <details class="derive">
-            <summary>展开：加速 → 偏转 → 打板判据</summary>
-            <p>加速：|q|U₀ = ½m v₀²，得 v₀ = √(2|q|U₀/m)。</p>
-            <p>偏转：t = L/v₀，a_y = |q|E/m，v<sub>y</sub> = a_y t = |q|E·L/(m v₀)，故 v<sub>y</sub>/v₀ = E·L/(2U₀)。</p>
-            <p>y = ½ a_y t² = |q|E·L²/(2m v₀²)，代入 v₀² 得偏转位移大小 |y| = E·L²/(4U₀) = |U|·L²/(4dU₀)。</p>
-            <p>tanθ = v<sub>y</sub>/v₀，θ = arctan(v<sub>y</sub>/v₀)；出射速度大小 v出 = √(v₀² + v<sub>y</sub>²)。</p>
-            <p>打板判据：若按出板算出的 |y| ≥ d/2，则在出板前撞板，t_hit = √(2·(d/2)/|a|)；轨迹在撞板处截断，y 停在 d/2。</p>
-          </details>
-
-          <h3>模型假设</h3>
-          <ul>
-            <li>偏转区为匀强电场，E = U/d，忽略边缘效应；加速区两板中心开孔，粒子从孔中通过；</li>
-            <li>加速区在画面上按示意比例画出，其长度、板距只服务于动画，不是题目条件；</li>
-            <li>忽略重力（mg 远小于 |q|E）；</li>
-            <li>非相对论近似（v₀ ≪ c），质量取静止质量；</li>
-            <li>粒子沿中线垂直入射，入口 y = 0；出板后 E = 0、F 消失，若继续飞行则做匀速直线运动（速度矢量给出出射方向与 θ）。</li>
-          </ul>
-
-          <h3>课堂观察</h3>
-          <ul>
-            <li>只把 U 从 +100 V 改到 −100 V：偏转方向怎么变？轨迹形状变不变？</li>
-            <li>把 U₀ 从 1000 V 改到 2000 V，|y| 变成原来的几分之几？（提示：|y| ∝ 1/U₀）</li>
-            <li>切换质子：v₀ 约变成电子的 1/43，为什么偏转位移大小不变？</li>
-            <li>为什么加速区极性要随粒子电性翻转？若不翻转，正离子会怎样运动？</li>
-          </ul>
-
-          <p class="note">快捷键：空格 播放/暂停 · R 重置 · P 折叠参数 · ? 打开/关闭本说明</p>
-        </section>
+      <div class="legend" id="legend" aria-label="图例">
+        <span class="lg"><i class="sw traj"></i>轨迹</span>
+        <span class="lg"><i class="sw force"></i>F = qE</span>
+        <span class="lg"><i class="sw vx"></i>vₓ</span>
+        <span class="lg"><i class="sw vy"></i>v<sub>y</sub></span>
+        <span class="lg"><i class="sw plate"></i>极板（红正蓝负）</span>
+        <span class="lg"><i class="sw dim"></i>L / d 标尺</span>
       </div>
     </div>
+
+    <aside class="panel" id="ctrlPanel" aria-label="参数与开关">
+      <div class="group">
+        <p class="group-label">教材第 5 题</p>
+        <button type="button" class="preset-btn" id="presetBtn" aria-pressed="false">应用教材第 5 题预设</button>
+        <div class="preset-note" id="presetNote">
+          <p><b>题给</b> 电子 · U₀ 1000 V · E 5000 N/C · L 6 cm</p>
+          <p><b>画图设置</b> d 2 cm、U 100 V —— 仅为按 E = U/d 凑出 5000 N/C</p>
+          <p class="warn">d 不是题给条件：题目没有给出板距</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="group-label">参数</p>
+        <div class="row"><label for="u0Slider">加速电压 U₀</label><b id="u0Value">1000 V</b></div>
+        <input id="u0Slider" type="range" min="200" max="2000" step="10" value="1000" />
+
+        <div class="row"><label for="uSlider">偏转电压 U</label><b id="uValue">+100 V</b></div>
+        <input id="uSlider" type="range" min="-400" max="400" step="10" value="100" />
+
+        <div class="row"><label for="lSlider">板长 L</label><b id="lValue">6.0 cm</b></div>
+        <input id="lSlider" type="range" min="2" max="10" step="0.1" value="6" />
+
+        <div class="row"><label for="dSlider">板距 d</label><b id="dValue">2.0 cm</b></div>
+        <input id="dSlider" type="range" min="1" max="5" step="0.1" value="2" />
+      </div>
+
+      <div class="group">
+        <p class="group-label">粒子</p>
+        <div class="segmented" role="group" aria-label="粒子种类">
+          <button type="button" class="particle-btn active" data-particle="electron" aria-pressed="true">电子</button>
+          <button type="button" class="particle-btn" data-particle="proton" aria-pressed="false">质子</button>
+          <button type="button" class="particle-btn" data-particle="alpha" aria-pressed="false">α 粒子</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="group-label">显示</p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>力和速度箭头</span></label>
+          <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>中线与出板辅助线</span></label>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="primary-btn" id="playBtn">播放</button>
+        <button type="button" id="resetBtn" title="回到完整轨迹；重新观看请按播放">重置</button>
+      </div>
+
+      <p class="ctl-hint">板间 E = U/d（U &gt; 0 时上板为正、场强向下）。加速区极性随粒子电性自动翻转。</p>
+    </aside>
+
+    <section class="drawer" id="drawer" hidden aria-label="预设说明、结论、模型假设与课堂问题">
+      <div class="drawer-head">
+        <h2>说明</h2>
+        <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭说明">×</button>
+      </div>
+
+      <h3>教材第 5 题：题给条件 ≠ 网页设置</h3>
+      <p><b class="tag-given">题给</b>电子，由静止经 U₀ = 1000 V 加速，垂直进入 E = 5000 N/C 的匀强电场，偏转电极长 L = 6 cm。</p>
+      <p><b class="tag-web">画图设置</b>d = 2 cm、U = 100 V。设这两个量只是为了让网页按 E = U/d 画出 5000 N/C 的场；<b>题目没有给出板距</b>，d 不是题给条件，U 也不是。</p>
+      <p class="note">点参数卡顶部的「应用教材第 5 题预设」即回到这组参数。顶栏只保留 粒子 / v₀ / |y| / 状态 四项读数，v<sub>y</sub>、v出、θ 见下方「实时量值」。</p>
+
+      <h3>一句结论</h3>
+      <p>在<b>同一加速电压 U₀、同一偏转电压 U</b> 下，电子、质子、α 粒子进入同一偏转电场后的<b>偏转位移大小</b>相同：|y| = |U|·L²/(4dU₀)（E = U/d），只由 U、d、L、U₀ 决定，与粒子种类、电荷量大小无关。</p>
+      <p>但<b>方向不能一概而论</b>：偏转方向由电荷正负与场强方向共同决定；同一偏转电场中电子与质子／α 粒子的偏转方向<b>相反</b>，所以“相同”只指位移的<b>大小</b>。</p>
+      <p>加速区极性随粒子电性自动翻转：负粒子→左板负、右板正（E 向左，受力向右）；正粒子→左板正、右板负（E 向右，受力向右）。任何粒子都由静止向右加速，再进入偏转区。</p>
+
+      <h3>实时量值</h3>
+      <p class="formula-line">偏转场 E = <span class="metric-value" id="valE">—</span>　加速度 a = <span class="metric-value" id="valA">—</span></p>
+      <p class="formula-line">加速后 v₀ = <span class="metric-value" id="valV0">—</span>　偏转时间 t = <span class="metric-value" id="valT">—</span></p>
+      <p class="formula-line">v<sub>y</sub> = <span class="metric-value" id="valVy">—</span>　v出 = <span class="metric-value" id="valVout">—</span>　θ = <span class="metric-value" id="valTheta">—</span></p>
+      <p><span id="deflectionLabel">离开电场时 |y|</span> = <span class="metric-value" id="deflectionValue">—</span>（占半板距 <span id="deflectionPct">—</span>）</p>
+      <p class="note" id="deflectionNote"></p>
+      <p class="note" id="motionNote"></p>
+      <p class="note">读数为“离开电场时”的值；打板时取撞板瞬间。画面上的速度箭头按统一比例缩放，v<sub>y</sub>/vₓ 与真实的正切一致；F 箭头按对数缩放，只表示力的量级与方向。板间飞行时角弧标 θ(t)（当前时刻），出板时与读数 θ 相同。精确数值以上面各项为准。</p>
+
+      <h3>推导（折叠）</h3>
+      <details class="derive">
+        <summary>展开：加速 → 偏转 → 打板判据</summary>
+        <p>加速：|q|U₀ = ½m v₀²，得 v₀ = √(2|q|U₀/m)。</p>
+        <p>偏转：t = L/v₀，a_y = |q|E/m，v<sub>y</sub> = a_y t = |q|E·L/(m v₀)，故 v<sub>y</sub>/v₀ = E·L/(2U₀)。</p>
+        <p>y = ½ a_y t² = |q|E·L²/(2m v₀²)，代入 v₀² 得偏转位移大小 |y| = E·L²/(4U₀) = |U|·L²/(4dU₀)。</p>
+        <p>tanθ = v<sub>y</sub>/v₀，θ = arctan(v<sub>y</sub>/v₀)；出射速度大小 v出 = √(v₀² + v<sub>y</sub>²)。</p>
+        <p>打板判据：若按出板算出的 |y| ≥ d/2，则在出板前撞板，t_hit = √(2·(d/2)/|a|)；轨迹在撞板处截断，y 停在 d/2。</p>
+      </details>
+
+      <h3>模型假设</h3>
+      <ul>
+        <li>偏转区为匀强电场，E = U/d，忽略边缘效应；加速区两板中心开孔，粒子从孔中通过；</li>
+        <li>加速区在画面上按示意比例画出，其长度、板距只服务于动画，不是题目条件；</li>
+        <li>忽略重力（mg 远小于 |q|E）；</li>
+        <li>非相对论近似（v₀ ≪ c），质量取静止质量；</li>
+        <li>粒子沿中线垂直入射，入口 y = 0；出板后 E = 0、F 消失，若继续飞行则做匀速直线运动（速度矢量给出出射方向与 θ）。</li>
+      </ul>
+
+      <h3>课堂观察</h3>
+      <ul>
+        <li>只把 U 从 +100 V 改到 −100 V：偏转方向怎么变？轨迹形状变不变？</li>
+        <li>把 U₀ 从 1000 V 改到 2000 V，|y| 变成原来的几分之几？（提示：|y| ∝ 1/U₀）</li>
+        <li>切换质子：v₀ 约变成电子的 1/43，为什么偏转位移大小不变？</li>
+        <li>为什么加速区极性要随粒子电性翻转？若不翻转，正离子会怎样运动？</li>
+      </ul>
+
+      <h3>操作</h3>
+      <p>快捷键：空格 播放/暂停 · R 重置 · ? 打开/关闭本说明 · Esc 关闭说明</p>
+    </section>
   </main>
 
   <script>
@@ -313,21 +345,14 @@
     const LW = 960, LH = 540;
     const VIEW = { left: 281, midY: 330, pxPerM: 5000, plateThick: 24, panelLimit: LW - 14 };
 
-    /* 面板左缘（逻辑坐标）：窗口越大，面板占的逻辑宽度越小，出板区可用宽度随之变化。 */
+    /* 参数卡已移到画布外（右侧独立白卡），画布内不再给浮层面板让位：
+       出板区可用到画布右缘，panelLimit 固定为逻辑宽度减 14。 */
     function fitRightEdge() {
-      const r = canvas.getBoundingClientRect();
-      if (!r.width) return;
-      const panelEl = document.getElementById("ctrlPanel");
-      let limit = LW - 14;
-      if (panelEl && !panelEl.hidden) {
-        const pr = panelEl.getBoundingClientRect();
-        if (pr.width > 0) limit = Math.min(limit, (pr.left - r.left) * (LW / r.width) - 8);
-      }
-      VIEW.panelLimit = clamp(limit, 520, LW - 14);
+      VIEW.panelLimit = LW - 14;
     }
 
     /* 极板比例：默认 5000 px/m（1 cm = 50 px）；L 很长或窗口很窄时自动收缩，
-       保证「极板右缘 + y 标尺 + 标签」始终落在参数面板左侧。 */
+       保证「极板右缘 + y 标尺 + 标签」始终落在画布内。 */
     function plateScale(L) {
       const room = (VIEW.panelLimit - 34 - 150) - VIEW.left;
       return clamp(room / Math.max(L, 1e-4), 2500, VIEW.pxPerM);
@@ -386,9 +411,6 @@
       dValue: document.getElementById("dValue"),
       stageParticle: document.getElementById("stageParticle"),
       stageV0: document.getElementById("stageV0"),
-      stageVy: document.getElementById("stageVy"),
-      stageVout: document.getElementById("stageVout"),
-      stageTheta: document.getElementById("stageTheta"),
       stageY: document.getElementById("stageY"),
       stageHit: document.getElementById("stageHit"),
       valE: document.getElementById("valE"),
@@ -406,8 +428,6 @@
     };
 
     const presetBtn = document.getElementById("presetBtn");
-    const presetNote = document.getElementById("presetNote");
-    const presetChip = document.getElementById("presetChip");
 
     /* —— 高清渲染（HiDPI）—— */
     function syncBackingStore() {
@@ -1202,9 +1222,6 @@
 
       output.stageParticle.textContent = m.p.label;
       output.stageV0.textContent = `${fmtSci(m.v0, 3)} m/s`;
-      output.stageVy.textContent = `${fmtSci(m.vyEnd, 3)} m/s`;
-      output.stageVout.textContent = `${fmtSci(m.vEnd, 3)} m/s`;
-      output.stageTheta.textContent = `${thetaDeg.toFixed(2)}°`;
       output.stageY.textContent = `${fmtMm(yMm)} mm`;
       const atEnd = state.progress >= 1 - 1e-9;
       const tNow = state.progress * m.tEndTotal;
@@ -1294,8 +1311,6 @@
 
     function updatePresetUI() {
       const on = state.preset === "book5";
-      presetChip.hidden = !on;
-      presetNote.hidden = !on;
       presetBtn.classList.toggle("active", on);
       presetBtn.setAttribute("aria-pressed", String(on));
     }
@@ -1359,14 +1374,15 @@
     controls.showGhosts.addEventListener("change", render);
 
     controls.particleButtons.forEach(button => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
         state.particle = button.dataset.particle;
         clearPreset();
+        if (event.detail > 0) button.blur();
         render();
       });
     });
 
-    controls.playBtn.addEventListener("click", () => {
+    controls.playBtn.addEventListener("click", (event) => {
       if (state.playing) {
         state.playing = false;
         controls.playBtn.textContent = "播放";
@@ -1375,146 +1391,63 @@
         state.playing = true;
         controls.playBtn.textContent = "暂停";
       }
+      if (event.detail > 0) controls.playBtn.blur();
       render();
     });
 
-    controls.resetBtn.addEventListener("click", () => {
+    controls.resetBtn.addEventListener("click", (event) => {
       state.playing = false;
       state.progress = 1;
       controls.playBtn.textContent = "播放";
+      if (event.detail > 0) controls.resetBtn.blur();
       render();
     });
 
-    presetBtn.addEventListener("click", () => applyPreset("book5"));
+    presetBtn.addEventListener("click", (event) => {
+      applyPreset("book5");
+      if (event.detail > 0) presetBtn.blur();
+    });
 
-    /* —— 外壳交互：参数折叠 / 「?」抽屉 / 快捷键 —— */
-    const panel = document.getElementById("ctrlPanel");
-    const ctrlToggle = document.getElementById("ctrlToggle");
+    /* —— 外壳交互：「?」抽屉 / 快捷键（参数卡固定常显，不再折叠或拖动）—— */
     const moreBtn = document.getElementById("moreBtn");
     const drawer = document.getElementById("drawer");
-
-    function setPanel(open) {
-      panel.hidden = !open;
-      ctrlToggle.setAttribute("aria-expanded", String(open));
-    }
-
-    // 打开「?」抽屉时收起参数面板，避免两块叠加层互相遮挡；关闭时恢复原状态。
-    let restorePanelOnDrawerClose = false;
+    const drawerClose = document.getElementById("drawerClose");
 
     function setDrawer(open) {
       drawer.hidden = !open;
       moreBtn.setAttribute("aria-expanded", String(open));
-      if (open && !panel.hidden) {
-        restorePanelOnDrawerClose = true;
-        setPanel(false);
-      } else if (!open && restorePanelOnDrawerClose) {
-        restorePanelOnDrawerClose = false;
-        setPanel(true);
-      }
+      if (open) drawerClose.focus();
     }
 
-    ctrlToggle.addEventListener("click", () => setPanel(panel.hidden));
-    moreBtn.addEventListener("click", () => setDrawer(drawer.hidden));
+    moreBtn.addEventListener("click", (event) => {
+      setDrawer(drawer.hidden);
+      if (event.detail > 0 && drawer.hidden) moreBtn.blur();
+    });
+    drawerClose.addEventListener("click", () => { setDrawer(false); moreBtn.focus(); });
 
     document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        if (!drawer.hidden) { setDrawer(false); moreBtn.focus(); }
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       const tag = event.target && event.target.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (event.code === "Space") {
-        if (tag === "BUTTON") return;
+        // 空格 = 播放/暂停；焦点在控件上时保留浏览器原生行为
+        if (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A", "SUMMARY"].includes(tag)) return;
         event.preventDefault();
         controls.playBtn.click();
         return;
       }
       const key = event.key.toLowerCase();
       if (key === "r") {
+        event.preventDefault();
         controls.resetBtn.click();
+      } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
         event.preventDefault();
-      } else if (key === "p") {
-        setPanel(panel.hidden);
-        event.preventDefault();
-      } else if (event.key === "?") {
         setDrawer(drawer.hidden);
-        event.preventDefault();
-      } else if (key === "escape") {
-        setDrawer(false);
       }
     });
-
-    /* —— 参数面板：拖动 + 位置记忆（LAYOUT.md「参数面板必须可拖动」）—— */
-    (function initDraggablePanel() {
-      const panelEl = document.getElementById("ctrlPanel");
-      const grip = panelEl && panelEl.querySelector(".panel-grip");
-      const collapseBtn = document.getElementById("panelCollapse");
-      if (!panelEl || !grip) return;
-      const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
-
-      function clampToFrame(x, y) {
-        const f = panelEl.parentElement.getBoundingClientRect();
-        const r = panelEl.getBoundingClientRect();
-        return {
-          x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
-          y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
-        };
-      }
-      function place(x, y) {
-        const p = clampToFrame(x, y);
-        panelEl.style.left = p.x + "px";
-        panelEl.style.top = p.y + "px";
-        panelEl.style.right = "auto";
-        panelEl.style.bottom = "auto";
-      }
-
-      let saved = null;
-      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (err) { saved = null; }
-      if (saved && isFinite(saved.x) && isFinite(saved.y)) place(saved.x, saved.y);
-
-      let dx = 0, dy = 0, dragging = false, moved = false;
-      grip.addEventListener("pointerdown", (e) => {
-        if (e.button !== 0 || e.target.closest("button")) return;
-        const f = panelEl.parentElement.getBoundingClientRect();
-        const r = panelEl.getBoundingClientRect();
-        dx = e.clientX - r.left; dy = e.clientY - r.top;
-        dragging = true; moved = false;
-        panelEl.classList.add("dragging");
-        grip.setPointerCapture(e.pointerId);
-        panelEl.style.left = (r.left - f.left) + "px";
-        panelEl.style.top = (r.top - f.top) + "px";
-        panelEl.style.right = "auto";
-        panelEl.style.bottom = "auto";
-      });
-      grip.addEventListener("pointermove", (e) => {
-        if (!dragging) return;
-        const f = panelEl.parentElement.getBoundingClientRect();
-        const nx = e.clientX - f.left - dx;
-        const ny = e.clientY - f.top - dy;
-        if (Math.abs(nx - parseFloat(panelEl.style.left)) > 1 ||
-            Math.abs(ny - parseFloat(panelEl.style.top)) > 1) moved = true;
-        place(nx, ny);
-      });
-      function endDrag(e) {
-        if (!dragging) return;
-        dragging = false;
-        panelEl.classList.remove("dragging");
-        if (grip.hasPointerCapture(e.pointerId)) grip.releasePointerCapture(e.pointerId);
-        if (!moved) return;
-        try {
-          localStorage.setItem(KEY, JSON.stringify({
-            x: parseFloat(panelEl.style.left), y: parseFloat(panelEl.style.top)
-          }));
-        } catch (err) { /* 隐私模式下忽略 */ }
-      }
-      grip.addEventListener("pointerup", endDrag);
-      grip.addEventListener("pointercancel", endDrag);
-      if (collapseBtn) collapseBtn.addEventListener("click", () => setPanel(false));
-      grip.addEventListener("dblclick", (e) => {
-        if (e.target.closest("button")) return;
-        ctrlToggle.click();
-      });
-      window.addEventListener("resize", () => {
-        if (panelEl.hidden || !panelEl.style.left) return;
-        place(parseFloat(panelEl.style.left), parseFloat(panelEl.style.top));
-      });
-    })();
 
     window.addEventListener("resize", render);
     updatePresetUI();
