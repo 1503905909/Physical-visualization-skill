@@ -654,7 +654,22 @@
 
       // 场线贴着地形走 + 箭头（参考视频那种）
       if (layers.field) {
-        const lines = seedLines(field, Math.max(7, Math.round(state.density * 0.7)));
+        // 用与曲面同一套软化电势追线，保证 3D 里场线严格垂直于等高线
+        const softFieldObj = {
+          charges: field.charges,
+          sc: field.sc,
+          meridional(x, rho) {
+            let ex = 0, er = 0;
+            for (const c of field.charges) {
+              const dx = x - c.x;
+              const r2 = dx * dx + rho * rho + 0.36;
+              const inv = c.q / (r2 * Math.sqrt(r2));
+              ex += inv * dx; er += inv * rho;
+            }
+            return { ex, er };
+          }
+        };
+        const lines = seedLines(softFieldObj, Math.max(7, Math.round(state.density * 0.7)));
         for (const ln of lines) {
           for (const mir of [1, -1]) {
             // 场线画在底面（z≈0），不要"贴"到起伏上：贴上去会在山顶绕成一团
