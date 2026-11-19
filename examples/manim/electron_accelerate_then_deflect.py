@@ -646,6 +646,9 @@ class ElectronAccelerateThenDeflectScene(Scene):
 
     # ------------------------------------------------------------ 10 教材第5题
     def beat_exam(self):
+        if self.tag is not None:
+            self.play(FadeOut(self.tag), run_time=0.4)
+            self.tag = None
         head = cn("回到教材第 5 题", 34, KEY, BOLD).move_to([0, 2.95, 0])
         r1 = VGroup(
             cn("出射速度大小", 26, MUTED),
