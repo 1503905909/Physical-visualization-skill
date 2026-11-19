@@ -289,7 +289,9 @@ class ElectronAccelerateThenDeflectScene(Scene):
                   *[FadeOut(a) for a in drop], *extra, run_time=t1)
         if add:
             self.play(*[FadeIn(b) for b in add], run_time=run_time - t1)
-        self.remove(old, *add)
+        # manim 会把被 Transform 的子对象顺带加进场景，收尾时要一并摘掉，
+        # 否则旧令牌会留在原地，和 new 重影。
+        self.remove(old, *add, *[a for a, _ in keep])
         self.add(new)
         return new
 
@@ -622,15 +624,9 @@ class ElectronAccelerateThenDeflectScene(Scene):
         self.play(FadeIn(lab_m, shift=DOWN * 0.05), run_time=0.3)
 
         self.say("e、m 约去，分母 2×2 = 4：|y| = EL²/(4U₀)", 0.6)
-        alive = {i: Y2[i] for i in (0, 1, 3, 4, 5, 6, 9, 11, 14)}
-        dead = kill_list(Y2, [2, 7, 8, 10, 12, 13])
-        self.play(FadeOut(VGroup(dead, se_n, se_d, sm_a, sm_b, lab_e, lab_m)), run_time=0.85)
-        # 分母两个 2 合成 4：第一个 2 变成 4，第二个 2 淡出
-        self.retarget(Y2, Y3,
-                      [(alive[0], Y3[0]), (alive[1], Y3[1]), (alive[3], Y3[2]),
-                       (alive[4], Y3[3]), (alive[5], Y3[4]), (alive[6], Y3[5]),
-                       (alive[11], Y3[6]), (alive[14], Y3[7])],
-                      drop=[alive[9]], run_time=1.0)
+        self.play(FadeOut(VGroup(Y2, se_n, se_d, sm_a, sm_b, lab_e, lab_m),
+                         shift=DOWN * 0.04), run_time=0.8)
+        self.play(FadeIn(Y3, scale=0.97), run_time=0.65)
         self.play(Y3.animate.set_color(KEY), run_time=0.5)
         self.play(Circumscribe(Y3, color=KEY, run_time=1.0))
 
