@@ -50,10 +50,10 @@ def posix(p: str) -> str:
 
 
 def video_for(rid: str) -> str | None:
-    """若已渲染出 MP4，返回相对路径，否则 None。"""
-    cand = os.path.join(ROOT, "build", "videos", "manim", f"{rid}.mp4")
-    if os.path.exists(cand):
-        return f"build/videos/manim/{rid}.mp4"
+    """找已渲染的 MP4：优先 gallery/videos（随仓库发布），其次 build/videos/manim（本地渲染产物，被 gitignore）。"""
+    for rel in (f"gallery/videos/{rid}.mp4", f"build/videos/manim/{rid}.mp4"):
+        if os.path.exists(os.path.join(ROOT, rel)):
+            return rel
     return None
 
 
@@ -364,7 +364,7 @@ def build_page(reg: dict) -> str:
     <p class="coverage">当前覆盖：{coverage}。人教版其余教材（必修第一册、必修第二册、选择性必修第一册、选择性必修第三册）暂无资源。</p>
     <p>本页由 <code>tools/build_gallery.py</code> 依据 <code>gallery/resources.json</code> 生成。
        新增资源：在 JSON 中登记一条，然后重跑 <code>python tools/build_gallery.py</code>。
-       Manim 动画渲染到 <code>build/videos/manim/&lt;id&gt;.mp4</code> 后会自动出现播放器。</p>
+       Manim 动画渲染后放到 <code>gallery/videos/&lt;id&gt;.mp4</code>（随仓库发布）即可在卡片里播放。</p>
   </div>
 </footer>
 

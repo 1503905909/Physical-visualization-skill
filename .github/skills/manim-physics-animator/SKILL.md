@@ -133,7 +133,7 @@ description: 生成面向高中物理课堂的 Manim 教学动画，尤其适用
 - `examples/coulombs_law.py`：库仑定律课堂动画，包含电荷正负、力箭头、距离变化和反平方关系。
 - `examples/electric_field_lines.py`：点电荷和两点电荷电场线课堂动画，强调电场线方向、典型分布，并包含二维图示向三维空间分布过渡的场景。
 - `examples/electric_potential_equipotential.py`：电势与等势面课堂动画，强调电势、等势线、电场方向、二者垂直关系，并包含三维等势面和电势高度图场景。
-- `examples/charged_particle_uniform_field.py`：带电粒子的加速与偏转**分步解题**动画（30 s，带字幕）：读图 → 判断受力 → 建立模型 → 动能定理/类平抛推导 → 代入消元得 E = 2E₀tanθ → 量纲与极限检验。分镜表见 `charged_particle_storyboard.md`。
+- `examples/charged_particle_uniform_field.py`：带电粒子的加速与偏转**分步解题**动画（75 s，0.4 倍速，带字幕）：读图 → 判断受力 → 建立模型 → 动能定理/类平抛推导 → 代入消元得 E = (2√3/3)E₀（精确值） → 量纲与极限检验。分镜表见 `charged_particle_storyboard.md`。
 - `examples/cyclotron.py`：回旋加速器课堂动画（3D 建结构 → 2D 讲场与运动，带字幕）：先 3D 摆出两个半圆金属盒与缝隙，再用 E/B 箭头与 U-t 图讲电场、磁场，镜头压到俯视后讲半圆轨迹、半径 r = mv/(qB) 与周期 T = 2πm/(qB)。分镜表见同目录 `cyclotron_storyboard.md`。
 - `examples/capacitor.py`：电容器课堂动画，包含充电过程、C = ε0εrS/d 中 S、d、εr 的影响，"U 不变"与"Q 不变"两种情形的对比。
 - `examples/magnetic_flux.py`：磁场与磁通量课堂动画，包含磁通量概念、线圈转动与进出磁场、感应电流产生条件的归纳。
