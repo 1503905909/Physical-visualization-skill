@@ -24,6 +24,18 @@
 0.0045 m 对应 0.285 单位；出射切线与水平方向夹角恰为 arctan(3/20)，
 与第 5 镜的速度三角形一致（角度没有夸大）。
 
+“动态约去同类项”一段（第 6、9 镜）的做法，参考真实网课的板书习惯：
+  ① 被替换的式子写成蓝色方框（#4D9BFF，淡蓝底色）放在旁边，
+     再用箭头指到代入位置；
+  ② 被约去的符号上画红色斜线（#FF4D4D），由 Create 动画从左上往右下
+     “划下去”，两条线分两批出现（先 e 后 m）；
+  ③ 划掉的整项随后淡出，留下的式子用黄色收口。
+  为了让红斜线精确落在具体字母上（而不是歪在字符旁边），本例不把整条
+  公式写成一个字符串，而是按“令牌”拆成多个 MathTex 参数（见 eq()）：
+  LaTeX 的基线、间距、\\frac 横线完全不变，但每个符号都是独立子对象，
+  斜线长度按“沿斜线方向穿过整个字框”计算（见 slash()），
+  所以短胖的 m 与瘦高的 e 都能被跨满而不会甩出很远。
+
 渲染：
   D:\\python3.14\\python.exe -m manim -qh --media_dir "<仓库>\\build" ^
       electron_accelerate_then_deflect.py ElectronAccelerateThenDeflectScene
@@ -62,6 +74,8 @@ KEY = "#ffe066"
 WARN = "#ffb86b"
 ELEC = "#7ce7ff"
 VY = "#9fb8d6"
+CANCEL = "#FF4D4D"        # 约去：红色斜线
+SUBST = "#4D9BFF"         # 待代入式：蓝色方框
 
 # ---------------- 版面（画面示意图坐标）
 ACC_X0, ACC_X1 = -6.28, -5.08      # 加速区两极板
@@ -122,6 +136,71 @@ def parabola_points(u0=None, u1=1.0, n=41):
     return pts
 
 
+# ---------------- 代入 / 约去 专用元件
+def eq(*parts, size=42, color=INK):
+    """把一条公式按“令牌”写成多个 MathTex 参数。
+
+    manim 会把每个参数包成独立的 SVG 分组，所以 LaTeX 版式（基线、间距、
+    \\frac 的横线）与整串书写完全一致，但每个符号都能单独取出，
+    替换、箭头指向、画约去线都不会“压偏”。
+    """
+    return MathTex(*parts, font_size=size, color=color)
+
+
+def place_like(mob, ref, idx=0):
+    """让 mob 的第 idx 个令牌与 ref 的第 idx 个重合 —— 换式子时左侧不跳动。"""
+    mob.shift(ref[idx].get_center() - mob[idx].get_center())
+    return mob
+
+
+def slash(mobj, angle=-52, sw=5.6, color=CANCEL, extra=0.0, grow=1.22):
+    """红色斜线：从左上方划到右下方，比字符略长，斜跨整个符号。
+
+    长度按“沿该方向穿过整个字框”算：w·|cos| + h·|sin|，再放大 22%，
+    于是短胖的 m 和瘦高的 e 都能被跨满，两侧各露出一点，像手写的删除线。
+    """
+    w, h = float(mobj.width), float(mobj.height)
+    a = np.deg2rad(angle)
+    length = max(grow * (w * abs(np.cos(a)) + h * abs(np.sin(a))), 0.30) + extra
+    d = np.array([np.cos(a), np.sin(a), 0.0])
+    c = mobj.get_center()
+    ln = Line(c - d * length / 2.0, c + d * length / 2.0,
+              color=color, stroke_width=sw, stroke_opacity=0.96)
+    ln.set_z_index(6)
+    return ln
+
+
+def subst_box(formula, tag):
+    """蓝色方框（带淡蓝底色）圈住待代入式，上方一行小标签。"""
+    box = RoundedRectangle(
+        width=formula.width + 0.46, height=formula.height + 0.30,
+        corner_radius=0.12, stroke_color=SUBST, stroke_width=3.0,
+        fill_color=SUBST, fill_opacity=0.10,
+    )
+    formula.move_to(box.get_center())
+    lab = cn(tag, 20, SUBST, BOLD).next_to(box, UP, buff=0.10)
+    box.set_z_index(1)
+    return VGroup(box, formula, lab)
+
+
+def point_at(box_group, target, color=SUBST, sw=3.0):
+    """蓝框左沿 → 被替换位置的箭头；停在符号外侧，不压住字符。"""
+    start = box_group[0].get_left() + LEFT * 0.02
+    c = target.get_center()
+    v = np.array([c[0] - start[0], c[1] - start[1], 0.0])
+    v = v / (np.linalg.norm(v) or 1.0)
+    end = c - v * (0.55 * float(target.width) + 0.14)
+    return Arrow(start, end, buff=0.0, color=color, stroke_width=sw,
+                 max_tip_length_to_length_ratio=0.11)
+
+
+def kill_list(mob, idxs):
+    """取出若干令牌（用于淡出）并从父对象里摘掉；返回可 FadeOut 的 VGroup。"""
+    picked = VGroup(*[mob[i] for i in idxs])
+    mob.remove(*[mob[i] for i in idxs])
+    return picked
+
+
 # ---------------- 场景
 class ElectronAccelerateThenDeflectScene(Scene):
     def construct(self):
@@ -155,8 +234,10 @@ class ElectronAccelerateThenDeflectScene(Scene):
         self.beat_accel()
         self.beat_deflect()
         self.beat_compose()
-        self.beat_ratio()
+        self.beat_substitute()
+        self.beat_speed()
         self.beat_angle()
+        self.beat_displacement()
         self.beat_exam()
 
     # ------------------------------------------------------------ 字幕
@@ -194,6 +275,25 @@ class ElectronAccelerateThenDeflectScene(Scene):
                       stroke_color="#0a0f15", stroke_width=2)
         sign = Text("−", font=FONT, font_size=20, color="#06121d", weight=BOLD)
         return VGroup(body, sign).move_to(point)
+
+    # ------------------------------------------------------------ 换式子
+    def retarget(self, old, new, keep, drop=(), add=(), extra=(), run_time=1.0):
+        """把 old 换成 new，但只对“对得上号”的令牌做 Transform。
+
+        直接 ReplacementTransform 整条公式，两次 LaTeX 排版在中间帧会互相
+        错位成一团；这里分两步走：
+          ① 先让 kept 的令牌平移到新位置（可拉伸），被替换的项淡出；
+          ② 再把新写进去的令牌淡入 —— 先腾位置、再落笔，不会糊在半空。
+        """
+        t1 = run_time * 0.58
+        self.play(*[Transform(a, b) for a, b in keep],
+                  *[FadeOut(a) for a in drop], *extra, run_time=t1)
+        if add:
+            self.play(*[FadeIn(b) for b in add], run_time=run_time - t1)
+        self.remove(old, *add)
+        self.add(new)
+        return new
+
 
     # ------------------------------------------------------------ 01 开场
     def beat_open(self):
@@ -369,80 +469,219 @@ class ElectronAccelerateThenDeflectScene(Scene):
         self.play(FadeIn(self.panel[6], shift=LEFT * 0.12), run_time=0.5)
         self.say("方向：tanθ 等于竖直分速度与水平分速度之比", 0.9)
 
-    # ------------------------------------------------------------ 06 比值
-    def beat_ratio(self):
-        self.play(FadeOut(self.tag), FadeOut(self.tri), FadeOut(self.panel), run_time=0.7)
-        self.say("先算比值：e 与 mₑ 全部约去")
-        a1 = mth(r"\frac{v_y}{v_0}=\frac{eEL}{m_e v_0^{2}}=\frac{EL}{2U_0}", 36)
-        a2 = mth(r"=\frac{5000\times 0.06}{2\times 1000}=\frac{3}{20}", 36, KEY)
-        note = cn("e、mₑ 被约去：这个比值只由 E、L、U₀ 决定", 21, MUTED)
-        b1 = mth(r"v=\sqrt{v_0^{2}+v_y^{2}}=\sqrt{1+\left(\frac{3}{20}\right)^{2}}"
-                 r"\;v_0=\frac{\sqrt{409}}{20}\,v_0", 32)
+    # ------------------------------------------------------------ 06 代入与约去（tanθ）
+    def beat_substitute(self):
+        self.set_tag("④ 代入与约去：e、m 相消")
+
+        # 每一式都拆成“令牌”，下标固定：0 = tanθ=，2 = 分子 e，6/12 = 分母两个 m ...
+        E0 = eq(r"\tan\theta=", r"\frac{", "v_y", r"}{", "v_0", r"}", size=48
+                ).move_to([-1.55, 1.05, 0])
+        E1 = place_like(eq(r"\tan\theta=", r"\frac{", "e", "E", "L", r"}{",
+                           "m", "v_0^{2}", r"}", size=48), E0)
+        E2 = place_like(eq(r"\tan\theta=", r"\frac{", "e", "E", "L", r"}{",
+                           "m", r"\cdot", "2", "e", "U_0", "/", "m", r"}", size=48), E0)
+        E3 = place_like(eq(r"\tan\theta=", r"\frac{", "E", "L", r"}{",
+                           "2", "U_0", r"}", size=48), E0)
+
+        self.play(FadeOut(self.panel, shift=LEFT * 0.12), FadeOut(self.tri), run_time=0.6)
+        self.play(FadeIn(E0, scale=0.92), run_time=0.6)
+        self.say("从正切定义出发：tanθ = v_y / v₀", 0.7)
+
+        # —— 代入 ①：v_y = eEL/(m v₀)
+        b1 = subst_box(mth(r"v_y=\dfrac{eEL}{m v_0}", 34), "代入 ①")
+        b1.move_to([4.30, 2.00, 0])
+        a1 = point_at(b1, E0[2])
+        self.say("竖直分速度 v_y = eEL/(m v₀)：先代这一项")
+        self.play(FadeIn(b1, shift=LEFT * 0.10), GrowArrow(a1), run_time=0.7)
+        self.play(Circumscribe(E0[2], color=SUBST, run_time=0.8))
+        # v_y → eEL（v_y 的首字变成 e）、v₀ → v₀²，新出现的 E、L、m 淡入
+        self.retarget(E0, E1,
+                      [(E0[0], E1[0]), (E0[1], E1[1]), (E0[2], E1[2]),
+                       (E0[3], E1[5]), (E0[4], E1[7])],
+                      add=[E1[3], E1[4], E1[6]],
+                      extra=[FadeOut(b1), FadeOut(a1)], run_time=1.0)
+        self.say("分母随之出现 v₀² —— 它要用加速段的结论换掉", 0.7)
+
+        # —— 代入 ②：v₀² = 2eU₀/m（蓝框 + 箭头）
+        b2 = subst_box(mth(r"v_0^{2}=\dfrac{2eU_0}{m}", 34), "待代入")
+        b2.move_to([4.30, 0.32, 0])
+        a2 = point_at(b2, E1[7])
+        self.play(FadeIn(b2, shift=LEFT * 0.10), GrowArrow(a2), run_time=0.7)
+        self.play(Indicate(b2[1], color=SUBST, scale_factor=1.05), run_time=0.8)
+        self.say("把 v₀² 整项换成 2eU₀/m：分母变成 m·2eU₀/m")
+        # v₀² 淡出，·2eU₀/m 就地淡入；分式横线与分子随之被拉宽
+        self.retarget(E1, E2, [(E1[i], E2[i]) for i in range(7)],
+                      drop=[E1[7]], add=[E2[i] for i in range(7, 13)],
+                      extra=[FadeOut(a2)], run_time=1.1)
+        ins = VGroup(*E2[7:13])
+        self.play(ins.animate.set_color(SUBST), run_time=0.4)
+        self.play(ins.animate.set_color(INK), FadeOut(b2), run_time=0.5)
+        self.say("接下来 e 与 e、m 与 m 各约掉一个", 0.6)
+
+        # —— 动态约去：红斜线从左上划到右下
+        se_n, se_d = slash(E2[2]), slash(E2[9])
+        lab_e = cn("e 约去", 22, CANCEL, BOLD).next_to(se_n, UP, buff=0.12)
+        self.say("约 e：分子一个 e，分母 2eU₀ 里一个 e", 0.4)
+        self.play(Create(se_n), Create(se_d), run_time=0.85)
+        self.play(FadeIn(lab_e, shift=UP * 0.05), run_time=0.3)
+
+        sm_a, sm_b = slash(E2[6]), slash(E2[12])
+        lab_m = cn("m 约去", 22, CANCEL, BOLD).next_to(sm_a, DOWN, buff=0.16)
+        self.say("约 m：分母开头的 m 与 /m 里的 m 相消", 0.4)
+        self.play(Create(sm_a), Create(sm_b), run_time=0.8)
+        self.play(FadeIn(lab_m, shift=DOWN * 0.05), run_time=0.3)
+
+        # —— 划掉的整项淡出，剩下的自己“收口”
+        self.say("被划掉的整项消失，只剩 EL 与 2U₀", 0.6)
+        alive = {i: E2[i] for i in (0, 1, 3, 4, 5, 8, 10, 13)}
+        dead = kill_list(E2, [2, 6, 7, 9, 11, 12])
+        self.play(FadeOut(VGroup(dead, se_n, se_d, sm_a, sm_b, lab_e, lab_m)), run_time=0.85)
+        self.retarget(E2, E3,
+                      [(alive[0], E3[0]), (alive[1], E3[1]), (alive[3], E3[2]),
+                       (alive[4], E3[3]), (alive[5], E3[4]), (alive[8], E3[5]),
+                       (alive[10], E3[6]), (alive[13], E3[7])], run_time=1.0)
+        ring = SurroundingRectangle(E3, color=KEY, buff=0.14, stroke_width=2.4)
+        self.play(E3.animate.set_color(KEY), Create(ring), run_time=0.7)
+        self.play(Circumscribe(E3, color=KEY, run_time=1.0))
+        self.say("约干净了：tanθ = EL/(2U₀) —— e、m 全部被约去", 0.8)
+
+        num = mth(r"=\frac{5000\times 0.06}{2\times 1000}=\frac{3}{20}", 40, KEY)
+        num.next_to(E3, RIGHT, buff=0.52)
+        self.say("代入数值：5000×0.06/(2×1000) = 3/20")
+        self.play(FadeIn(num, shift=LEFT * 0.12), run_time=0.6)
+        self.play(Circumscribe(num, color=KEY, run_time=1.0))
+        self.say("3/20 是正切值 —— 它只由 E、L、U₀ 决定", 0.8)
+        self.play(FadeOut(VGroup(E3, num, ring)), run_time=0.7)
+
+    # ------------------------------------------------------------ 07 出射速度大小
+    def beat_speed(self):
+        self.set_tag("⑤ 出射速度：用上 3/20")
+        b1 = mth(r"v=\sqrt{v_0^{2}+v_y^{2}}"
+                 r"=\sqrt{1+\left(\frac{3}{20}\right)^{2}}\;v_0"
+                 r"=\frac{\sqrt{409}}{20}\,v_0", 38)
         b2 = mth(r"=\frac{\sqrt{409}}{20}\sqrt{\frac{2eU_0}{m_e}}"
-                 r"\approx 1.9\times10^{7}\ \mathrm{m/s}", 32, KEY)
-        self.block5 = column([a1, a2, note, b1, b2], 0, 2.05, gap=0.30,
-                             max_w=11.4, max_h=4.85)
+                 r"\approx 1.9\times10^{7}\ \mathrm{m/s}", 38, KEY)
+        blk = column([b1, b2], 0, 1.30, gap=0.42, max_w=12.4)
 
-        self.play(FadeIn(a1, shift=UP * 0.10), run_time=0.6)
-        self.say("先写出比值，再用 eU₀ = ½mₑv₀² 把 v₀² 换掉")
-        self.play(FadeIn(a2, shift=UP * 0.10), run_time=0.6)
-        self.play(Circumscribe(a2, color=KEY, run_time=1.0))
-        self.say("比值 = EL/(2U₀) = 5000×0.06/(2×1000) = 3/20")
-        self.play(FadeIn(note, shift=UP * 0.10), run_time=0.5)
-        self.play(FadeIn(b1, shift=UP * 0.10), run_time=0.6)
+        self.play(FadeIn(b1, shift=UP * 0.10), run_time=0.7)
         self.say("合成：v = √(1+(3/20)²)·v₀ = (√409/20)·v₀")
-        self.play(FadeIn(b2, shift=UP * 0.10), run_time=0.6)
-        self.say("把 v₀ = √(2eU₀/mₑ) 代进去即得精确式", 1.0)
+        self.play(FadeIn(b2, shift=UP * 0.10), run_time=0.7)
+        self.play(Circumscribe(b2, color=KEY, run_time=1.0))
+        self.say("再把 v₀ = √(2eU₀/mₑ) 代进去，得到出射速度的精确式", 1.0)
+        self.play(FadeOut(blk), run_time=0.6)
 
-    # ------------------------------------------------------------ 07 夹角与位移
+    # ------------------------------------------------------------ 08 夹角
     def beat_angle(self):
-        self.play(FadeOut(self.block5), run_time=0.6)
+        self.set_tag("⑥ 夹角：3/20 是正切值")
+        c1 = mth(r"\tan\theta=\frac{3}{20}", 52, KEY).move_to([0, 1.60, 0])
+        c2 = mth(r"\theta=\arctan\frac{3}{20}\approx 8.5^{\circ}", 50, KEY).move_to([0, 0.35, 0])
+        warn = cn("3/20 是正切值，不是角度", 30, WARN, BOLD).move_to([0, -1.05, 0])
+
         self.say("比值 3/20 是正切值，它决定夹角，不是角度本身")
-        c1 = mth(r"\frac{v_y}{v_0}=\tan\theta=\frac{3}{20}", 42, KEY)
-        c2 = mth(r"\theta=\arctan\frac{3}{20}\approx 8.5^{\circ}", 42, KEY)
-        warn = cn("3/20 是正切值，不是角度", 26, WARN, BOLD)
-        d1 = mth(r"|y|=\frac{1}{2}a_y t^{2}=\frac{EL^{2}}{4U_0}"
-                 r"=\frac{9}{2000}\ \mathrm{m}\approx 4.5\ \mathrm{mm}", 32)
-        d2 = cn("方向向上；只用 E、L、U₀，不需要偏转板间距", 21, MUTED)
-        self.block6 = column([c1, c2, warn, d1, d2], 0, 1.95, gap=0.30,
-                             max_w=11.4, max_h=4.90)
-
         self.play(FadeIn(c1, shift=UP * 0.10), run_time=0.6)
-        self.say("tanθ = 3/20，所以 θ = arctan(3/20)")
         self.play(FadeIn(c2, shift=UP * 0.10), run_time=0.6)
-        self.play(FadeIn(warn, shift=UP * 0.10), run_time=0.5)
-        self.say("严格写法是 θ = arctan(3/20)，约 8.5°", 0.8)
-        self.play(FadeIn(d1, shift=UP * 0.10), run_time=0.6)
-        self.say("顺带核对偏转位移：精确值 9/2000 m，方向向上")
-        self.play(FadeIn(d2, shift=UP * 0.10), run_time=0.5)
-        self.say("推导全程没有用到偏转板间距 —— 题目也没给这个量", 1.0)
+        self.play(FadeIn(warn, scale=0.92), run_time=0.5)
+        self.say("严格写法是 θ = arctan(3/20)，约 8.5°", 0.9)
+        self.blk_angle = VGroup(c1, c2, warn)
+        self.play(FadeOut(self.blk_angle), run_time=0.6)
 
-    # ------------------------------------------------------------ 08 教材第5题
+    # ------------------------------------------------------------ 09 偏转位移（同样代入 + 约去）
+    def beat_displacement(self):
+        self.set_tag("⑦ 偏转位移：再代一次、再约一次")
+
+        Y1 = eq(r"|y|=\frac{1}{2}a_y t^{2}=", r"\frac{", "e", "E", "L^{2}", r"}{",
+                "2", "m", "v_0^{2}", r"}", size=42).move_to([-1.30, 1.10, 0])
+        Y2 = place_like(eq(r"|y|=\frac{1}{2}a_y t^{2}=", r"\frac{", "e", "E", "L^{2}", r"}{",
+                           "2", "m", r"\cdot", "2", "e", "U_0", "/", "m", r"}", size=42), Y1)
+        Y3 = place_like(eq(r"|y|=\frac{1}{2}a_y t^{2}=", r"\frac{", "E", "L^{2}", r"}{",
+                           "4", "U_0", r"}", size=42), Y1)
+
+        self.say("再看偏转位移：|y| = ½a_y t²，代入 a_y 与 t")
+        self.play(FadeIn(Y1, shift=UP * 0.10), run_time=0.7)
+        self.play(Circumscribe(Y1[4], color=KEY, run_time=0.9))
+        self.say("竖直位移 = ½·(eE/m)·(L/v₀)² = eEL²/(2m v₀²)", 0.7)
+
+        b3 = subst_box(mth(r"v_0^{2}=\dfrac{2eU_0}{m}", 32), "待代入")
+        b3.move_to([4.30, 0.52, 0])
+        a3 = point_at(b3, Y1[8])
+        self.play(FadeIn(b3, shift=LEFT * 0.10), GrowArrow(a3), run_time=0.7)
+        self.say("还是同一个待代入式：v₀² = 2eU₀/m")
+        self.retarget(Y1, Y2, [(Y1[i], Y2[i]) for i in range(8)],
+                      drop=[Y1[8]], add=[Y2[i] for i in range(8, 14)],
+                      extra=[FadeOut(a3)], run_time=1.0)
+        self.play(Indicate(VGroup(*Y2[8:14]), color=SUBST, scale_factor=1.10), run_time=0.9)
+        self.play(FadeOut(b3), run_time=0.4)
+        self.say("分母成了 2m·2eU₀/m —— 和上一段一样收拾", 0.6)
+
+        se_n, se_d = slash(Y2[2]), slash(Y2[10])
+        lab_e = cn("e 约去", 22, CANCEL, BOLD).next_to(se_n, UP, buff=0.12)
+        self.say("约 e：分子一个 e，分母 2eU₀ 里一个 e", 0.4)
+        self.play(Create(se_n), Create(se_d), run_time=0.85)
+        self.play(FadeIn(lab_e, shift=UP * 0.05), run_time=0.3)
+
+        sm_a, sm_b = slash(Y2[7]), slash(Y2[13])
+        lab_m = cn("m 约去", 22, CANCEL, BOLD).next_to(sm_a, DOWN, buff=0.16)
+        self.say("约 m：2m 里的 m 与 /m 里的 m 相消", 0.4)
+        self.play(Create(sm_a), Create(sm_b), run_time=0.8)
+        self.play(FadeIn(lab_m, shift=DOWN * 0.05), run_time=0.3)
+
+        self.say("e、m 约去，分母 2×2 = 4：|y| = EL²/(4U₀)", 0.6)
+        alive = {i: Y2[i] for i in (0, 1, 3, 4, 5, 6, 9, 11, 14)}
+        dead = kill_list(Y2, [2, 7, 8, 10, 12, 13])
+        self.play(FadeOut(VGroup(dead, se_n, se_d, sm_a, sm_b, lab_e, lab_m)), run_time=0.85)
+        # 分母两个 2 合成 4：第一个 2 变成 4，第二个 2 淡出
+        self.retarget(Y2, Y3,
+                      [(alive[0], Y3[0]), (alive[1], Y3[1]), (alive[3], Y3[2]),
+                       (alive[4], Y3[3]), (alive[5], Y3[4]), (alive[6], Y3[5]),
+                       (alive[11], Y3[6]), (alive[14], Y3[7])],
+                      drop=[alive[9]], run_time=1.0)
+        self.play(Y3.animate.set_color(KEY), run_time=0.5)
+        self.play(Circumscribe(Y3, color=KEY, run_time=1.0))
+
+        num = mth(r"=\frac{5000\times(0.06)^{2}}{4\times 1000}"
+                  r"=\frac{18}{4000}=\frac{9}{2000}\ \mathrm{m}", 36, KEY)
+        num.move_to([-0.30, -0.80, 0])
+        self.say("代入数值：5000×0.06²/(4×1000) = 18/4000 = 9/2000 m")
+        self.play(FadeIn(num, shift=UP * 0.10), run_time=0.7)
+        self.play(Circumscribe(num, color=KEY, run_time=1.0))
+
+        note = cn("方向向上；全程只用 E、L、U₀，不需要偏转板间距", 22, MUTED)
+        note.move_to([0, -1.80, 0])
+        self.play(FadeIn(note, shift=UP * 0.08), run_time=0.5)
+        self.say("推导全程没有用到偏转板间距 —— 题目也没给这个量", 1.0)
+        self.blk_y = VGroup(Y3, num, note)
+        self.play(FadeOut(self.blk_y), run_time=0.7)
+
+    # ------------------------------------------------------------ 10 教材第5题
     def beat_exam(self):
-        self.play(FadeOut(self.block6), run_time=0.6)
         head = cn("回到教材第 5 题", 34, KEY, BOLD).move_to([0, 2.95, 0])
         r1 = VGroup(
             cn("出射速度大小", 26, MUTED),
             mth(r"v=\frac{\sqrt{409}}{20}\sqrt{\frac{2eU_0}{m_e}}", 34),
             mth(r"\approx 1.9\times10^{7}\ \mathrm{m/s}", 28, MUTED),
-        ).arrange(RIGHT, buff=0.35).move_to([0, 2.15, 0])
+        ).arrange(RIGHT, buff=0.35).move_to([0, 2.10, 0])
         r2 = VGroup(
             cn("与入射方向的夹角", 26, MUTED),
             mth(r"\theta=\arctan\frac{3}{20}", 34, KEY),
             mth(r"\approx 8.5^{\circ}", 28, MUTED),
-        ).arrange(RIGHT, buff=0.35).move_to([0, 1.45, 0])
-        divider = Line([-6.30, 0.95, 0], [6.30, 0.95, 0],
+        ).arrange(RIGHT, buff=0.35).move_to([0, 1.42, 0])
+        r3 = VGroup(
+            cn("出板竖直偏移", 26, MUTED),
+            mth(r"|y|=\frac{EL^{2}}{4U_0}=\frac{9}{2000}\ \mathrm{m}", 34, KEY),
+            cn("向上", 26, MUTED),
+        ).arrange(RIGHT, buff=0.35).move_to([0, 0.76, 0])
+        divider = Line([-6.30, 0.34, 0], [6.30, 0.34, 0],
                        color="#243040", stroke_width=1.5)
         steps = VGroup(
             cn("① 加速段：静电力做功 = 动能增量，定出入射速度", 24, INK),
             cn("② 偏转段：水平匀速 + 竖直匀加速，求出时间与竖直分速度", 24, INK),
-            cn("③ 速度合成：出射速度大小与夹角一并得到", 24, INK),
-        ).arrange(DOWN, buff=0.34).move_to([0, -0.05, 0])
-        concl = cn("先定入射速度 → 再分解求分速度 → 最后合成", 26, KEY, BOLD
-                   ).move_to([0, -2.00, 0])
+            cn("③ 合成与约去：e、m 全消，结果只由 E、L、U₀ 决定", 24, INK),
+        ).arrange(DOWN, buff=0.32).move_to([0, -0.62, 0])
+        concl = cn("先定入射速度 → 再分解求分速度 → 代入约去 → 合成", 26, KEY, BOLD
+                   ).move_to([0, -2.35, 0])
 
-        for m in (r1, r2, steps):
-            fit(m, max_w=12.2)
+        for m in (r1, r2, r3, steps):
+            fit(m, max_w=12.4)
 
         self.say("回到教材第 5 题：写出最终答案")
         self.play(FadeIn(head, shift=DOWN * 0.10), run_time=0.6)
@@ -450,9 +689,11 @@ class ElectronAccelerateThenDeflectScene(Scene):
         self.say("出射速度 (√409/20)√(2eU₀/mₑ)，约 1.9×10⁷ m/s")
         self.play(FadeIn(r2, shift=UP * 0.10), run_time=0.6)
         self.say("与入射方向夹角 θ = arctan(3/20)，约 8.5°")
+        self.play(FadeIn(r3, shift=UP * 0.10), run_time=0.6)
+        self.say("出板竖直偏移 9/2000 m，方向向上")
         self.play(Create(divider), run_time=0.5)
         self.play(LaggedStart(*[FadeIn(s, shift=RIGHT * 0.12) for s in steps],
                               lag_ratio=0.35), run_time=1.4)
-        self.say("分析顺序：先加速、再分解、最后合成", 0.8)
+        self.say("分析顺序：先加速、再分解、代入约去、最后合成", 0.8)
         self.play(FadeIn(concl, shift=UP * 0.10), run_time=0.6)
         self.say("两段场、两个模型：动能定理 + 类平抛", 2.4)
