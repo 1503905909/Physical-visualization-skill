@@ -193,7 +193,7 @@ body{margin:0;background:var(--bg);color:var(--ink);
   font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}
 a{color:inherit;text-decoration:none}
 .hero{background:linear-gradient(135deg,#1f5c68 0%,#2f7f8f 55%,#4a9aa8 100%);color:#fff;padding:44px 24px 38px}
-.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+.wrap{max-width:1320px;margin:0 auto;padding:0 24px}
 .hero h1{margin:0 0 8px;font-size:30px;letter-spacing:.5px}
 .hero p{margin:0;opacity:.9;font-size:15px}
 .hero .stats{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
@@ -211,7 +211,16 @@ input[type=search]:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--tea
 .chip:hover{border-color:var(--teal);color:var(--teal)}
 .chip[aria-pressed=true]{background:var(--teal);border-color:var(--teal);color:#fff}
 .count{color:var(--muted);font-size:13px;margin:18px 0 6px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(292px,1fr));gap:20px;padding-bottom:40px}
+.group{margin-top:30px}
+.group[hidden]{display:none}
+.group-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  margin:0 0 16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.group-title{margin:0;font-size:19px;letter-spacing:.4px;font-weight:700}
+.group-title::before{content:"";display:inline-block;width:4px;height:15px;border-radius:2px;
+  background:var(--teal);margin-right:9px;vertical-align:-1px}
+.group[data-group="manim"] .group-title::before{background:var(--amber)}
+.group-sub{margin:0;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;padding-bottom:8px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
   box-shadow:var(--shadow);display:flex;flex-direction:column;transition:.18s}
 .card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,42,52,.12)}
@@ -220,20 +229,21 @@ input[type=search]:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--tea
 .thumb.vid video{width:100%;height:100%;object-fit:cover;display:block}
 .thumb.poster{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;
   background:linear-gradient(135deg,#123b45,#256a7a 60%,#3f8b9a)}
-.poster-scene{color:#eaf6f8;font:600 15px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.95}
+.poster-scene{color:#eaf6f8;font:600 clamp(10px,0.95vw,13.5px)/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+  opacity:.95;padding:0 10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .poster-note{color:#a9cfd7;font-size:12px}
 .badge{position:absolute;left:10px;top:10px;border-radius:999px;padding:3px 10px;font-size:11.5px;
   font-weight:600;letter-spacing:.3px;color:#fff}
 .badge-html{background:var(--teal)}
 .badge-manim{background:#8a5a12}
-.body{padding:14px 16px 6px;flex:1}
+.body{padding:12px 14px 5px;flex:1}
 .kicker{font-size:12px;color:var(--teal);font-weight:600;letter-spacing:.2px}
-.body h2{margin:6px 0 6px;font-size:16.5px;line-height:1.4}
+.body h2{margin:6px 0 6px;font-size:15.5px;line-height:1.4}
 .body h2 a:hover{color:var(--teal)}
-.desc{margin:0 0 10px;color:var(--muted);font-size:13.5px;line-height:1.62}
+.desc{margin:0 0 10px;color:var(--muted);font-size:13px;line-height:1.6}
 .tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .tag{background:var(--teal-l);color:var(--teal-d);border-radius:6px;padding:2px 8px;font-size:11.5px}
-.foot{padding:12px 16px 14px;border-top:1px solid var(--line);display:flex;gap:10px;
+.foot{padding:10px 14px 12px;border-top:1px solid var(--line);display:flex;gap:8px;
   align-items:center;flex-wrap:wrap}
 .btn{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:7px 13px;
   font-size:13px;cursor:pointer;font-family:inherit}
@@ -248,8 +258,19 @@ footer code{background:var(--bg);border:1px solid var(--line);border-radius:6px;
   background:#16232b;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;opacity:0;
   pointer-events:none;transition:.2s}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:1200px){
+  .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:980px){
+  .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media(max-width:640px){
   .hero h1{font-size:23px}
+}
+@media(max-width:560px){
   .grid{grid-template-columns:1fr}
 }
 """
@@ -262,6 +283,7 @@ JS = """
   const chapChips=[...document.querySelectorAll('#chapChips .chip')];
   const countEl=document.getElementById('count');
   const empty=document.getElementById('empty');
+  const groups=[...document.querySelectorAll('.group')];
   let type='all', chap='all';
 
   function apply(){
@@ -274,6 +296,12 @@ JS = """
       const on = okType && okChap && okKw;
       c.style.display = on ? '' : 'none';
       if(on) shown++;
+    }
+    for(const g of groups){
+      const vis=[...g.querySelectorAll('.card')].filter(c=>c.style.display!=='none').length;
+      g.hidden = vis===0;
+      const n=g.querySelector('[data-count]');
+      if(n) n.textContent=vis;
     }
     countEl.textContent = '显示 ' + shown + ' / ' + cards.length + ' 个资源';
     empty.hidden = shown !== 0;
@@ -355,7 +383,8 @@ def build_page(reg: dict) -> str:
     n_html = sum(1 for r in res if r["type"] == "html")
     n_manim = len(res) - n_html
 
-    cards = "\n".join(card_html(r, video_for(r["id"])) for r in res)
+    cards_html = "\n".join(card_html(r, video_for(r["id"])) for r in res if r["type"] == "html")
+    cards_manim = "\n".join(card_html(r, video_for(r["id"])) for r in res if r["type"] != "html")
 
     type_chips = (
         '<button class="chip" data-type="all" aria-pressed="true">全部</button>'
@@ -401,9 +430,27 @@ def build_page(reg: dict) -> str:
 
 <main class="wrap">
   <p class="count" id="count"></p>
-  <div class="grid" id="grid">
-{cards}
-  </div>
+
+  <section class="group" data-group="html">
+    <div class="group-head">
+      <h2 class="group-title">交互仿真</h2>
+      <p class="group-sub">单文件 HTML，双击即可离线运行 · 共 <span data-count="html">{n_html}</span> 个</p>
+    </div>
+    <div class="grid">
+{cards_html}
+    </div>
+  </section>
+
+  <section class="group" data-group="manim">
+    <div class="group-head">
+      <h2 class="group-title">讲解动画</h2>
+      <p class="group-sub">Manim 脚本渲染的课堂动画 · 共 <span data-count="manim">{n_manim}</span> 个</p>
+    </div>
+    <div class="grid">
+{cards_manim}
+    </div>
+  </section>
+
   <div class="empty" id="empty" hidden>没有匹配的资源，试试换个关键词或清除筛选。</div>
 </main>
 
