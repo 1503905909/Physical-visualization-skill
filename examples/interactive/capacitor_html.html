@@ -73,7 +73,7 @@
     .stage-frame > canvas { display: block; width: 100%; height: 100%; }
 
     /* —— 画布下方一行图例 —— */
-    .legend { display: flex; align-items: center; justify-content: center; gap: 16px;
+    .legend { display: flex; align-items: center; justify-content: center; gap: 14px;
               padding: 7px 12px; background: var(--card); border: 1px solid var(--line);
               border-radius: 10px; font-size: 12px; color: var(--muted);
               white-space: nowrap; overflow: hidden; }
@@ -82,6 +82,8 @@
     .dot-red { background: #d92d2d; }
     .dot-blue { background: #3558ff; }
     .dot-green { background: #15803d; }
+    .dot-cyan { background: #06b6d4; }
+    .dot-amber { background: #f59e0b; }
     .arrow-glyph { color: #b45309; font-weight: 900; }
     .lg.warn { color: var(--warn); font-weight: 700; }
 
@@ -94,16 +96,18 @@
     .group-label b { color: var(--ink); font-size: 12px; font-weight: 700; }
 
     .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mode-switch.three { grid-template-columns: 1fr 1fr 1fr; }
     .mode-btn { display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
-                padding: 6px 7px; min-height: 48px; text-align: left; font-family: inherit;
+                padding: 6px 6px; min-height: 48px; text-align: left; font-family: inherit;
                 border: 1px solid #dfe6ea; border-radius: 8px; background: var(--card);
-                color: var(--ink); cursor: pointer; }
-    .mode-btn .mode-title { font-size: 12.5px; font-weight: 700; line-height: 1.25; }
-    .mode-btn .mode-sub { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+                color: var(--ink); cursor: pointer; min-width: 0; }
+    .mode-btn .mode-title { font-size: 12.5px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+    .mode-btn .mode-sub { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.3; white-space: nowrap; }
     .mode-btn:hover { background: #f7f9fa; border-color: #d3dce2; }
     .mode-btn.active { border-color: var(--ink); background: var(--ink); }
     .mode-btn.active .mode-title { color: #ffffff; }
     .mode-btn.active .mode-sub { color: rgba(255, 255, 255, .8); }
+    .mode-btn[data-sw="bulb"].active { border-color: #b45309; background: #b45309; }
 
     .row { display: flex; justify-content: space-between; align-items: baseline;
            gap: 8px; margin-top: 8px; color: var(--muted); font-size: 11.5px; }
@@ -152,6 +156,7 @@
     .conclusion-card { margin: 4px 0 6px; padding: 8px 10px; border-radius: 6px;
                        border-left: 3px solid #2dd4bf; background: #f0faf8; }
     .conclusion-card.warn { border-left-color: #d97706; background: #fdf6e8; }
+    .conclusion-card.deploy { border-left-color: #ea580c; background: #fdf1e8; }
     .conclusion-body { margin: 0 0 4px; font-size: 12.5px; line-height: 1.55; color: #2c4a52; }
     .conclusion-key { margin: 0; font-size: 12.5px; font-weight: 700; color: #175e58; }
     .conclusion-formula { margin: 6px 0; padding: 6px 8px; border: 1px dashed #d4dee3;
@@ -161,6 +166,7 @@
                  line-height: 1.55; border-left: 3px solid #2dd4bf; background: #f0faf8;
                  color: #2c5a63; }
     .mode-hint.warn { border-left-color: #d97706; background: #fdf6e8; color: #7a5410; }
+    .mode-hint.deploy { border-left-color: #ea580c; background: #fdf1e8; color: #8a3d10; }
     .q-list { margin: 4px 0; padding-left: 16px; }
     .drawer-keys { margin-top: 10px; font-size: 11px; color: #8a9aa3; }
 
@@ -178,15 +184,22 @@
     .drawer .tile-badge.down { background: #e8f1fd; color: #1f4f8f; }
     .drawer .tile-badge.na { opacity: .45; }
 
+    /* 自检面板（仅 ?selftest=1 时出现，不参与正常界面） */
+    #selftestOut { position: fixed; z-index: 999; left: 12px; bottom: 12px; width: min(920px, 94vw);
+                   max-height: 62vh; overflow: auto; margin: 0; padding: 12px 14px;
+                   background: rgba(8, 14, 20, .94); color: #9ef0c0; border: 1px solid #1f4d3d;
+                   border-radius: 10px; font: 12px/1.55 Consolas, "Courier New", monospace;
+                   white-space: pre-wrap; }
+
     button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     @media (max-width: 1200px) {
       .topbar { padding: 0 16px; gap: 12px; }
       .workspace { padding: 12px 16px 14px; gap: 14px; }
-      .panel { width: 240px; padding: 12px; }
+      .panel { width: 252px; padding: 12px; }
       .drawer { right: 16px; top: 12px; width: 300px; max-height: calc(100% - 26px); }
       .readout .tile { padding: 3px 9px; }
-      .legend { gap: 12px; }
+      .legend { gap: 11px; }
     }
 
     @media (max-width: 980px) {
@@ -235,25 +248,30 @@
       </div>
 
       <div class="legend" aria-label="图例">
-        <span class="lg"><i class="dot dot-red"></i>正电荷</span>
-        <span class="lg"><i class="dot dot-blue"></i>负电荷</span>
-        <span class="lg"><b class="arrow-glyph">→</b>E：正极板→负极板</span>
-        <span class="lg"><i class="dot dot-green"></i>板间距 d</span>
+        <span class="lg"><i class="dot dot-red"></i>正电荷 +</span>
+        <span class="lg"><i class="dot dot-blue"></i>负电荷 −</span>
+        <span class="lg"><i class="dot dot-cyan"></i>电流方向（正电荷流向）</span>
+        <span class="lg"><i class="dot dot-green"></i>尺寸标注 d / S</span>
+        <span class="lg"><i class="dot dot-amber"></i>灯泡亮度 ∝ i²</span>
         <span class="lg warn" id="breakdownChip" hidden>E 接近空气击穿（拓展）</span>
       </div>
     </div>
 
     <aside class="panel" id="ctrlPanel" aria-label="参数与开关">
       <div class="group">
-        <p class="group-label">情形：<b id="stageMode">接通电源（U 不变）</b></p>
-        <div class="mode-switch" role="group" aria-label="电源开关">
-          <button type="button" class="mode-btn active" data-mode="uconst" aria-pressed="true">
-            <span class="mode-title">接通电源</span>
-            <span class="mode-sub">U 不变 · Q 随 C 变</span>
+        <p class="group-label">开关：<b id="stageMode">接电池（U 不变）</b></p>
+        <div class="mode-switch three" role="group" aria-label="三档开关：接电池 / 断开 / 接灯泡">
+          <button type="button" class="mode-btn active" data-sw="battery" aria-pressed="true">
+            <span class="mode-title">接电池</span>
+            <span class="mode-sub">U 不变 · 充电</span>
           </button>
-          <button type="button" class="mode-btn" data-mode="qconst" aria-pressed="false">
-            <span class="mode-title">断开电源</span>
-            <span class="mode-sub">Q 不变 · U 随 C 变</span>
+          <button type="button" class="mode-btn" data-sw="off" aria-pressed="false">
+            <span class="mode-title">断开</span>
+            <span class="mode-sub">Q 不变</span>
+          </button>
+          <button type="button" class="mode-btn" data-sw="bulb" aria-pressed="false">
+            <span class="mode-title">接灯泡</span>
+            <span class="mode-sub">放电 · 发光</span>
           </button>
         </div>
       </div>
@@ -269,17 +287,17 @@
         <div class="row"><label for="erSlider">相对介电常数 εᵣ</label><b id="erValue">1.0</b></div>
         <input id="erSlider" type="range" min="1" max="5" value="1" step="0.1" />
 
-        <div class="row"><label for="voltSlider">电压 U</label><b id="voltValue">300 V</b></div>
+        <div class="row"><label for="voltSlider">电源电压 U</label><b id="voltValue">300 V</b></div>
         <input id="voltSlider" type="range" min="0" max="1000" value="300" step="10" />
-        <p class="footnote" id="voltHint">接通电源时 U 由电源提供。</p>
+        <p class="footnote" id="voltHint">接电池时 U 由电源提供，极板电压被钉在 U。</p>
       </div>
 
       <div class="group">
         <p class="group-label">显示</p>
         <div class="toggles">
-          <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示板间场线</span></label>
-          <label class="toggle"><input type="checkbox" id="showCharge" checked /><span>显示极板电荷</span></label>
-          <label class="toggle"><input type="checkbox" id="showFlow" checked /><span>箭头流动（标方向）</span></label>
+          <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示板间电场线</span></label>
+          <label class="toggle"><input type="checkbox" id="showCharge" checked /><span>显示极板电荷符号</span></label>
+          <label class="toggle"><input type="checkbox" id="showFlow" checked /><span>电流动画与流向箭头</span></label>
         </div>
       </div>
 
@@ -304,7 +322,7 @@
       </div>
       <p class="conclusion-formula" id="conclusionFormula">—</p>
       <p class="conclusion-note" id="conclusionExtra">—</p>
-      <p class="mode-hint" id="modeHint">接通电源：极板两端电压由电源决定，始终等于 U。</p>
+      <p class="mode-hint" id="modeHint">接电池：极板两端电压由电源决定，始终等于 U。</p>
 
       <h3>读数明细</h3>
       <div class="tile" id="tileW">
@@ -314,33 +332,39 @@
         <span class="tile-badge na">—</span>
       </div>
       <p class="conclusion-note" id="unitNote">—</p>
+      <p class="conclusion-note" id="dynNote">—</p>
       <p class="conclusion-note" id="extraNote">E_C 为电场能（拓展内容，避免与功的符号 W 混淆）。教材中平行板电容写作 C = εᵣS/(4πkd)，其中 ε₀ = 1/(4πk)，与这里的 C = ε₀εᵣS/d 完全等价。</p>
       <p class="conclusion-note">板间场线：<span id="stageLines">0 条</span>；极板电荷：<span id="stageState">由电源补充</span>。</p>
 
       <h3>模型假设</h3>
-      <p class="conclusion-note">理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场。极板高度随 S、电荷符号个数随 Q 单调变化，但都只是示意（非线性），不按真实比例绘制。</p>
+      <p class="conclusion-note">理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场。极板面积按透视投影绘制，电荷符号个数随 Q 单调变化（4–40 个，非线性），都只是示意，不按真实比例。</p>
+      <p class="conclusion-note">为让充电/放电过程在任何参数下都看得清，仿真把时间常数固定为 τ充 = 0.25 s、τ放 = 0.60 s；等效串联电阻按 R = τ/C 折算（默认参数下约 2.8×10⁹ Ω）。充放电本身严格按 dQ/dt = (CU − Q)/τ 与 dQ/dt = −Q/τ 演化。</p>
 
       <h3>课堂观察</h3>
       <ul class="q-list">
-        <li>保持「接通电源」，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
-        <li>先接通电源充好电，再切到「断开电源」，只改变 d：E 的读数和场线疏密为什么几乎不变？此时 U 与 d 成什么关系？</li>
-        <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、E_C 也变小？</li>
+        <li>接电池，闭合后看导线里的小点：电流在充电刚开始时最大，随 Q 接近 CU 迅速变小 —— i = dQ/dt。</li>
+        <li>接电池，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
+        <li>先接电池充好电，再扳到「断开」，只改变 d：E 的读数为什么不动？此时 U 与 d 成什么关系？</li>
+        <li>扳到「接灯泡」：灯泡先亮后暗，Q 与 U 一起降到 0。电场能去哪儿了？</li>
       </ul>
 
       <h3>关于 ↑↓ 徽标</h3>
       <p class="conclusion-note" id="deltaHint">—</p>
 
-      <p class="drawer-keys">快捷键：空格 箭头流动 · R 重置 · ? 打开/关闭本说明 · Esc 关闭说明</p>
+      <p class="drawer-keys">快捷键：1 接电池 · 2 断开 · 3 接灯泡 · 空格 电流动画 · R 重置 · ? 本说明 · Esc 关闭</p>
     </section>
   </main>
 
   <script>
+  (function () {
+    "use strict";
+
     const canvas = document.getElementById("capCanvas");
     const ctx = canvas.getContext("2d");
 
-    /* 逻辑坐标系：原来 canvas.width / canvas.height 的 1600×900（不要改）。
-       位图改为「CSS 尺寸 × DPR」，绘制一律按逻辑坐标（LAYOUT.md「高清渲染」）。 */
+    /* 逻辑坐标系：1600×900；位图 = CSS 尺寸 × DPR，绘制一律用逻辑坐标。 */
     const LW = 1600, LH = 900;
+    const D2R = Math.PI / 180;
 
     function syncBackingStore() {
       const r = canvas.getBoundingClientRect();
@@ -350,36 +374,37 @@
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     }
 
-    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
     function beginFrame() {
       syncBackingStore();
       ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
     }
 
-    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
-    function toLogical(e) {
-      const r = canvas.getBoundingClientRect();
-      return { x: (e.clientX - r.left) * (LW / r.width),
-               y: (e.clientY - r.top) * (LH / r.height) };
-    }
-
     const EPS0 = 8.8541878128e-12;
+    const TAU_CHG = 0.25;   // 充电时间常数（s）
+    const TAU_DIS = 0.60;   // 放电时间常数（s）
     const FONT_CN = "'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', Arial, sans-serif";
 
-    const DEFAULTS = { S: 300, d: 3.0, er: 1.0, U: 300, refD: 3.0 };
+    const DEFAULTS = { S: 300, d: 3.0, er: 1.0, U: 300 };
 
+    /* ================= 状态 ================= */
     const state = {
       S: DEFAULTS.S,
       d: DEFAULTS.d,
       er: DEFAULTS.er,
       U: DEFAULTS.U,
-      mode: "uconst",
-      Qfrozen: 0,
-      refD: DEFAULTS.refD,
+      sw: "battery",        // battery | off | bulb  —— 三档开关，只有这一套语义
+      Q: 0,                 // 极板电荷量（C），动态量
+      i: 0,                 // 电流（A），i > 0 表示流向上板（充电）
+      refD: DEFAULTS.d,
       time: 0,
       showField: true,
       showCharge: true,
-      showFlow: true
+      showFlow: true,
+      paused: false,
+      armTop: 200 * D2R,
+      armBot: 160 * D2R,
+      needle: 215 * D2R,
+      dotPhase: 0
     };
 
     const el = {
@@ -392,7 +417,7 @@
       erOut: document.getElementById("erValue"),
       uOut: document.getElementById("voltValue"),
       voltHint: document.getElementById("voltHint"),
-      modeButtons: Array.from(document.querySelectorAll(".mode-btn")),
+      swButtons: Array.from(document.querySelectorAll(".mode-btn")),
       modeHint: document.getElementById("modeHint"),
       modeTag: document.getElementById("modeTag"),
       showField: document.getElementById("showField"),
@@ -408,6 +433,7 @@
       conclusionKey: document.getElementById("conclusionKey"),
       conclusionExtra: document.getElementById("conclusionExtra"),
       unitNote: document.getElementById("unitNote"),
+      dynNote: document.getElementById("dynNote"),
       deltaHint: document.getElementById("deltaHint"),
       breakdownChip: document.getElementById("breakdownChip"),
       tiles: {
@@ -419,30 +445,8 @@
       }
     };
 
-    const MODE_TEXT = {
-      uconst: {
-        name: "接通电源（U 不变）",
-        hint: "接通电源：极板两端电压由电源决定，始终等于 U。调节 d 时电源会自动补充或取回电荷，所以 Q 会变，U 不变。",
-        tag: "U 不变",
-        body: "d 减小 → C 增大、Q 增大、E 增大、E_C 增大；d 增大则 C、Q、E、E_C 全部减小。整个过程中 U 保持不变。",
-        formula: "C = ε₀εᵣS/d　　Q = CU　　E = U/d　　E_C = ½CU²（拓展）",
-        key: "关键：E = U/d。电压被电源固定后，板间场强只由板间距 d 决定 —— d 越小，电场越强。",
-        extra: "同一情形下增大 S 或 εᵣ：C 增大，Q 增大，E_C 增大；而 E = U/d 保持不变。"
-      },
-      qconst: {
-        name: "断开电源（Q 不变）",
-        hint: "已断开电源：极板上的电荷无处流走，Q 保持不变，电压由 U = Q/C 决定。此时电压滑块失效。",
-        tag: "Q 不变",
-        body: "d 减小 → C 增大、U 减小、E_C 减小；d 增大则 C 减小、U 增大、E_C 增大。整个过程中 E 保持不变。",
-        formula: "C = ε₀εᵣS/d　　U = Q/C = Qd/(ε₀εᵣS)　　E = U/d = Q/(ε₀εᵣS)　　E_C = ½Q²/C（拓展）",
-        key: "关键：E = Q/(ε₀εᵣS)，式中没有 d。断开电源后「锁住」的电荷量使板间场强不随 d 改变。",
-        extra: "同一情形下增大 S 或 εᵣ：C 增大，U 减小，E 减小，E_C 减小。"
-      }
-    };
-
-    function clamp(value, min, max) {
-      return Math.min(max, Math.max(min, value));
-    }
+    /* ================= 小工具 ================= */
+    function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
 
     function roundRect(x, y, w, h, r) {
       const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
@@ -463,10 +467,7 @@
       ctx.font = (weight || "bold") + " " + size + "px " + FONT_CN;
     }
 
-    const SUP = {
-      "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³",
-      "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
-    };
+    const SUP = { "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" };
 
     function sci(x) {
       if (!(Math.abs(x) > 0)) return "0";
@@ -520,17 +521,40 @@
       return [sig3(Wv / 1e-12), "pJ"];
     }
 
-    function computeAt(dMm) {
-      const S = state.S * 1e-4;
-      const dM = Math.max(dMm, 0.01) * 1e-3;
-      const C = EPS0 * state.er * S / dM;
-      if (state.mode === "uconst") {
-        const U = state.U;
-        return { C: C, Q: C * U, U: U, E: U / dM, W: 0.5 * C * U * U };
-      }
-      const Q = state.Qfrozen;
+    function fmtCur(i) {
+      const a = Math.abs(i);
+      if (!(a > 1e-15)) return ["0", "A"];
+      if (a >= 1e-3) return [sig3(a / 1e-3), "mA"];
+      if (a >= 1e-6) return [sig3(a / 1e-6), "μA"];
+      if (a >= 1e-9) return [sig3(a / 1e-9), "nA"];
+      if (a >= 1e-12) return [sig3(a / 1e-12), "pA"];
+      return [sig3(a / 1e-15), "fA"];
+    }
+
+    /* ================= 物理 ================= */
+    function capacitance() {
+      return EPS0 * state.er * (state.S * 1e-4) / Math.max(state.d * 1e-3, 1e-9);
+    }
+
+    // 实时量：U 取极板两端真实电压 Q/C（充电过程中会低于电源电压）
+    function live() {
+      const C = capacitance();
+      const Q = state.Q;
       const U = Q / C;
-      return { C: C, Q: Q, U: U, E: U / dM, W: 0.5 * Q * Q / C };
+      return { C: C, Q: Q, U: U, E: U / Math.max(state.d * 1e-3, 1e-9) };
+    }
+
+    // 稳态量：只用于顶栏 ↑↓ 徽标（描述「只改 d」的影响，不受瞬态干扰）
+    function steadyAt(dVal) {
+      const dM = Math.max(dVal * 1e-3, 1e-9);
+      const C = EPS0 * state.er * (state.S * 1e-4) / dM;
+      if (state.sw === "battery") {
+        const U = state.U;
+        return { C: C, Q: C * U, U: U, E: U / dM };
+      }
+      const Q = state.Q;
+      const U = Q / C;
+      return { C: C, Q: Q, U: U, E: U / dM };
     }
 
     function deltaBadge(cur, ref) {
@@ -542,65 +566,953 @@
       return { text: (cur > ref ? "↑ " : "↓ ") + p + "%", cls: cur > ref ? "up" : "down" };
     }
 
-    function stageGeom() {
-      const cx = 800;
-      const cy = 470;
-      const plateH = 180 + 200 * (state.S - 100) / 900;
-      const gap = 90 + 330 * (state.d - 0.5) / 9.5;
+    /* 充放电用解析解推进，与 dt 无关：
+       接电池：Q → CU，dQ/dt = (CU − Q)/τ充
+       接灯泡：Q → 0，dQ/dt = −Q/τ放（i = −dQ/dt，灯泡亮度 ∝ i²）
+       断开：  Q 不变，i = 0 */
+    function stepPhysics(dt) {
+      if (!(dt > 0)) return;
+      const C = capacitance();
+      const Qfull = C * state.U;
+      if (state.sw === "battery") {
+        const a = 1 - Math.exp(-dt / TAU_CHG);
+        state.Q += (Qfull - state.Q) * a;
+        if (Math.abs(Qfull - state.Q) <= 1e-7 * Math.abs(Qfull) + 1e-20) state.Q = Qfull;
+        state.i = (Qfull - state.Q) / TAU_CHG;
+      } else if (state.sw === "bulb") {
+        if (!(state.Q > 0)) { state.Q = 0; state.i = 0; return; }
+        const Qn = state.Q * Math.exp(-dt / TAU_DIS);
+        state.i = -(state.Q - Qn) / dt;
+        state.Q = Qn;
+        // 亮度 ∝ i²，Q 降到满值的 0.4% 时肉眼已不可见，直接归零，避免永远“剩一点”
+        if (!(Qfull > 0) || state.Q < 0.004 * Qfull) { state.Q = 0; state.i = 0; }
+      } else {
+        state.i = 0;
+      }
+    }
+
+    /* ================= 几何 ================= */
+    const GEO = {
+      cx: 700,
+      batX: 210, batTop: 340, batBot: 690, batW: 120,
+      railTopY: 193, railBotY: 767,
+      pivotTop: { x: 700, y: 285 }, pivotBot: { x: 700, y: 675 },
+      armLen: 150,
+      plateW: 400,
+      bulb: { x: 1252, y: 470, r: 64 },
+      meter: { x: 1425, y: 725, r: 58 }
+    };
+
+    const ARM = {
+      top: { battery: 218 * D2R, off: 270 * D2R, bulb: 322 * D2R },
+      bot: { battery: 142 * D2R, off: 90 * D2R, bulb: 38 * D2R }
+    };
+
+    function armEnd(which, angle) {
+      const p = which === "top" ? GEO.pivotTop : GEO.pivotBot;
+      return [p.x + Math.cos(angle) * GEO.armLen, p.y + Math.sin(angle) * GEO.armLen];
+    }
+
+    // 三档开关的两个固定触点（接电池 / 接灯泡）与悬空位（断开）
+    const SW_NODE = {
+      top: {
+        battery: armEnd("top", ARM.top.battery),
+        bulb: armEnd("top", ARM.top.bulb),
+        off: armEnd("top", ARM.top.off)
+      },
+      bot: {
+        battery: armEnd("bot", ARM.bot.battery),
+        bulb: armEnd("bot", ARM.bot.bulb),
+        off: armEnd("bot", ARM.bot.off)
+      }
+    };
+
+    function geom() {
+      const tg = clamp((state.d - 0.5) / 9.5, 0, 1);
+      const gapPx = 100 + 160 * tg;          // 100 … 260
+      const ts = clamp((state.S - 100) / 900, 0, 1);
+      const dep = 150 + 100 * ts;            // 150 … 250（透视方向长度，随 S 变长）
       return {
-        cx: cx,
-        cy: cy,
-        plateH: plateH,
-        gap: gap,
-        leftInner: cx - gap / 2,
-        rightInner: cx + gap / 2,
-        top: cy - plateH / 2,
-        bottom: cy + plateH / 2,
-        thickness: 16
+        cx: GEO.cx, w: GEO.plateW,
+        dx: dep * 0.62, dy: dep * 0.30, dep: dep,
+        topCy: 490 - gapPx / 2, botCy: 490 + gapPx / 2, gap: gapPx
       };
+    }
+
+    // 极板：四个角 FL, FR, BR, BL（等比四边形，看得出“面积”）
+    function plateQuad(g, which) {
+      const cy = which === "top" ? g.topCy : g.botCy;
+      const cx = g.cx, w = g.w, dx = g.dx, dy = g.dy;
+      return [
+        [cx - w / 2 - dx / 2, cy + dy / 2],
+        [cx + w / 2 - dx / 2, cy + dy / 2],
+        [cx + w / 2 + dx / 2, cy - dy / 2],
+        [cx - w / 2 + dx / 2, cy - dy / 2]
+      ];
+    }
+
+    function quadPoint(q, u, v) {
+      const fl = q[0], fr = q[1], bl = q[3];
+      return [
+        fl[0] + u * (fr[0] - fl[0]) + v * (bl[0] - fl[0]),
+        fl[1] + u * (fr[1] - fl[1]) + v * (bl[1] - fl[1])
+      ];
+    }
+
+    function pathQuad(q) {
+      ctx.beginPath();
+      ctx.moveTo(q[0][0], q[0][1]);
+      ctx.lineTo(q[1][0], q[1][1]);
+      ctx.lineTo(q[2][0], q[2][1]);
+      ctx.lineTo(q[3][0], q[3][1]);
+      ctx.closePath();
     }
 
     function fieldLineCount(E) {
       if (!(E > 1)) return 0;
-      const g = stageGeom();
-      // 条数乘以极板投影长度：密度（条数/板高）= f(E)/200，只由 E 决定，与 S 无关。
-      // f(E) 是单调压缩，只保证「E 越大条数越多」，并非严格正比；取 200 使 S=300 时仍为 6 条。
-      const f = 2 + 3.6 * Math.log10(E / 1e4);
-      const n = Math.round(f * g.plateH / 200);
-      return clamp(n, 2, 16);
+      const f = 3 + 4.2 * Math.log10(E / 1e4);
+      return Math.round(clamp(f, 2, 12));
     }
 
+    // 电荷符号个数：4 … 40，随 Q 单调（对数映射，非线性，仅示意）
     function chargeCount(Q) {
-      if (!(Q > 1e-15)) return 0;
-      const n = Math.round(3 + 3 * Math.log10(Q / 1e-9));
-      return clamp(n, 2, 14);
+      if (!(Q > 0)) return 0;
+      const t = Math.log10(Q / 1e-9) / 3;   // 1 nC → 0，1 μC → 1
+      return Math.round(4 + 36 * clamp(t, 0, 1));
     }
 
-    function arrowHead(x, y, size, color, dir) {
-      const s = dir === -1 ? -1 : 1;
+    // Halton 低差异序列：任意前缀都均匀铺满极板，且位置永久固定（不抖动）
+    function halton(i, b) {
+      let f = 1, r = 0, n = i;
+      while (n > 0) { f /= b; r += f * (n % b); n = Math.floor(n / b); }
+      return r;
+    }
+    const CHG_PTS = (function () {
+      const arr = [];
+      let seed = 20240611;
+      for (let k = 0; k < 40; k += 1) {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        const jx = (seed / 4294967296 - 0.5) * 0.035;
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        const jy = (seed / 4294967296 - 0.5) * 0.035;
+        arr.push({ u: clamp(0.10 + 0.80 * halton(k + 1, 2) + jx, 0.06, 0.94),
+                   v: clamp(0.14 + 0.72 * halton(k + 1, 3) + jy, 0.08, 0.92) });
+      }
+      return arr;
+    })();
+
+    /* ================= 绘制：底景 ================= */
+    function drawBackground(g) {
+      const grad = ctx.createLinearGradient(0, 0, 0, LH);
+      grad.addColorStop(0, "#0a1118");
+      grad.addColorStop(0.55, "#0b141a");
+      grad.addColorStop(1, "#06090d");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, LW, LH);
+
+      const glow = ctx.createRadialGradient(g.cx, 470, 80, g.cx, 470, 640);
+      glow.addColorStop(0, "rgba(96, 165, 250, 0.11)");
+      glow.addColorStop(1, "rgba(96, 165, 250, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, LW, LH);
+
       ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(s, 1);
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(size, 0);
-      ctx.lineTo(-size * 0.62, size * 0.58);
-      ctx.lineTo(-size * 0.62, -size * 0.58);
-      ctx.closePath();
-      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.032)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= LW; x += 80) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, LH); ctx.stroke();
+      }
+      for (let y = 0; y <= LH; y += 80) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(LW, y); ctx.stroke();
+      }
       ctx.restore();
     }
 
-    function chip(text, x, y, color, align) {
+    /* ================= 绘制：导线与回路 ================= */
+    const WIRE = "#93a7b5";
+
+    const PATHS = {
+      batTop: [[GEO.batX, GEO.batTop], [GEO.batX, GEO.railTopY], [SW_NODE.top.battery[0], GEO.railTopY]],
+      batBot: [[GEO.batX, GEO.batBot], [GEO.batX, GEO.railBotY], [SW_NODE.bot.battery[0], GEO.railBotY]],
+      bulbTop: [[SW_NODE.top.bulb[0], GEO.railTopY], [1100, GEO.railTopY], [1100, 445], [1132, 445]],
+      bulbBot: [[1140, 492], [1140, 522], [1100, 522], [1100, GEO.railBotY], [SW_NODE.bot.bulb[0], GEO.railBotY]]
+    };
+
+    /* 电流路径：把刀闸臂与极板引线也算进去，小点才能“穿过开关”流进球形回路 */
+    function flowPaths(g) {
+      const pT = GEO.pivotTop, pB = GEO.pivotBot;
+      const cT = [pT.x + Math.cos(state.armTop) * GEO.armLen, pT.y + Math.sin(state.armTop) * GEO.armLen];
+      const cB = [pB.x + Math.cos(state.armBot) * GEO.armLen, pB.y + Math.sin(state.armBot) * GEO.armLen];
+      const topEdge = [g.cx, g.topCy - g.dy / 2];
+      const botEdge = [g.cx, g.botCy + g.dy / 2];
+      if (state.sw === "bulb") {
+        return {
+          top: [topEdge, [pT.x, pT.y], cT, [1100, GEO.railTopY], [1100, 445], [1132, 445]],
+          bot: [[1140, 492], [1140, 522], [1100, 522], [1100, GEO.railBotY], cB, [pB.x, pB.y], botEdge]
+        };
+      }
+      return {
+        top: [[GEO.batX, GEO.batTop], [GEO.batX, GEO.railTopY], cT, [pT.x, pT.y], topEdge],
+        bot: [botEdge, [pB.x, pB.y], cB, [GEO.batX, GEO.railBotY], [GEO.batX, GEO.batBot]]
+      };
+    }
+
+    function strokePoly(pts, color, width) {
+      ctx.beginPath();
+      for (let k = 0; k < pts.length; k += 1) {
+        if (k === 0) ctx.moveTo(pts[k][0], pts[k][1]);
+        else ctx.lineTo(pts[k][0], pts[k][1]);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    function wire(pts, width) {
       ctx.save();
-      setFont(19, "bold");
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      strokePoly(pts, "rgba(3,7,10,0.75)", (width || 5) + 5);
+      strokePoly(pts, WIRE, width || 5);
+      strokePoly(pts.map(function (p) { return [p[0], p[1] - 1.2]; }), "rgba(226,238,246,0.35)", 1.6);
+      ctx.restore();
+    }
+
+    function drawWires() {
+      wire(PATHS.batTop, 5.5);
+      wire(PATHS.batBot, 5.5);
+      wire(PATHS.bulbTop, 5.5);
+      wire(PATHS.bulbBot, 5.5);
+    }
+
+    /* ================= 绘制：三档开关 ================= */
+    function drawSwitch() {
+      ["top", "bot"].forEach(function (which) {
+        const node = SW_NODE[which];
+        const pivot = which === "top" ? GEO.pivotTop : GEO.pivotBot;
+        const angle = which === "top" ? state.armTop : state.armBot;
+
+        // 接电池 / 接灯泡 两个固定触点
+        ["battery", "bulb"].forEach(function (key) {
+          const p = node[key];
+          const on = state.sw === key;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(p[0], p[1], 8, 0, Math.PI * 2);
+          ctx.fillStyle = on ? "#e8f4ff" : "#6b7f8d";
+          ctx.fill();
+          ctx.strokeStyle = on ? "#7fe3ff" : "#465764";
+          ctx.lineWidth = 2.4;
+          ctx.stroke();
+          if (on) {
+            ctx.shadowColor = "rgba(125,227,255,0.9)";
+            ctx.shadowBlur = 16;
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+            ctx.fillStyle = "#bff4ff";
+            ctx.fill();
+          }
+          ctx.restore();
+        });
+
+        // 「断开」悬空位：虚线小孔
+        if (state.sw === "off") {
+          const o = node.off;
+          ctx.save();
+          ctx.setLineDash([5, 5]);
+          ctx.strokeStyle = "rgba(148,163,184,0.85)";
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.arc(o[0], o[1], 9, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 刀闸臂
+        ctx.save();
+        ctx.translate(pivot.x, pivot.y);
+        ctx.rotate(angle);
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        roundRect(4, -5, GEO.armLen + 6, 14, 7);
+        ctx.fill();
+
+        const grd = ctx.createLinearGradient(0, -7, 0, 7);
+        grd.addColorStop(0, "#eef4f8");
+        grd.addColorStop(0.45, "#b7c7d3");
+        grd.addColorStop(1, "#788995");
+        ctx.fillStyle = grd;
+        roundRect(0, -6.5, GEO.armLen, 13, 6.5);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(GEO.armLen, 0, 9, 0, Math.PI * 2);
+        ctx.fillStyle = "#e6eef4";
+        ctx.fill();
+        ctx.strokeStyle = "#5b6e7c";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+
+        // 转轴
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(pivot.x, pivot.y, 11, 0, Math.PI * 2);
+        ctx.fillStyle = "#101a21";
+        ctx.fill();
+        ctx.strokeStyle = "#93a7b5";
+        ctx.lineWidth = 3.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pivot.x, pivot.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "#dbe7ef";
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    /* ================= 绘制：电池 ================= */
+    function drawBattery() {
+      const x = GEO.batX, w = GEO.batW, half = w / 2;
+      const bodyTop = 372, split = 520, bodyBot = 660;
+
+      // 顶部接线柱
+      ctx.save();
+      ctx.fillStyle = "#b9c6cf";
+      roundRect(x - 18, 340, 36, 22, 5);
+      ctx.fill();
+      ctx.restore();
+
+      // 顶部金属帽
+      const cap = ctx.createLinearGradient(x - half, 0, x + half, 0);
+      cap.addColorStop(0, "#7c8b96");
+      cap.addColorStop(0.35, "#e4edf3");
+      cap.addColorStop(0.7, "#9fb0bb");
+      cap.addColorStop(1, "#5c6b76");
+      ctx.fillStyle = cap;
+      roundRect(x - half, 358, w, 26, 7);
+      ctx.fill();
+
+      // 正极（橙色段）
+      const pos = ctx.createLinearGradient(x - half, 0, x + half, 0);
+      pos.addColorStop(0, "#a85c11");
+      pos.addColorStop(0.28, "#f6a83c");
+      pos.addColorStop(0.55, "#ffc266");
+      pos.addColorStop(0.8, "#e08c1e");
+      pos.addColorStop(1, "#8a4a0c");
+      ctx.fillStyle = pos;
+      ctx.fillRect(x - half, bodyTop, w, split - bodyTop);
+
+      // 负极（深色段）
+      const neg = ctx.createLinearGradient(x - half, 0, x + half, 0);
+      neg.addColorStop(0, "#05090c");
+      neg.addColorStop(0.3, "#2b343c");
+      neg.addColorStop(0.6, "#3c4852");
+      neg.addColorStop(1, "#070b0e");
+      ctx.fillStyle = neg;
+      ctx.fillRect(x - half, split, w, bodyBot - split);
+
+      // 分隔环
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(x - half, split - 3, w, 4);
+
+      // 文字
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      setFont(26, "bold");
+      ctx.fillStyle = "rgba(255,255,255,0.94)";
+      ctx.fillText("+", x, bodyTop + 26);
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillText("−", x, bodyBot - 24);
+
+      ctx.translate(x, (split + bodyBot) / 2 - 6);
+      ctx.rotate(-Math.PI / 2);
+      setFont(30, "bold");
+      const uv = fmtVolt(state.U);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(uv[0] + " " + uv[1], 0, 0);
+      ctx.restore();
+
+      ctx.save();
+      setFont(15, "bold");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#7c8d97";
+      ctx.fillText("电源", x, 334);
+      ctx.restore();
+    }
+
+    /* ================= 绘制：极板（3D 透视） ================= */
+    function drawPlateFace(q, cIn, cOut, rim) {
+      // 侧厚（把四边形整体下移，做出板厚）
+      const side = q.map(function (p) { return [p[0], p[1] + 11]; });
+      ctx.beginPath();
+      ctx.moveTo(q[0][0], q[0][1]);
+      ctx.lineTo(q[1][0], q[1][1]);
+      ctx.lineTo(side[1][0], side[1][1]);
+      ctx.lineTo(side[0][0], side[0][1]);
+      ctx.closePath();
+      ctx.fillStyle = cOut;
+      ctx.fill();
+
+      // 板面
+      const grd = ctx.createLinearGradient(q[0][0], q[0][1], q[3][0], q[3][1]);
+      grd.addColorStop(0, cIn);
+      grd.addColorStop(0.55, cOut);
+      grd.addColorStop(1, cIn);
+      pathQuad(q);
+      ctx.fillStyle = grd;
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 前缘高光
+      ctx.beginPath();
+      ctx.moveTo(q[0][0], q[0][1]);
+      ctx.lineTo(q[1][0], q[1][1]);
+      ctx.strokeStyle = rim;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+
+    function drawPlus(x, y, s, tint) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = tint;
+      ctx.lineWidth = 3.4;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(255,86,60,0.85)";
+      ctx.shadowBlur = 7;
+      ctx.beginPath();
+      ctx.moveTo(-s, 0); ctx.lineTo(s, 0);
+      ctx.moveTo(0, -s); ctx.lineTo(0, s);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawMinus(x, y, s, tint) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = tint;
+      ctx.lineWidth = 3.4;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(80,150,255,0.85)";
+      ctx.shadowBlur = 7;
+      ctx.beginPath();
+      ctx.moveTo(-s, 0); ctx.lineTo(s, 0);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawField(g, m) {
+      const n = fieldLineCount(m.E);
+      const y0 = g.topCy + g.dy / 2 + 7;
+      const y1 = g.botCy - g.dy / 2 - 7;
+      if (!(y1 - y0 > 10)) return;
+      const span = g.w * 0.80;
+      const x0 = g.cx - span / 2;
+      const eN = clamp(Math.log10(Math.max(m.E, 1) / 1e3) / 2.6, 0, 1);
+      const alpha = 0.22 + 0.5 * eN;
+      const flow = state.showFlow ? (state.time * 0.0011) % 1 : 0;
+
+      for (let k = 0; k < n; k += 1) {
+        const x = x0 + span * (k + 0.5) / n;
+        ctx.save();
+        ctx.strokeStyle = "rgba(226,240,255," + alpha.toFixed(3) + ")";
+        ctx.lineWidth = 2.1;
+        ctx.beginPath();
+        ctx.moveTo(x, y0);
+        ctx.lineTo(x, y1);
+        ctx.stroke();
+
+        // 场强方向：+ 板 → − 板，向下
+        const hs = 6.5;
+        [0.55, 0.92].forEach(function (f) {
+          const y = y0 + (y1 - y0) * f;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - hs, y - hs * 1.5);
+          ctx.lineTo(x + hs, y - hs * 1.5);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(226,240,255," + alpha.toFixed(3) + ")";
+          ctx.fill();
+        });
+
+        if (state.showFlow) {
+          const y = y0 + (y1 - y0) * ((flow + k * 0.13) % 1);
+          ctx.beginPath();
+          ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255,214,102,0.85)";
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawCharges(g, top, bot, m) {
+      const n = chargeCount(m.Q);
+      if (n <= 0) return;
+      const small = n > 26;
+      const s = small ? 7.2 : 9.2;
+      const tintP = small ? "rgba(255,246,242,0.96)" : "rgba(255,248,244,0.98)";
+      const tintN = small ? "rgba(232,244,255,0.96)" : "rgba(236,246,255,0.98)";
+      for (let k = 0; k < n; k += 1) {
+        const p = CHG_PTS[k];
+        const a = quadPoint(top, p.u, p.v);
+        const b = quadPoint(bot, p.u, p.v);
+        drawPlus(a[0], a[1], s, tintP);
+        drawMinus(b[0], b[1], s * 1.05, tintN);
+      }
+    }
+
+    function drawCapacitor(g, m) {
+      const top = plateQuad(g, "top");
+      const bot = plateQuad(g, "bot");
+
+      // 引线杆（先画，被极板遮住下段 → 看起来接在板中心）
+      wire([[g.cx, g.topCy - g.dy / 2], [g.cx, GEO.pivotTop.y]], 6);
+      wire([[g.cx, g.botCy + g.dy / 2], [g.cx, GEO.pivotBot.y]], 6);
+
+      // 介质（εᵣ > 1 时可见）
+      if (state.er > 1.02) {
+        const a = 0.035 + 0.055 * (state.er - 1);
+        const tl = [top[0][0], top[0][1] + 11];
+        const tr = [top[1][0], top[1][1] + 11];
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(tl[0], tl[1]);
+        ctx.lineTo(tr[0], tr[1]);
+        ctx.lineTo(bot[1][0], bot[1][1]);
+        ctx.lineTo(bot[0][0], bot[0][1]);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(56,189,248," + clamp(a, 0.035, 0.30).toFixed(3) + ")";
+        ctx.fill();
+        ctx.setLineDash([8, 8]);
+        ctx.strokeStyle = "rgba(125,211,252,0.45)";
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 板间电场线（先画，被极板遮住 → 只在缝隙里露出）
+      if (state.showField) drawField(g, m);
+
+      // 极板：上板红（+），下板蓝（−）
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetY = 8;
+      drawPlateFace(bot, "#4a7bd0", "#1d3a75", "rgba(170,205,255,0.9)");
+      ctx.restore();
+
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetY = 8;
+      drawPlateFace(top, "#d3564c", "#7c211c", "rgba(255,190,180,0.95)");
+      ctx.restore();
+
+      if (state.showCharge) drawCharges(g, top, bot, m);
+    }
+
+    /* ================= 绘制：灯泡 ================= */
+    function bulbBrightness() {
+      if (state.sw !== "bulb") return 0;   // 灯泡不在回路里时不发光
+      const Qfull = capacitance() * state.U;
+      if (!(Qfull > 0)) return 0;
+      const f = state.Q / Qfull;
+      return clamp(f * f, 0, 1);
+    }
+
+    function drawBulbGlow(b) {
+      const bx = GEO.bulb.x, by = GEO.bulb.y;
+      if (b <= 0.004) return;
+      const lin = Math.sqrt(b);                       // 半径 ∝ i
+      const R = 94 + 190 * lin;
+      ctx.save();
+      const grd = ctx.createRadialGradient(bx, by, 12, bx, by, R);
+      grd.addColorStop(0, "rgba(255,243,196," + (0.72 * b).toFixed(3) + ")");
+      grd.addColorStop(0.28, "rgba(255,213,110," + (0.34 * b).toFixed(3) + ")");
+      grd.addColorStop(0.62, "rgba(255,186,70," + (0.13 * b).toFixed(3) + ")");
+      grd.addColorStop(1, "rgba(255,170,60,0)");
+      ctx.fillStyle = grd;
+      ctx.fillRect(bx - R, by - R, R * 2, R * 2);
+      ctx.restore();
+    }
+
+    function drawBulb() {
+      const b = bulbBrightness();
+      const bx = GEO.bulb.x, by = GEO.bulb.y, r = GEO.bulb.r;
+
+      // 灯座（螺纹金属 + 黑色胶木）
+      ctx.save();
+      const metal = ctx.createLinearGradient(1130, 0, 1182, 0);
+      metal.addColorStop(0, "#5d6b76");
+      metal.addColorStop(0.32, "#e2ebf1");
+      metal.addColorStop(0.62, "#9aaaa6");
+      metal.addColorStop(1, "#4d5b66");
+      ctx.fillStyle = metal;
+      roundRect(1132, 446, 50, 46, 9);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(8,14,18,0.55)";
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(12,18,22,0.55)";
+      roundRect(1132, 446, 9, 46, 4);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(28,40,48,0.45)";
+      ctx.lineWidth = 1.4;
+      for (let k = 0; k < 4; k += 1) {
+        ctx.beginPath();
+        ctx.moveTo(1150, 452 + k * 10);
+        ctx.lineTo(1178, 452 + k * 10);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 灯颈
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(1176, 452);
+      ctx.lineTo(1196, 458);
+      ctx.lineTo(1196, 480);
+      ctx.lineTo(1176, 486);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(186,204,196,0.4)";
+      ctx.fill();
+      ctx.restore();
+
+      // 玻璃壳
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, Math.PI * 2);
+      const gl = ctx.createRadialGradient(bx + 6, by, 6, bx, by, r);
+      if (b > 0.02) {
+        gl.addColorStop(0, "rgba(255,253,238," + (0.6 + 0.35 * b).toFixed(3) + ")");
+        gl.addColorStop(0.5, "rgba(255,234,160," + (0.30 + 0.25 * b).toFixed(3) + ")");
+        gl.addColorStop(1, "rgba(255,193,86," + (0.16 + 0.14 * b).toFixed(3) + ")");
+      } else {
+        gl.addColorStop(0, "rgba(214,232,224,0.13)");
+        gl.addColorStop(0.7, "rgba(170,196,186,0.10)");
+        gl.addColorStop(1, "rgba(126,156,146,0.20)");
+      }
+      ctx.fillStyle = gl;
+      ctx.fill();
+      ctx.strokeStyle = b > 0.02
+        ? "rgba(255,232,170," + (0.35 + 0.4 * b).toFixed(3) + ")"
+        : "rgba(190,212,204,0.38)";
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      // 玻璃球内的光（亮度 ∝ i²）
+      if (b > 0.02) {
+        const core = ctx.createRadialGradient(bx + 8, by, 2, bx + 8, by, r * 0.85);
+        core.addColorStop(0, "rgba(255,255,252," + (0.9 * Math.min(1, b * 1.3)).toFixed(3) + ")");
+        core.addColorStop(0.3, "rgba(255,240,180," + (0.45 * b).toFixed(3) + ")");
+        core.addColorStop(1, "rgba(255,200,96,0)");
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fillStyle = core;
+        ctx.fill();
+      }
+
+      // 高光
+      ctx.beginPath();
+      ctx.ellipse(bx - 24, by - 26, 14, 7, -0.7, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255," + (0.10 + 0.26 * b).toFixed(3) + ")";
+      ctx.fill();
+      ctx.restore();
+
+      // 灯丝：亮度 ∝ i²（功率）
+      ctx.save();
+      ctx.translate(bx + 8, by);
+      ctx.lineWidth = 3.4;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = b > 0.02
+        ? "rgba(255," + Math.round(222 + 30 * b) + "," + Math.round(150 + 100 * b) + ",1)"
+        : "rgba(108,128,120,0.9)";
+      if (b > 0.02) {
+        ctx.shadowColor = "rgba(255,220,130,0.95)";
+        ctx.shadowBlur = 12 + 30 * b;
+      }
+      ctx.beginPath();
+      ctx.moveTo(-40, -16);
+      ctx.lineTo(-26, 8);
+      ctx.lineTo(-12, -12);
+      ctx.lineTo(2, 10);
+      ctx.lineTo(16, -12);
+      ctx.lineTo(28, 8);
+      ctx.lineTo(38, -14);
+      ctx.stroke();
+      ctx.restore();
+
+      // 从灯座引出的两根细支撑丝
+      ctx.save();
+      ctx.strokeStyle = "rgba(150,170,164,0.55)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(1198, 462);
+      ctx.lineTo(1216, 468);
+      ctx.moveTo(1198, 478);
+      ctx.lineTo(1216, 472);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /* ================= 绘制：电压表 ================= */
+    function drawMeterLeads(g) {
+      const top = plateQuad(g, "top");
+      const bot = plateQuad(g, "bot");
+      const pTop = top[2];   // 极板右后角
+      const pBot = bot[2];
+      const m = GEO.meter;
+      ctx.save();
+      ctx.setLineDash([7, 7]);
+      ctx.strokeStyle = "rgba(148,163,184,0.42)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(m.x - 70, m.y - 26);
+      ctx.lineTo(pTop[0], pTop[1]);
+      ctx.moveTo(m.x - 70, m.y + 8);
+      ctx.lineTo(pBot[0], pBot[1]);
+      ctx.stroke();
+      ctx.restore();
+
+      // 表笔夹
+      [[pTop, "#f87171"], [pBot, "#60a5fa"]].forEach(function (it) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(it[0][0], it[0][1], 5, 0, Math.PI * 2);
+        ctx.fillStyle = it[1];
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function meterMax() {
+      const C = capacitance();
+      const U = C > 0 ? state.Q / C : 0;
+      return Math.max(1000, Math.ceil(U / 500) * 500);
+    }
+
+    function needleTarget() {
+      const C = capacitance();
+      const U = C > 0 ? state.Q / C : 0;
+      const f = clamp(U / meterMax(), 0, 1);
+      return (215 + 110 * f) * D2R;
+    }
+
+    function drawMeter() {
+      const m = GEO.meter;
+      const bw = 138, bh = 158;
+      const x = m.x - bw / 2, y = m.y - bh / 2;
+
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)";
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetY = 8;
+      ctx.fillStyle = "#0e171e";
+      roundRect(x, y, bw, bh, 12);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(148,163,184,0.45)";
+      ctx.lineWidth = 1.6;
+      roundRect(x, y, bw, bh, 12);
+      ctx.stroke();
+
+      // 表盘
+      ctx.fillStyle = "#eef3f5";
+      roundRect(x + 8, y + 8, bw - 16, 104, 8);
+      ctx.fill();
+
+      const cx = m.x, cy = y + 100, r = 46;
+      ctx.strokeStyle = "rgba(30,46,58,0.7)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 215 * D2R, 325 * D2R);
+      ctx.stroke();
+
+      for (let k = 0; k <= 5; k += 1) {
+        const a = (215 + 110 * (k / 5)) * D2R;
+        const inner = k % 5 === 0 ? 9 : 6;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * (r - inner), cy + Math.sin(a) * (r - inner));
+        ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        ctx.strokeStyle = "rgba(30,46,58,0.8)";
+        ctx.lineWidth = k % 5 === 0 ? 2 : 1.2;
+        ctx.stroke();
+      }
+
+      const C = capacitance();
+      const U = C > 0 ? state.Q / C : 0;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(state.needle) * (r - 7), cy + Math.sin(state.needle) * (r - 7));
+      ctx.strokeStyle = "#d64545";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#2b3a44";
+      ctx.fill();
+      ctx.restore();
+
+      setFont(14, "bold");
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#3c4f5c";
+      ctx.fillText("V", x + 15, y + 21);
+      const mv = fmtVolt(meterMax());
+      ctx.textAlign = "right";
+      setFont(12, "bold");
+      ctx.fillStyle = "#7b8c97";
+      ctx.fillText(mv[0] + mv[1], x + bw - 13, y + 88);
+
+      // 数码读数
+      ctx.fillStyle = "#0a1218";
+      roundRect(x + 8, y + 118, bw - 16, 30, 6);
+      ctx.fill();
+      setFont(16, "bold");
+      ctx.textAlign = "center";
+      const uv = fmtVolt(U);
+      ctx.fillStyle = "#7dffb0";
+      ctx.fillText(uv[0] + " " + uv[1], m.x, y + 134);
+
+      setFont(12, "bold");
+      ctx.fillStyle = "#8a9aa5";
+      ctx.fillText("电压表", m.x, y + bh - 4);
+      ctx.restore();
+    }
+
+    /* ================= 绘制：电流动画 ================= */
+    function pathLen(pts) {
+      let L = 0;
+      for (let k = 0; k < pts.length - 1; k += 1) {
+        L += Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]);
+      }
+      return L;
+    }
+
+    function pathPoint(pts, s) {
+      let d = s;
+      for (let k = 0; k < pts.length - 1; k += 1) {
+        const a = pts[k], b = pts[k + 1];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (d <= L && L > 0) {
+          const t = d / L;
+          return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        }
+        d -= L;
+      }
+      const last = pts[pts.length - 1];
+      return [last[0], last[1]];
+    }
+
+    function drawChevron(x, y, dir, scale, alpha) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(dir, 1);
+      ctx.globalAlpha = alpha;
+      const w = 46 * scale, h = 27 * scale, tip = 13 * scale;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(w / 2 - tip, -h / 2);
+      ctx.lineTo(w / 2, 0);
+      ctx.lineTo(w / 2 - tip, h / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(34,178,205,0.30)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(125,235,255,0.95)";
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(-w / 4, -h / 4);
+      ctx.lineTo(-w / 4 + tip * 0.7, 0);
+      ctx.lineTo(-w / 4, h / 4);
+      ctx.strokeStyle = "rgba(226,250,255,0.95)";
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function flowInfo() {
+      const C = capacitance();
+      const Qfull = C * state.U;
+      const iAbs = Math.abs(state.i);
+      let ref;
+      if (state.sw === "bulb") ref = Qfull / TAU_DIS;
+      else ref = Qfull / TAU_CHG;
+      const norm = ref > 0 ? clamp(iAbs / ref, 0, 1) : 0;
+      let dir = 0;
+      if (state.sw === "bulb" && state.i < 0) dir = 1;
+      else if (state.sw === "battery" && state.i > 0) dir = 1;
+      else if (state.sw === "battery" && state.i < 0) dir = -1;
+      return { norm: norm, dir: dir, active: iAbs > 1e-14 && dir !== 0 };
+    }
+
+    function drawCurrent(g) {
+      if (!state.showFlow) return;
+      const fi = flowInfo();
+      if (!fi.active || fi.norm < 0.002) return;
+
+      const fp = flowPaths(g);
+      const paths = [fp.top, fp.bot];
+      const spacing = 52;
+      const phase = ((state.dotPhase % spacing) + spacing) % spacing;
+
+      ctx.save();
+      paths.forEach(function (pts) {
+        const seq = fi.dir >= 0 ? pts : pts.slice().reverse();
+        const L = pathLen(seq);
+        for (let s = phase; s < L; s += spacing) {
+          const p = pathPoint(seq, s);
+          ctx.beginPath();
+          ctx.arc(p[0], p[1], 5.2, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(150,240,255,0.95)";
+          ctx.shadowColor = "rgba(90,220,255,0.95)";
+          ctx.shadowBlur = 10;
+          ctx.fill();
+        }
+      });
+      ctx.restore();
+
+      const sc = 0.72 + 0.5 * fi.norm;
+      const al = 0.45 + 0.55 * fi.norm;
+      const cxChev = state.sw === "bulb" ? 962 : 392;
+      drawChevron(cxChev, GEO.railTopY, fi.dir, sc, al);
+      drawChevron(cxChev, GEO.railBotY, -fi.dir, sc, al);
+    }
+
+    /* ================= 绘制：标注与 HUD ================= */
+    function chip(text, x, y, color, align, size) {
+      ctx.save();
+      setFont(size || 18, "bold");
       const w = ctx.measureText(text).width;
       let left = x - w / 2;
       if (align === "right") left = x - w;
       if (align === "left") left = x;
-      ctx.fillStyle = "rgba(8,10,14,0.74)";
-      roundRect(left - 9, y - 16, w + 18, 32, 8);
+      ctx.fillStyle = "rgba(8,12,17,0.78)";
+      roundRect(left - 9, y - 15, w + 18, 30, 8);
       ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
       ctx.fillStyle = color;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -608,287 +1520,203 @@
       ctx.restore();
     }
 
-    function drawBackground(g) {
-      const grad = ctx.createLinearGradient(0, 0, 0, LH);
-      grad.addColorStop(0, "#0a0d13");
-      grad.addColorStop(1, "#05070a");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, LW, LH);
-
-      const glow = ctx.createRadialGradient(g.cx, g.cy, 60, g.cx, g.cy, 560);
-      glow.addColorStop(0, "rgba(120, 160, 220, 0.10)");
-      glow.addColorStop(1, "rgba(120, 160, 220, 0)");
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, LW, LH);
-
+    function drawPlusArrow(x, y0, y1, color) {
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.045)";
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= LW; x += 100) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, LH);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= LH; y += 100) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(LW, y);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    function drawCircuit(g) {
-      const yTop = 190;
-      const lx = g.leftInner - 8;
-      const rx = g.rightInner + 8;
-      const barL = g.cx - 14;
-      const barR = g.cx + 14;
-      const wire = "#94a3b8";
-
-      ctx.save();
-      ctx.strokeStyle = wire;
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-
-      ctx.beginPath();
-      ctx.moveTo(lx, g.top);
-      ctx.lineTo(lx, yTop);
-      ctx.moveTo(rx, g.top);
-      ctx.lineTo(rx, yTop);
-      ctx.stroke();
-
-      if (state.mode === "uconst") {
-        ctx.beginPath();
-        ctx.moveTo(lx, yTop);
-        ctx.lineTo(barL, yTop);
-        ctx.moveTo(barR, yTop);
-        ctx.lineTo(rx, yTop);
-        ctx.stroke();
-
-        ctx.strokeStyle = "#e73535";
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.moveTo(barL, yTop - 26);
-        ctx.lineTo(barL, yTop + 26);
-        ctx.stroke();
-
-        ctx.strokeStyle = "#3558ff";
-        ctx.beginPath();
-        ctx.moveTo(barR, yTop - 13);
-        ctx.lineTo(barR, yTop + 13);
-        ctx.stroke();
-
-        setFont(17, "bold");
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "#ff8f8f";
-        ctx.fillText("+", barL - 18, yTop);
-        ctx.fillStyle = "#8fa8ff";
-        ctx.fillText("−", barR + 18, yTop);
-
-        const u = fmtVolt(state.U);
-        chip("U = " + u[0] + " " + u[1] + "　电源接通", g.cx, yTop - 62, "#e2e8f0", "center");
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(lx, yTop);
-        ctx.lineTo(g.cx - 70, yTop);
-        ctx.moveTo(g.cx + 70, yTop);
-        ctx.lineTo(rx, yTop);
-        ctx.stroke();
-
-        ctx.strokeStyle = "#94a3b8";
-        ctx.lineWidth = 2.4;
-        ctx.beginPath();
-        ctx.arc(g.cx - 70, yTop, 6, 0, Math.PI * 2);
-        ctx.arc(g.cx + 70, yTop, 6, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.save();
-        ctx.setLineDash([9, 8]);
-        ctx.strokeStyle = "#f59e0b";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(g.cx - 58, yTop);
-        ctx.lineTo(g.cx - 14, yTop);
-        ctx.moveTo(g.cx + 14, yTop);
-        ctx.lineTo(g.cx + 58, yTop);
-        ctx.stroke();
-        ctx.restore();
-
-        chip("已断开电源：Q 保持不变", g.cx, yTop - 62, "#fbbf24", "center");
-      }
-      ctx.restore();
-    }
-
-    function drawMedium(g) {
-      if (state.er <= 1.02) return;
-      const alpha = clamp(0.05 + 0.07 * (state.er - 1), 0.05, 0.32);
-      ctx.save();
-      ctx.fillStyle = "rgba(56, 189, 248, " + alpha.toFixed(3) + ")";
-      ctx.fillRect(g.leftInner, g.top, g.gap, g.plateH);
-      ctx.strokeStyle = "rgba(125, 211, 252, 0.45)";
-      ctx.setLineDash([7, 7]);
-      ctx.lineWidth = 1.6;
-      ctx.strokeRect(g.leftInner + 1, g.top + 1, g.gap - 2, g.plateH - 2);
-      ctx.restore();
-    }
-
-    function drawPlates(g) {
-      const t = g.thickness;
-
-      ctx.save();
-      ctx.shadowColor = "rgba(231, 53, 53, 0.55)";
-      ctx.shadowBlur = 26;
-      ctx.fillStyle = "rgba(231, 53, 53, 0.22)";
-      roundRect(g.leftInner - t, g.top, t, g.plateH, 7);
-      ctx.fill();
-      ctx.restore();
-
-      ctx.save();
-      ctx.strokeStyle = "#e73535";
+      ctx.strokeStyle = color;
       ctx.lineWidth = 2.6;
-      roundRect(g.leftInner - t, g.top, t, g.plateH, 7);
-      ctx.stroke();
-      ctx.strokeStyle = "#ff6b6b";
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(g.leftInner - 3, g.top + 8);
-      ctx.lineTo(g.leftInner - 3, g.bottom - 8);
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
       ctx.stroke();
-      ctx.restore();
-
-      ctx.save();
-      ctx.shadowColor = "rgba(53, 88, 255, 0.55)";
-      ctx.shadowBlur = 26;
-      ctx.fillStyle = "rgba(53, 88, 255, 0.22)";
-      roundRect(g.rightInner, g.top, t, g.plateH, 7);
-      ctx.fill();
-      ctx.restore();
-
-      ctx.save();
-      ctx.strokeStyle = "#3558ff";
-      ctx.lineWidth = 2.6;
-      roundRect(g.rightInner, g.top, t, g.plateH, 7);
-      ctx.stroke();
-      ctx.strokeStyle = "#8fa8ff";
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(g.rightInner + 3, g.top + 8);
-      ctx.lineTo(g.rightInner + 3, g.bottom - 8);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawFieldLines(g, m) {
-      const n = fieldLineCount(m.E);
-      if (n <= 0) {
-        chip("E = 0：板间无电场", g.cx, g.cy - 34, "#cbd5e1", "center");
-        return;
-      }
-      const x0 = g.leftInner + 5;
-      const x1 = g.rightInner - 5;
-      const span = g.plateH * 0.80;
-      const flow = state.showFlow ? (state.time * 0.00035) % 1 : 0;
-      const headScale = clamp((x1 - x0) / 150, 0.55, 1);
-
-      for (let i = 0; i < n; i += 1) {
-        const y = g.cy - span / 2 + span * (i + 0.5) / n;
-        ctx.save();
-        ctx.strokeStyle = "rgba(248, 250, 252, 0.78)";
-        ctx.lineWidth = 2.2;
+      const s = 7;
+      [[y0, -1], [y1, 1]].forEach(function (it) {
         ctx.beginPath();
-        ctx.moveTo(x0, y);
-        ctx.lineTo(x1, y);
-        ctx.stroke();
-        ctx.restore();
-
-        arrowHead(x0 + (x1 - x0) * 0.55, y, 10 * headScale, "#f8fafc");
-        arrowHead(x1 - 8, y, 10 * headScale, "#f8fafc");
-
-        if (state.showFlow) {
-          const tt = (flow + i * 0.07) % 1;
-          const fx = x0 + 10 + (x1 - x0 - 20) * tt;
-          arrowHead(fx, y, 12 * headScale, "#ffd166");
-        }
-      }
-    }
-
-    function drawSign(x, y, mark, color) {
-      ctx.save();
-      setFont(24, "bold");
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = color;
-      ctx.fillText(mark, x, y);
+        ctx.moveTo(x, it[0]);
+        ctx.lineTo(x - s * 0.85, it[0] - it[1] * s * 1.6);
+        ctx.lineTo(x + s * 0.85, it[0] - it[1] * s * 1.6);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      });
       ctx.restore();
-    }
-
-    function drawCharges(g, m) {
-      const n = chargeCount(m.Q);
-      if (n <= 0) {
-        chip("极板未带电：先接通电源充电", g.cx, g.cy + 34, "#fbbf24", "center");
-        return;
-      }
-      const span = g.plateH * 0.72;
-      for (let i = 0; i < n; i += 1) {
-        const y = g.cy - span / 2 + span * (i + 0.5) / n;
-        drawSign(g.leftInner - 9, y, "+", "#ff8080");
-        drawSign(g.rightInner + 9, y, "−", "#8fa8ff");
-      }
     }
 
     function drawAnnotations(g, m) {
-      const q = fmtCharge(m.Q);
+      const dOut = "d = " + state.d.toFixed(1) + " mm";
+      const sOut = "S = " + state.S + " cm²";
 
-      chip("正极板　+" + q[0] + " " + q[1], g.leftInner - 34, g.bottom + 38, "#ff9a9a", "right");
-      chip("负极板　−" + q[0] + " " + q[1], g.rightInner + 34, g.bottom + 38, "#a5b8ff", "left");
-
-      chip("S = " + state.S + " cm²　εᵣ = " + state.er.toFixed(1), g.leftInner - 34, g.cy - 18, "#cbd5e1", "right");
-      chip("板高随 S 单调变化（示意）", g.leftInner - 34, g.cy + 18, "#94a3b8", "right");
-
-      const yDim = g.bottom + 104;
+      // —— 板间距 d：绿色双向箭头 ——
+      const yTop = g.topCy + g.dy / 2 + 2;
+      const yBot = g.botCy - g.dy / 2 - 2;
+      const dimX = g.cx - 66;
+      drawPlusArrow(dimX, yTop, yBot, "#22c55e");
+      // 两端的界限横线
       ctx.save();
-      ctx.strokeStyle = "#22c55e";
-      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = "rgba(34,197,94,0.55)";
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(g.leftInner, yDim - 14);
-      ctx.lineTo(g.leftInner, yDim + 14);
-      ctx.moveTo(g.rightInner, yDim - 14);
-      ctx.lineTo(g.rightInner, yDim + 14);
-      ctx.moveTo(g.leftInner + 14, yDim);
-      ctx.lineTo(g.rightInner - 14, yDim);
+      ctx.moveTo(dimX - 12, yTop); ctx.lineTo(dimX + 12, yTop);
+      ctx.moveTo(dimX - 12, yBot); ctx.lineTo(dimX + 12, yBot);
       ctx.stroke();
       ctx.restore();
+      chip(dOut, dimX - 16, (yTop + yBot) / 2, "#86efac", "right", 18);
 
-      arrowHead(g.leftInner + 14, yDim, 9, "#22c55e", -1);
-      arrowHead(g.rightInner - 14, yDim, 9, "#22c55e", 1);
+      // —— 板面积 S：沿透视方向的双向箭头（S 越大，箭头越长）——
+      const bot = plateQuad(g, "bot");
+      const a = quadPoint(bot, 1.05, 0);
+      const b = quadPoint(bot, 1.05, 1);
+      const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = Math.cos(ang), uy = Math.sin(ang);
 
-      chip("d = " + state.d.toFixed(1) + " mm", g.cx, yDim - 34, "#86efac", "center");
+      ctx.save();
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(a[0] + ux * 8, a[1] + uy * 8);
+      ctx.lineTo(b[0] - ux * 8, b[1] - uy * 8);
+      ctx.stroke();
+
+      // 两端向外的箭头 + 垂直界线
+      [[a, 1], [b, -1]].forEach(function (it) {
+        const p = it[0], sgn = it[1];
+        ctx.save();
+        ctx.translate(p[0], p[1]);
+        ctx.rotate(ang);
+        ctx.fillStyle = "#22c55e";
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(sgn * 16, -8);
+        ctx.lineTo(sgn * 16, 8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(34,197,94,0.6)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(0, -14);
+        ctx.lineTo(0, 14);
+        ctx.stroke();
+        ctx.restore();
+      });
+      ctx.restore();
+
+      const mx = a[0] + 18;
+      const my = a[1] + 34;
+      chip(sOut, mx, my, "#86efac", "left", 18);
+
+      // —— 极板电荷读数 ——
+      const q = fmtCharge(m.Q);
+      const leftMost = g.cx - g.w / 2 - g.dx / 2 - 34;
+      ctx.save();
+      setFont(17, "bold");
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      if (m.Q > 0) {
+        ctx.fillStyle = "#fca5a5";
+        ctx.fillText("上板 ＋" + q[0] + " " + q[1], leftMost, g.topCy - 4);
+        ctx.fillStyle = "#93c5fd";
+        ctx.fillText("下板 −" + q[0] + " " + q[1], leftMost, g.botCy + 4);
+      } else {
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillText("极板未带电", leftMost, g.botCy + 4);
+      }
+      ctx.restore();
+
+      // —— 电流读数 ——
+      const cur = fmtCur(state.i);
+      const cn = chargeCount(m.Q);
+      const fi = flowInfo();
+      const showI = fi.active && fi.norm > 0.004;
+      let iText;
+      if (!showI) iText = "i ≈ 0";
+      else iText = "i = " + cur[0] + " " + cur[1] + (state.i > 0 ? "（充入上板）" : "（流出上板）");
+      chip(iText, 392, 246, showI ? "#7dd3fc" : "#8a9aa5", "center", 18);
+
+      // —— 顶部状态卡：一眼看出“谁不变” ——
+      drawHUD(m, cn);
     }
 
-    function drawStage(m) {
-      const g = stageGeom();
+    function drawHUD(m, cn) {
+      const x = 40, y = 34, w = 452, h = 126;
+      const uv = fmtVolt(state.U);
+      const curU = fmtVolt(m.U);
+      let accent, line1, line2, line3;
+      if (state.sw === "battery") {
+        const Qfull = m.C * state.U;
+        const diff = m.Q - Qfull;
+        const settling = Math.abs(diff) > 0.005 * Qfull + 1e-20;
+        accent = "#67e8f9";
+        line1 = settling
+          ? "接电池 · 电源 U = " + uv[0] + " " + uv[1] + " 不变（" + (diff < 0 ? "充电中" : "电荷回流中") + "）"
+          : "接电池 · U = " + uv[0] + " " + uv[1] + " 不变";
+        line2 = "C 随 S、d、εᵣ 变 → Q = CU 跟着变；E = U/d";
+        line3 = settling
+          ? "极板电压 " + curU[0] + " " + curU[1] + (diff < 0 ? " 正在追上电源" : " 正在回落") + "；i = dQ/dt = (CU − Q)/τ，τ = " + TAU_CHG.toFixed(2) + " s"
+          : "i = 0（已充满）· Q = CU 保持，τ充 = " + TAU_CHG.toFixed(2) + " s";
+      } else if (state.sw === "off") {
+        accent = "#fbbf24";
+        const qq = fmtCharge(m.Q);
+        line1 = "断开 · Q = " + qq[0] + " " + qq[1] + " 不变";
+        line2 = "改 d：C 变 → U = Q/C 变，E = U/d 不变";
+        line3 = "i = 0（电荷被锁在极板上）";
+      } else {
+        accent = "#fb923c";
+        line1 = m.Q > 0 ? "接灯泡 · 放电中" : "接灯泡 · 已放完，灯灭";
+        line2 = m.Q > 0 ? "Q 指数衰减 → 0，电场能变成光" : "Q = 0，U = 0，灯泡熄灭";
+        line3 = m.Q > 0
+          ? "i = −Q/τ放，τ = " + TAU_DIS.toFixed(2) + " s，t½ = " + (TAU_DIS * Math.LN2).toFixed(2) + " s，亮度 ∝ i²"
+          : "扳到「接电池」重新充电";
+      }
+
+      ctx.save();
+      ctx.fillStyle = "rgba(9,16,22,0.80)";
+      roundRect(x, y, w, h, 12);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(148,196,220,0.16)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      roundRect(x, y, 5, h, 2.5);
+      ctx.fill();
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      setFont(21, "bold");
+      ctx.fillStyle = accent;
+      ctx.fillText(line1, x + 20, y + 34);
+
+      setFont(17, "bold");
+      ctx.fillStyle = "#cbd5e1";
+      ctx.fillText(line2, x + 20, y + 70);
+
+      setFont(15, "bold");
+      ctx.fillStyle = "#8fa6b4";
+      ctx.fillText(line3, x + 20, y + 102);
+      ctx.restore();
+    }
+
+    /* ================= 总绘制 ================= */
+    function render() {
+      const g = geom();
+      const m = live();
       beginFrame();
       ctx.clearRect(0, 0, LW, LH);
+
       drawBackground(g);
-      drawCircuit(g);
-      drawMedium(g);
-      drawPlates(g);
-      if (state.showField) {
-        drawFieldLines(g, m);
-      }
-      if (state.showCharge) {
-        drawCharges(g, m);
-      }
+      drawMeterLeads(g);
+      drawBulbGlow(bulbBrightness());
+      drawWires();
+      drawSwitch();
+      drawBattery();
+      drawCapacitor(g, m);
+      drawBulb();
+      drawMeter();
+      drawCurrent(g);
       drawAnnotations(g, m);
     }
 
+    /* ================= DOM 读数 ================= */
     function setTile(key, value, unit, badge) {
       const tile = el.tiles[key];
       tile.querySelector(".tile-value").textContent = value;
@@ -898,39 +1726,87 @@
       b.className = "tile-badge " + badge.cls;
     }
 
-    function updateReadouts(m, ref) {
+    let lastUI = 0;
+    function refreshUI(force) {
+      const now = performance.now();
+      if (!force && now - lastUI < 90) return;
+      lastUI = now;
+
+      const m = live();
+      const cur = steadyAt(state.d);
+      const ref = steadyAt(state.refD);
       const c = fmtCap(m.C);
       const q = fmtCharge(m.Q);
       const u = fmtVolt(m.U);
       const e = fmtField(m.E);
-      const w = fmtEnergy(m.W);
+      const w = fmtEnergy(0.5 * m.Q * m.U);
 
-      setTile("C", c[0], c[1], deltaBadge(m.C, ref.C));
-      setTile("Q", q[0], q[1], deltaBadge(m.Q, ref.Q));
-      setTile("U", u[0], u[1], deltaBadge(m.U, ref.U));
-      setTile("E", e[0], e[1], deltaBadge(m.E, ref.E));
-      setTile("W", w[0], w[1], deltaBadge(m.W, ref.W));
+      setTile("C", c[0], c[1], deltaBadge(cur.C, ref.C));
+      setTile("Q", q[0], q[1], deltaBadge(cur.Q, ref.Q));
+      setTile("U", u[0], u[1], deltaBadge(cur.U, ref.U));
+      setTile("E", e[0], e[1], deltaBadge(cur.E, ref.E));
+      setTile("W", w[0], w[1], deltaBadge(0.5 * cur.Q * cur.U, 0.5 * ref.Q * ref.U));
 
       el.stageLines.textContent = fieldLineCount(m.E) + " 条（E 越大条数越多，示意）";
-      el.stageState.textContent = state.mode === "uconst" ? "由电源补充或取回" : "被锁在极板上";
+      el.stageState.textContent = state.sw === "battery" ? "由电源补充或取回"
+        : (state.sw === "bulb" ? "经灯泡流走" : "被锁在极板上");
 
+      const curI = fmtCur(state.i);
       el.unitNote.textContent = "C = " + c[0] + " " + c[1] + " = " + sci(m.C / 1e-6) + " μF　|　Q = " + q[0] + " " + q[1] + " = " + sci(m.Q / 1e-6) + " μC　|　1 cm² = 10⁻⁴ m²，1 mm = 10⁻³ m，1 μF = 10⁻⁶ F，1 μC = 10⁻⁶ C";
+
+      const R = m.C > 0 ? TAU_CHG / m.C : 0;
+      el.dynNote.textContent = "当前电流 i = " + curI[0] + " " + curI[1] + "　|　τ充 = " + TAU_CHG.toFixed(2) + " s，τ放 = " + TAU_DIS.toFixed(2) + " s（等效 R = τ/C ≈ " + sci(R) + " Ω）　|　电荷符号 " + chargeCount(m.Q) + " 个";
+
       el.breakdownChip.hidden = !(m.E >= 1e6);
     }
 
+    /* ================= 文字与开关 ================= */
+    const SW_TEXT = {
+      battery: {
+        name: "接电池（U 不变）",
+        hint: "接电池：电源始终保持极板两端电压为 U（合上瞬间需要约 1 s 充电，读数会短暂偏低，之后稳定在 U）。改 d / S / εᵣ 时电源补充或取回电荷，Q 跟着变，U 不变。",
+        tag: "U 不变",
+        card: "",
+        body: "d 减小 → C 增大、Q 增大、E 增大、E_C 增大；d 增大则 C、Q、E、E_C 全部减小。整个过程中 U 保持不变。",
+        formula: "C = ε₀εᵣS/d　　Q = CU　　E = U/d　　E_C = ½CU²",
+        key: "关键：E = U/d。电压被电源固定后，板间场强只由板间距 d 决定 —— d 越小，电场越强。",
+        extra: "同一情形下增大 S 或 εᵣ：C 增大、Q 增大、E_C 增大；而 E = U/d 保持不变。"
+      },
+      off: {
+        name: "断开（Q 不变）",
+        hint: "断开：极板与电源、灯泡都断开，电荷无处可去，Q 保持不变，电压由 U = Q/C 决定。此时电压滑块失效。",
+        tag: "Q 不变",
+        card: " warn",
+        body: "d 增大 → C 减小、U 增大、E_C 增大；d 减小则 C 增大、U 减小、E_C 减小。整个过程中 E 保持不变。",
+        formula: "C = ε₀εᵣS/d　　U = Q/C = Qd/(ε₀εᵣS)　　E = U/d = Q/(ε₀εᵣS)",
+        key: "关键：E = Q/(ε₀εᵣS)，式中没有 d。断开后「锁住」的电荷量使板间场强不随 d 改变。",
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，U 减小，E 减小，E_C 减小。"
+      },
+      bulb: {
+        name: "接灯泡（放电）",
+        hint: "接灯泡：极板上的电荷经灯泡流过，形成放电电流 i = Q/τ。电荷放完，灯泡就灭。",
+        tag: "放电",
+        card: " deploy",
+        body: "Q 按 Q = Q₀e^(−t/τ) 衰减，U = Q/C 同步下降；灯泡亮度 ∝ i²，先亮后暗。放完后 Q = 0、U = 0、灯灭。",
+        formula: "i = −dQ/dt = Q/τ　　Q(t) = Q₀e^(−t/τ)　　τ放 = RC　　t½ = τ ln2",
+        key: "关键：电场能 ½Q²/C 通过灯泡变成光和热 —— 电荷放掉了，能量变成了光。",
+        extra: "默认参数下 τ放 = 0.60 s，半衰期 t½ = τ ln2 ≈ 0.42 s；灯泡亮度按 i²（功率）取，不是按 i 线性取。"
+      }
+    };
+
     function updateModeText() {
-      const text = MODE_TEXT[state.mode];
-      el.stageMode.textContent = text.name;
-      el.modeTag.textContent = text.tag;
-      el.modeTag.className = state.mode === "uconst" ? "mode-tag" : "mode-tag warn";
-      el.modeHint.textContent = text.hint;
-      el.modeHint.className = state.mode === "uconst" ? "mode-hint" : "mode-hint warn";
-      el.conclusionBody.textContent = text.body;
-      el.conclusionFormula.textContent = text.formula;
-      el.conclusionKey.textContent = text.key;
-      el.conclusionExtra.textContent = text.extra;
-      el.conclusionCard.className = state.mode === "uconst" ? "conclusion-card" : "conclusion-card warn";
-      el.deltaHint.textContent = "读数徽标 ↑↓ 只反映 d 的单独影响：以「基准 d = " + state.refD.toFixed(1) + " mm」为参照，改动 S、εᵣ、电源或电压后基准会重置为当前 d，徽标回到「—」，因此不会与屏幕上的读数相矛盾。";
+      const t = SW_TEXT[state.sw];
+      el.stageMode.textContent = t.name;
+      el.modeTag.textContent = t.tag;
+      el.modeTag.className = "mode-tag" + (state.sw === "off" ? " warn" : "");
+      el.modeHint.textContent = t.hint;
+      el.modeHint.className = "mode-hint" + t.card;
+      el.conclusionBody.textContent = t.body;
+      el.conclusionFormula.textContent = t.formula;
+      el.conclusionKey.textContent = t.key;
+      el.conclusionExtra.textContent = t.extra;
+      el.conclusionCard.className = "conclusion-card" + t.card;
+      el.deltaHint.textContent = "读数徽标 ↑↓ 只反映 d 的单独影响：以「基准 d = " + state.refD.toFixed(1) + " mm」为参照。改动 S、εᵣ、电源电压或开关后基准会重置为当前 d，徽标回到「—」，因此不会与屏幕读数矛盾。";
     }
 
     function syncLabels() {
@@ -942,56 +1818,48 @@
       el.dOut.textContent = state.d.toFixed(1) + " mm";
       el.erOut.textContent = state.er.toFixed(1);
       el.uOut.textContent = state.U.toFixed(0) + " V";
-      el.u.disabled = state.mode !== "uconst";
-      el.voltHint.textContent = state.mode === "uconst"
-        ? "接通电源时 U 由电源提供，拖动即改变电源电压。"
-        : "已断开电源：U = Q/C 由电荷量与电容决定，此滑块失效。";
+      el.u.disabled = state.sw !== "battery";
+      el.voltHint.textContent = state.sw === "battery"
+        ? "接电池时 U 由电源提供，拖动即改变电源电压。"
+        : (state.sw === "bulb"
+            ? "接灯泡：U = Q/C 由电荷决定，电源已断开，此滑块失效。"
+            : "已断开：U = Q/C 由电荷量决定，电源已断开，此滑块失效。");
     }
 
-    function render() {
-      const m = computeAt(state.d);
-      const ref = computeAt(state.refD);
-      updateReadouts(m, ref);
-      drawStage(m);
-    }
-
-    function setMode(mode) {
-      if (mode === state.mode) return;
-      if (mode === "qconst") {
-        state.Qfrozen = computeAt(state.d).Q;
-      }
-      state.mode = mode;
+    function setSwitch(pos) {
+      if (pos === state.sw) return;
+      state.sw = pos;
       state.refD = state.d;
-      el.modeButtons.forEach(function (btn) {
-        const on = btn.dataset.mode === mode;
+      el.swButtons.forEach(function (btn) {
+        const on = btn.dataset.sw === pos;
         btn.classList.toggle("active", on);
         btn.setAttribute("aria-pressed", on ? "true" : "false");
       });
       updateModeText();
       syncLabels();
-      render();
+      refreshUI(true);
     }
 
-    function animate() {
-      state.time += 16;
-      if (state.showFlow) {
-        render();
-      }
-      requestAnimationFrame(animate);
-    }
+    /* ================= 交互 ================= */
+    el.swButtons.forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        setSwitch(btn.dataset.sw);
+        if (event.detail > 0) btn.blur();
+      });
+    });
 
     el.s.addEventListener("input", function () {
       state.S = Number(el.s.value);
       state.refD = state.d;
       updateModeText();
       syncLabels();
-      render();
+      refreshUI(true);
     });
 
     el.d.addEventListener("input", function () {
       state.d = Number(el.d.value);
       syncLabels();
-      render();
+      refreshUI(true);
     });
 
     el.er.addEventListener("input", function () {
@@ -999,7 +1867,7 @@
       state.refD = state.d;
       updateModeText();
       syncLabels();
-      render();
+      refreshUI(true);
     });
 
     el.u.addEventListener("input", function () {
@@ -1007,68 +1875,261 @@
       state.refD = state.d;
       updateModeText();
       syncLabels();
-      render();
+      refreshUI(true);
     });
 
-    el.modeButtons.forEach(function (btn) {
-      btn.addEventListener("click", function (event) {
-        setMode(btn.dataset.mode);
-        if (event.detail > 0) btn.blur();
-      });
-    });
+    el.showField.addEventListener("change", function () { state.showField = el.showField.checked; });
+    el.showCharge.addEventListener("change", function () { state.showCharge = el.showCharge.checked; });
+    el.showFlow.addEventListener("change", function () { state.showFlow = el.showFlow.checked; });
 
-    el.showField.addEventListener("change", function () {
-      state.showField = el.showField.checked;
-      render();
-    });
-
-    el.showCharge.addEventListener("change", function () {
-      state.showCharge = el.showCharge.checked;
-      render();
-    });
-
-    el.showFlow.addEventListener("change", function () {
-      state.showFlow = el.showFlow.checked;
-      render();
-    });
-
-    el.resetBtn.addEventListener("click", function (event) {
+    function resetAll() {
       state.S = DEFAULTS.S;
       state.d = DEFAULTS.d;
       state.er = DEFAULTS.er;
       state.U = DEFAULTS.U;
-      state.mode = "uconst";
-      state.Qfrozen = 0;
-      state.refD = DEFAULTS.refD;
+      state.sw = "battery";
+      state.refD = DEFAULTS.d;
       state.showField = true;
       state.showCharge = true;
       state.showFlow = true;
       el.showField.checked = true;
       el.showCharge.checked = true;
       el.showFlow.checked = true;
-      el.modeButtons.forEach(function (btn) {
-        const on = btn.dataset.mode === "uconst";
+      state.Q = capacitance() * state.U;
+      state.i = 0;
+      state.armTop = ARM.top.battery;
+      state.armBot = ARM.bot.battery;
+      state.needle = needleTarget();
+      state.dotPhase = 0;
+      el.swButtons.forEach(function (btn) {
+        const on = btn.dataset.sw === "battery";
         btn.classList.toggle("active", on);
         btn.setAttribute("aria-pressed", on ? "true" : "false");
       });
       updateModeText();
       syncLabels();
+      refreshUI(true);
+    }
+
+    el.resetBtn.addEventListener("click", function (event) {
+      resetAll();
       if (event.detail > 0) el.resetBtn.blur();
-      render();
     });
 
-    window.addEventListener("resize", function () {
-      syncBackingStore();
-      render();
-    });
+    /* ================= 动画循环 ================= */
+    function approachAngle(cur, target, k) {
+      let d = target - cur;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return cur + d * Math.min(1, k);
+    }
 
-    updateModeText();
+    let lastTs = 0;
+    function frame(ts) {
+      if (!lastTs) lastTs = ts;
+      let dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+      dt = clamp(dt, 0, 0.05);
+
+      if (!state.paused) {
+        state.time += dt * 1000;
+        stepPhysics(dt);
+        const fi = flowInfo();
+        const speed = 26 + 470 * fi.norm;
+        state.dotPhase += speed * dt * (fi.dir || 1);
+        state.armTop = approachAngle(state.armTop, ARM.top[state.sw], dt * 15);
+        state.armBot = approachAngle(state.armBot, ARM.bot[state.sw], dt * 15);
+        state.needle = approachAngle(state.needle, needleTarget(), dt * 9);
+      }
+
+      render();
+      refreshUI(false);
+      requestAnimationFrame(frame);
+    }
+
+    /* ================= 调试 / 自检接口 ================= */
+    function snapVisuals() {
+      state.armTop = ARM.top[state.sw];
+      state.armBot = ARM.bot[state.sw];
+      state.needle = needleTarget();
+    }
+
+    /* 供自动化与自检使用的只读/受控接口 */
+    window.__cap = {
+      state: state,
+      TAU: { chg: TAU_CHG, dis: TAU_DIS },
+      capacitance: capacitance,
+      live: live,
+      chargeCount: chargeCount,
+      fieldLineCount: fieldLineCount,
+      step: function (dt, n) {
+        const k = Math.max(1, n || 1);
+        for (let j = 0; j < k; j += 1) stepPhysics(dt);
+      },
+      setSwitch: function (pos) { setSwitch(pos); snapVisuals(); },
+      setParam: function (key, val) {
+        if (key in state) state[key] = val;
+        if (key === "S" || key === "er" || key === "U") state.refD = state.d;
+        syncLabels();
+        updateModeText();
+        refreshUI(true);
+        snapVisuals();
+      },
+      reset: resetAll,
+      render: render
+    };
+
+    /* ================= 自检 ================= */
+    function runSelfTest() {
+      const lines = [];
+      const saved = {
+        S: state.S, d: state.d, er: state.er, U: state.U, sw: state.sw,
+        Q: state.Q, i: state.i, refD: state.refD
+      };
+      function p(s) { lines.push(s); }
+
+      p("=== 电容器仿真自检 ===");
+      p("viewport " + window.innerWidth + "×" + window.innerHeight + "  dpr=" + (window.devicePixelRatio || 1));
+
+      // 1. 充电时间常数
+      state.sw = "battery"; state.S = 300; state.d = 3; state.er = 1; state.U = 300;
+      let C = capacitance(); let Qf = C * state.U;
+      state.Q = 0;
+      let t = 0, tauMeas = null, q2 = null;
+      const dt = 0.001;
+      for (let k = 0; k < 4000; k += 1) {
+        stepPhysics(dt); t += dt;
+        if (tauMeas === null && state.Q >= (1 - Math.exp(-1)) * Qf) tauMeas = t;
+        if (q2 === null && t >= 2 * TAU_CHG) q2 = state.Q / Qf;
+      }
+      p("[充电] Q0 = " + Qf.toExponential(4) + " C，C = " + C.toExponential(4) + " F");
+      p("[充电] 实测 τ = " + tauMeas.toFixed(3) + " s；理论 τ = RC = " + TAU_CHG.toFixed(3) + " s；等效 R = " + (TAU_CHG / C).toExponential(3) + " Ω");
+      p("[充电] 偏差 = " + (100 * (tauMeas - TAU_CHG) / TAU_CHG).toFixed(2) + " %；t = 2τ 时 Q/Q₀ 实测 " + q2.toFixed(4) + "（理论 " + (1 - Math.exp(-2)).toFixed(4) + "）");
+
+      // 2. 放电半衰期
+      state.Q = Qf; state.sw = "bulb"; t = 0;
+      let half = null;
+      for (let k = 0; k < 20000; k += 1) {
+        stepPhysics(dt); t += dt;
+        if (half === null && state.Q <= Qf * 0.5) half = t;
+        if (!(state.Q > 0)) break;
+      }
+      const halfTheory = TAU_DIS * Math.LN2;
+      p("[放电] 实测半衰期 t½ = " + half.toFixed(3) + " s；理论 τln2 = " + halfTheory.toFixed(3) + " s；偏差 " + (100 * (half - halfTheory) / halfTheory).toFixed(2) + " %");
+      p("[放电] 放完耗时 " + t.toFixed(2) + " s（Q 归零阈值 0.4%·Q₀）");
+
+      // 3. 断开电源改 d：E 恒定
+      state.sw = "off"; state.S = 300; state.er = 1; state.Q = 26.5625e-9;
+      p("[断开·改 d] Q = " + (state.Q * 1e9).toFixed(1) + " nC 固定");
+      [1, 3, 10].forEach(function (dv) {
+        state.d = dv;
+        const Cx = capacitance(); const Ux = state.Q / Cx; const Ex = Ux / (dv * 1e-3);
+        p("   d = " + dv.toFixed(1) + " mm → C = " + (Cx * 1e12).toFixed(1) + " pF, U = " + Ux.toFixed(1) + " V, E = " + Ex.toFixed(0) + " V/m");
+      });
+
+      // 4. 接电池改 S：E 恒定、Q ∝ S
+      state.sw = "battery"; state.d = 3; state.er = 1; state.U = 300; state.S = 300;
+      const rows = [];
+      [100, 300, 1000].forEach(function (sv) {
+        state.S = sv; state.Q = capacitance() * state.U;
+        const Cx = capacitance(); const Ux = state.Q / Cx; const Ex = Ux / (state.d * 1e-3);
+        rows.push({ S: sv, C: Cx, Q: state.Q, E: Ex });
+      });
+      const base = rows[0];
+      p("[接电池·改 S] U = 300 V 固定，d = 3.0 mm");
+      rows.forEach(function (r) {
+        p("   S = " + r.S + " cm² → C = " + (r.C * 1e12).toFixed(2) + " pF, Q = " + (r.Q * 1e9).toFixed(2) + " nC, E = " + r.E.toFixed(0) + " V/m, Q/Q₁₀₀ = " + (r.Q / base.Q).toFixed(3));
+      });
+
+      // 5. 电荷符号数量
+      p("[电荷符号] 4–40 个，随 Q 单调：" + [2e-9, 8.85e-9, 2.66e-8, 8.85e-8, 2.66e-7, 8.85e-7].map(function (qq) {
+        return (qq * 1e9).toFixed(1) + "nC→" + chargeCount(qq) + "个";
+      }).join("，"));
+
+      // 6. 布局
+      const se = document.documentElement;
+      const fr = document.querySelector(".stage-frame").getBoundingClientRect();
+      const pn = document.getElementById("ctrlPanel").getBoundingClientRect();
+      const okX = se.scrollWidth <= window.innerWidth + 1;
+      const okY = se.scrollHeight <= window.innerHeight + 1;
+      const frIn = fr.left >= -0.5 && fr.top >= -0.5 && fr.right <= window.innerWidth + 0.5 && fr.bottom <= window.innerHeight + 0.5;
+      const pnIn = pn.left >= -0.5 && pn.top >= -0.5 && pn.right <= window.innerWidth + 0.5 && pn.bottom <= window.innerHeight + 0.5;
+      p("[布局] 无横向滚动条 " + okX + "，无纵向滚动条 " + okY);
+      p("[布局] 画布卡 rect = " + [fr.left, fr.top, fr.right, fr.bottom].map(function (v) { return v.toFixed(1); }).join(",") + " 全在视口内 " + frIn);
+      p("[布局] 参数卡 rect = " + [pn.left, pn.top, pn.right, pn.bottom].map(function (v) { return v.toFixed(1); }).join(",") + " 全在视口内 " + pnIn);
+
+      // 还原
+      state.S = saved.S; state.d = saved.d; state.er = saved.er; state.U = saved.U;
+      state.sw = saved.sw; state.Q = saved.Q; state.i = saved.i; state.refD = saved.refD;
+      syncLabels(); updateModeText(); refreshUI(true); snapVisuals();
+
+      const text = lines.join("\n");
+      console.log("[SELFTEST]\n" + text);
+      return text;
+    }
+    window.__cap.selftest = runSelfTest;
+
+    /* ================= URL 参数（演示 / 截图 / 自检用） ================= */
+    function applyQuery() {
+      const p = new URLSearchParams(location.search);
+      let touched = false;
+      if (p.has("S")) { state.S = clamp(Number(p.get("S")), 100, 1000); touched = true; }
+      if (p.has("d")) { state.d = clamp(Number(p.get("d")), 0.5, 10); touched = true; }
+      if (p.has("er")) { state.er = clamp(Number(p.get("er")), 1, 5); touched = true; }
+      if (p.has("U")) { state.U = clamp(Number(p.get("U")), 0, 1000); touched = true; }
+      if (p.has("sw")) {
+        const sw = p.get("sw");
+        if (sw === "battery" || sw === "off" || sw === "bulb") { state.sw = sw; touched = true; }
+      }
+      if (touched) state.refD = state.d;
+
+      const C = capacitance();
+      if (p.has("Qf")) state.Q = C * state.U * clamp(Number(p.get("Qf")), 0, 1);
+      else if (p.has("Qn")) state.Q = Number(p.get("Qn")) * 1e-9;
+      else state.Q = C * state.U;
+
+      if (p.has("adv")) {
+        let rem = Math.max(0, Number(p.get("adv")) || 0);
+        while (rem > 0) { const s = Math.min(0.0005, rem); stepPhysics(s); rem -= s; }
+      }
+      if (p.get("paused") === "1") state.paused = true;
+      if (touched || p.has("Qf") || p.has("Qn") || p.has("adv")) {
+        state.i = 0;
+        if (state.sw === "battery" && Math.abs(state.Q - C * state.U) > 1e-12) {
+          state.i = (C * state.U - state.Q) / TAU_CHG;
+        }
+        if (state.sw === "bulb") state.i = -state.Q / TAU_DIS;
+      }
+    }
+
+    /* ================= 启动 ================= */
+    applyQuery();
+    if (state.sw !== "battery") el.u.disabled = true;
+    el.swButtons.forEach(function (btn) {
+      const on = btn.dataset.sw === state.sw;
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    state.Q = isFinite(state.Q) ? state.Q : capacitance() * state.U;
     syncLabels();
+    updateModeText();
+    snapVisuals();
+    refreshUI(true);
     render();
-    animate();
+    requestAnimationFrame(frame);
+
+    if (new URLSearchParams(location.search).get("selftest") === "1") {
+      const pre = document.createElement("pre");
+      pre.id = "selftestOut";
+      document.body.appendChild(pre);
+      setTimeout(function () {
+        pre.textContent = runSelfTest();
+      }, 60);
+    }
+  })();
   </script>
   <script>
-    /* —— 外壳交互：「?」抽屉 / 快捷键（参数卡固定常显，不再折叠或拖动）—— */
+    /* —— 外壳交互：「?」抽屉 / 快捷键（参数卡固定常显）—— */
     (function () {
       var drawer = document.getElementById("drawer");
       var more = document.getElementById("moreBtn");
@@ -1110,6 +2171,12 @@
           var flow = document.getElementById("showFlow");
           flow.checked = !flow.checked;
           flow.dispatchEvent(new Event("change", { bubbles: true }));
+          return;
+        }
+        if (event.key === "1" || event.key === "2" || event.key === "3") {
+          var map = { "1": "battery", "2": "off", "3": "bulb" };
+          var btn = document.querySelector('.mode-btn[data-sw="' + map[event.key] + '"]');
+          if (btn) { event.preventDefault(); btn.click(); }
         }
       });
     })();
