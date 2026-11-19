@@ -1,16 +1,26 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """回旋加速器 · 50 秒讲解动画（16:9 / 1280×720）
 
 分镜表（先有什么、再有什么；3D 搭结构 → 2D 讲场与运动）：
 
   01 装置   3D      两个中空的半圆金属盒 + 中间一条缝，镜头缓慢环绕
   02 缝隙   3D      缝里加交变电压 → 交变电场（绿色 E 箭头 + 左下角 U-t 方波）
-  03 磁场   3D      整个装置处在与盒面垂直的匀强磁场里（蓝色 B 箭头竖直立起）
-  04 俯视   3D→2D   镜头转到正上方：B 箭头变成圆点，立体的盒子压成平面 D 形
+  03 磁场   3D      整个装置处在与盒面垂直的匀强磁场里（蓝色 B 箭头竖直向下）
+  04 俯视   3D→2D   镜头转到正上方：B 箭头变成 ⊗（指向纸面里），立体的盒子压成平面 D 形
   05 第一圈 2D      粒子垂直进入磁场，洛伦兹力指向圆心，走一个半圆：r = mv/(qB)
-  06 加速   2D      回到缝口时电场反向，缝里直线加速，半径按 n 的平方根变大
+  06 加速   2D      回到缝口时电场反向，缝里直线加速；累计加速 n 次后 r ∝ √n
   07 周期   2D      半圈时间不变，U-t 的每次翻转正好对上粒子回到缝口：T = 2πm/(qB)
   08 收口   2D      三条式子 + 一句话
+
+物理约定（改字幕、改箭头时一并遵守）：
+  q 一律表示电荷量的大小（|q|），不是带符号的电荷。粒子按正电荷处理，所以缝内
+  电场力与电场同向、沿电场方向被加速；B 垂直盒面向下（俯视记作 ⊗），正粒子在
+  盒内逆时针绕行。三条式子里的 q 都是这个"电荷量大小"。
+  不能把 r = mv/(qB) 说成"半径只由速度决定"：v 与 B 都在变时 r 并不单由 v 决定；
+  正确的说法是——同一粒子、磁感应强度不变时，轨道半径随速度增大。
+  r ∝ √n 中的 n 是从静止开始、每次经过相同加速电压 U 的累计加速次数：加速 n 次
+  后 Ek = nqU，由 r = mv/(qB) 得 r ∝ √n（这里 B、q、m 都不变）。
+  "周期不变"只适用于固定粒子、匀强磁场、非相对论情形；半圈时间只有 T/2 = πm/(qB)。
 
 渲染：
   manim -qm cyclotron.py CyclotronScene      # 1280×720
@@ -54,6 +64,7 @@ R_BOX = 2.6                              # D 形盒半径
 GAP = 0.70                               # 缝宽
 R1 = 0.82                                # 第一次过缝后的半圆半径
 N_PASS = 6                               # 穿缝次数
+PATH_LIFT = 0.30                         # 轨迹整体上移，给下方的交变电源让位
 
 
 def cn(text, size=30, color=INK, weight=NORMAL):
@@ -107,9 +118,9 @@ def build_pieces(n_pass=N_PASS, gap=GAP, r1=R1):
 
     for p in pieces:
         if p["kind"] == "gap":
-            p["y"] -= mid
+            p["y"] -= mid - PATH_LIFT
         else:
-            p["cy"] -= mid
+            p["cy"] -= mid - PATH_LIFT
     return pieces, phase
 
 
@@ -221,6 +232,7 @@ def e_arrows_3d(to_right, ys=(-1.6, -0.55, 0.55, 1.6)):
 
 
 def b_arrows_3d(h=1.05):
+    """B 竖直向下：与轨迹的逆时针旋向配套（正粒子、B 指向盒面里侧）。"""
     grp = VGroup()
     for x in np.linspace(-2.15, 2.15, 7):
         for y in np.linspace(-2.05, 2.05, 5):
@@ -228,34 +240,48 @@ def b_arrows_3d(h=1.05):
                 continue
             if math.hypot(x, y) > R_BOX - 0.42:
                 continue
-            grp.add(Arrow3D(np.array([x, y, Z + 0.02]), np.array([x, y, Z + 0.02 + h]),
+            grp.add(Arrow3D(np.array([x, y, Z + 0.02 + h]), np.array([x, y, Z + 0.02]),
                             thickness=0.013, height=0.10, color=MAG, resolution=8))
     return grp
 
 
-def b_dots():
-    dots = VGroup()
+def cross_mark(center, radius=0.075, stroke=2.4, color=MAG):
+    """俯视图里的 ⊗：B 垂直纸面向里。"""
+    c0 = np.array(center, dtype=float)
+    c = Circle(radius=radius, color=color, stroke_width=stroke).move_to(c0)
+    d = radius * 0.70
+    return VGroup(
+        c,
+        Line(c0 + np.array([-d, -d, 0.0]), c0 + np.array([d, d, 0.0]),
+             color=color, stroke_width=stroke),
+        Line(c0 + np.array([-d, d, 0.0]), c0 + np.array([d, -d, 0.0]),
+             color=color, stroke_width=stroke),
+    )
+
+
+def b_crosses():
+    marks = VGroup()
     for x in np.linspace(-2.15, 2.15, 7):
         for y in np.linspace(-2.05, 2.05, 5):
             if abs(x) < GAP / 2 + 0.3:
                 continue
             if math.hypot(x, y) > R_BOX - 0.42:
                 continue
-            dots.add(Dot([x, y, Z + 0.02], radius=0.062, color=MAG, fill_opacity=0.85))
-    return dots
+            marks.add(cross_mark([x, y, Z + 0.02]))
+    return marks
 
 
-def ac_source(y=-2.15, z=0.06):
+def ac_source(y=-2.35, z=0.06):
     """交变电源符号：黄圈 + 正弦波，两条红线接到两个 D 形盒（不是电流球）。"""
-    ball = Circle(radius=0.28, color="#facc15", stroke_width=4).move_to([0, y, z])
+    ball = Circle(radius=0.24, color="#facc15", stroke_width=4).move_to([0, y, z])
     wave = VMobject(color="#facc15", stroke_width=3)
-    wave.set_points_smoothly([np.array([x, y + 0.11 * np.sin(x * 26), z])
-                              for x in np.linspace(-0.16, 0.16, 40)])
+    wave.set_points_smoothly([np.array([x, y + 0.09 * np.sin(x * 30), z])
+                              for x in np.linspace(-0.14, 0.14, 40)])
     leads = VGroup(
-        Line([-0.36, y, z], [-0.22, y, z], color="#ef4444", stroke_width=4),
-        Line([0.36, y, z], [0.22, y, z], color="#ef4444", stroke_width=4),
+        Line([-0.32, y, z], [-0.20, y, z], color="#ef4444", stroke_width=4),
+        Line([0.32, y, z], [0.20, y, z], color="#ef4444", stroke_width=4),
     )
-    label = cn("交变电源", 17, "#facc15").move_to([0.95, y, z])
+    label = cn("交变电源", 17, "#facc15").move_to([0.85, y, z])
     return VGroup(ball, wave, leads, label)
 
 
@@ -264,6 +290,8 @@ class CyclotronScene(ThreeDScene):
     def construct(self):
         self.cap = None
         self.cues = []
+        self.hint = VGroup()        # 06 才出现，先在收口页留个空占位
+        self.hint_note = VGroup()
         self.pieces, self.total = build_pieces()
 
         self.beat_device()
@@ -329,12 +357,12 @@ class CyclotronScene(ThreeDScene):
         e_arrows = e_arrows_3d(True)
         source = ac_source()
         self.play(FadeIn(e_arrows), FadeIn(source), run_time=0.8)
-        self.say("缝里加交变电压，就得到交变电场", 0.4)
+        self.say("缝里加交变电压，缝内就有交变电场", 0.4)
 
         ut, x_of = self.ut_panel()
         self.add_fixed_in_frame_mobjects(ut)
         self.play(FadeIn(ut, shift=UP * 0.12), run_time=0.6)
-        self.say("电压每半个周期翻一次向", 0.5)
+        self.say("电压每半个周期翻一次向，电场跟着反向", 0.5)
 
         flipped = e_arrows_3d(False)
         self.play(FadeOut(e_arrows), FadeIn(flipped), run_time=0.5)
@@ -347,20 +375,21 @@ class CyclotronScene(ThreeDScene):
     def beat_magnetic(self):
         bs = b_arrows_3d()
         self.play(FadeIn(bs), run_time=1.2)
-        self.say("整个装置处在与盒面垂直的匀强磁场中", 0.9)
+        self.say("整个装置处在与盒面垂直的匀强磁场中", 0.7)
+        self.say("磁场垂直盒面向下，正粒子在盒内偏转", 0.7)
         self.b_arrows = bs
 
     # ------------------------------------------------------------ 04 俯视（3D → 2D）
     def beat_top_down(self):
         self.say("从上往下看：盒里只有磁场，缝里只有电场", 0.2)
 
-        dots = b_dots()
+        marks = b_crosses()
         # 硬切到俯视：参考视频也是 3D 一镜、2D 一镜的切法，比连续转相机稳且快
         self.play(FadeOut(self.b_arrows), FadeOut(self.device), FadeOut(self.grid),
                   run_time=0.5)
         self.set_camera_orientation(phi=0, theta=-90 * DEGREES, zoom=1.12)
-        self.play(FadeIn(self.device), FadeIn(self.grid), FadeIn(dots), run_time=0.6)
-        self.b_dots = dots
+        self.play(FadeIn(self.device), FadeIn(self.grid), FadeIn(marks), run_time=0.6)
+        self.b_crosses = marks
         self.wait(0.2)
 
         labels = VGroup(
@@ -370,9 +399,18 @@ class CyclotronScene(ThreeDScene):
         self.play(FadeIn(labels), run_time=0.4)
         self.labels = labels
 
+        legend = VGroup(cross_mark([0, 0, 0], radius=0.085, stroke=2.6),
+                        cn("B 垂直纸面向里", 20, MUTED)) \
+            .arrange(RIGHT, buff=0.16).move_to([4.55, 2.55, 0])
+        self.add_fixed_in_frame_mobjects(legend)
+        self.play(FadeIn(legend), run_time=0.4)
+        self.legend = legend
+
+        self.say("磁场只改变方向、不做功；加速全靠电场", 0.7)
+
     # ------------------------------------------------------------ 05 第一圈
     def beat_first_orbit(self):
-        self.say("粒子从缝口静止出发，先被电场加速", 0.2)
+        self.say("粒子从缝口由静止出发，先被电场加速", 0.2)
 
         mover = Dot(track_pos(self.pieces, 0.0), radius=0.12, color=POS).set_stroke("#ffffff", 2)
         trail = TracedPath(mover.get_center, stroke_color=PATH_C, stroke_width=5)
@@ -385,24 +423,32 @@ class CyclotronScene(ThreeDScene):
         self.play(phase.animate.set_value(gap0["t0"] + gap0["dur"]),
                   run_time=0.8, rate_func=linear)
 
-        self.say("垂直进入磁场后，洛伦兹力始终指向圆心", 0.3)
+        self.say("垂直进入盒内磁场，洛伦兹力指向圆心", 0.3)
         f = VGroup(mth("<i>r</i> =", 44), frac("<i>mv</i>", "<i>qB</i>", 40)) \
-            .arrange(RIGHT, buff=0.16).move_to([4.55, 1.25, 0.0])
-        hint = VGroup(mth("<i>r</i> ∝", 30, MUTED), sqrt_of(mth("<i>n</i>", 30, MUTED))) \
-            .arrange(RIGHT, buff=0.12).move_to([4.55, 0.32, 0.0])
-        self.add_fixed_in_frame_mobjects(f, hint)
-        self.play(FadeIn(f, shift=LEFT * 0.2), FadeIn(hint, shift=UP * 0.1), run_time=0.6)
+            .arrange(RIGHT, buff=0.16).move_to([4.55, 1.55, 0.0])
+        self.add_fixed_in_frame_mobjects(f)
+        self.play(FadeIn(f, shift=LEFT * 0.2), run_time=0.6)
 
         arc0 = self.pieces[1]
         self.play(phase.animate.set_value(arc0["t0"] + arc0["dur"]),
                   run_time=1.7, rate_func=linear)
-        self.say("qvB = mv²/r → 半径只由速度决定", 0.7)
+        self.say("qvB = mv²/r，得 r = mv/(qB)，q 是电荷量大小", 1.2)
+        # 原来这里写"半径只由速度决定"：v 与 B 同时变时 r 并不单由 v 决定，
+        # 只有在同一粒子、B 不变的前提下 r 才随 v 增大。
+        self.say("同一粒子且 B 不变时，速度越大，轨道半径越大", 2.2)
 
-        self.mover, self.trail, self.phase, self.f_r, self.hint = mover, trail, phase, f, hint
+        self.mover, self.trail, self.phase, self.f_r = mover, trail, phase, f
 
     # ------------------------------------------------------------ 06 加速
     def beat_accelerate(self):
         self.say("回到缝口时电场刚好反向，再加速一次", 0.3)
+
+        # n 必须在画面上交代清楚：从静止开始、每次过缝获得同样 qU 的累计加速次数
+        hint = VGroup(mth("<i>r</i> ∝", 30, MUTED), sqrt_of(mth("<i>n</i>", 30, MUTED))) \
+            .arrange(RIGHT, buff=0.12).move_to([4.50, 0.60, 0.0])
+        note = cn("n：累计加速次数", 18, MUTED).move_to([4.50, 0.10, 0.0])
+        self.add_fixed_in_frame_mobjects(hint, note)
+        self.play(FadeIn(hint, shift=UP * 0.1), FadeIn(note, shift=UP * 0.1), run_time=0.5)
 
         gaps = [q for q in self.pieces if q["kind"] == "gap"]
         marks = VGroup()
@@ -423,39 +469,67 @@ class CyclotronScene(ThreeDScene):
                   run_time=(self.total - self.phase.get_value()) * 0.62 / math.pi,
                   rate_func=linear)
         marks.clear_updaters()
-        self.say("每过一次缝，动能 +qU，半径按 n 的平方根变大", 0.7)
-        self.marks = marks
+        self.say("每过一次缝，动能增加 qU（q 为电荷量大小）", 1.4)
+        self.say("从静止起累计加速 n 次，半径 r ∝ √n", 1.6)
+        self.marks, self.hint, self.hint_note = marks, hint, note
 
     # ------------------------------------------------------------ 07 周期
     def beat_period(self):
-        self.say("半径一次比一次大，但每半圈的时间没变", 0.4)
+        self.say("半径一次比一次大，但每半圈的时间相同", 1.4)
 
         f = VGroup(mth("<i>T</i> =", 44), frac("2π<i>m</i>", "<i>qB</i>", 40)) \
-            .arrange(RIGHT, buff=0.16).move_to([4.55, -0.78, 0.0])
-        self.add_fixed_in_frame_mobjects(f)
-        self.play(FadeIn(f, shift=LEFT * 0.2), run_time=0.5)
+            .arrange(RIGHT, buff=0.16).move_to([4.55, -1.15, 0.0])
+        f2 = cn("半圈只有 T/2 = πm/(qB)", 21, MUTED).move_to([4.55, -1.95, 0.0])
+        self.add_fixed_in_frame_mobjects(f, f2)
+        self.play(FadeIn(f, shift=LEFT * 0.2), FadeIn(f2, shift=UP * 0.08), run_time=0.6)
+
+        arcs = [p for p in self.pieces if p["kind"] == "arc"]
+
+        def elapsed_turns(t):
+            """t 时刻粒子已经走完多少个半圆（跨缝时停在整格上，不累积漂移）。"""
+            done = 0
+            for p in arcs:
+                if t >= p["t0"] + p["dur"] - 1e-9:
+                    done += 1
+                elif t > p["t0"]:
+                    return done + (t - p["t0"]) / p["dur"]
+                else:
+                    return float(done)
+            return float(done)
 
         cursor = Line([0, 0, 0], [0, 0, 0], color=HOT, stroke_width=3)
 
         def move_cursor(m):
-            x = self.x_of(self.phase.get_value() / math.pi)
+            x = self.x_of(elapsed_turns(self.phase.get_value()))
             m.become(Line([x, -2.5, 0], [x, -1.4, 0], color=HOT, stroke_width=3))
 
         cursor.add_updater(move_cursor)
         self.add_fixed_in_frame_mobjects(cursor)
         self.add(cursor)
-        self.say("所以电压的翻转，总能卡在粒子到缝口的时刻", 0.9)
 
-        self.cursor, self.f_t = cursor, f
+        # 周期不变是有条件的：固定粒子 + 匀强磁场 + 非相对论
+        self.say("固定粒子、匀强磁场、不计相对论效应，周期才不变", 1.8)
+        self.say("T = 2πm/(qB) 与速度、半径都无关", 1.0)
+
+        # 再走最后一整圈：游标每一格、粒子每半圈，把"同步"直接演出来
+        last_arcs = [p for p in self.pieces if p["kind"] == "arc"]
+        self.trail.set_points(np.zeros((0, 3)))
+        self.phase.set_value(last_arcs[-2]["t0"])
+        self.play(self.phase.animate.set_value(self.total), run_time=1.8, rate_func=linear)
+        self.say("电压半周期与半圈时间相等，翻转总卡在粒子回缝口", 1.6)
+
+        self.cursor, self.f_t, self.f_t2 = cursor, f, f2
 
     # ------------------------------------------------------------ 08 收口
     def beat_summary(self):
         # 先把 3D 场景收掉，收口页只留字，读起来才干净
-        self.play(FadeOut(VGroup(self.device, self.grid, self.b_dots, self.labels,
-                                 self.e_arrows, self.source, self.marks, self.trail, self.mover,
-                                 self.f_r, self.f_t, self.hint)), run_time=0.6)
+        self.play(FadeOut(VGroup(self.device, self.grid, self.b_crosses, self.labels,
+                                 self.legend, self.e_arrows, self.source, self.marks,
+                                 self.trail, self.mover, self.f_r, self.f_t, self.f_t2,
+                                 self.hint, self.hint_note)), run_time=0.6)
         self.play(FadeOut(self.ut), run_time=0.3)
-        self.remove_fixed_in_frame_mobjects(self.ut, self.f_r, self.f_t)
+        self.remove_fixed_in_frame_mobjects(self.ut, self.f_r, self.f_t, self.f_t2,
+                                           self.hint, self.hint_note, self.legend)
         self.cursor.clear_updaters()
         self.remove_fixed_in_frame_mobjects(self.cursor)
         self.remove(self.cursor)
@@ -468,23 +542,30 @@ class CyclotronScene(ThreeDScene):
                 .arrange(RIGHT, buff=0.26, aligned_edge=DOWN)
 
         rows = VGroup(
-            row(ACCEL, "电场加速", "Δ<i>E</i><sub>k</sub> = <i>qU</i>"),
-            row(MAG, "磁场偏转", "<i>r</i> = <i>mv</i>/(<i>qB</i>)"),
-            row(FIELD, "周期固定", "<i>T</i> = 2π<i>m</i>/(<i>qB</i>)"),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.4).move_to(UP * 0.3)
+            row(ACCEL, "电场加速（缝内）", "Δ<i>E</i><sub>k</sub> = <i>qU</i>"),
+            row(MAG, "磁场偏转（盒内）", "<i>r</i> = <i>mv</i>/(<i>qB</i>)"),
+            row(FIELD, "周期不变", "<i>T</i> = 2π<i>m</i>/(<i>qB</i>)"),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.38).move_to(UP * 0.45)
         self.add_fixed_in_frame_mobjects(rows)
 
         punch = cn("电加速 · 磁偏转 · 一圈一圈越转越快", 33, INK, BOLD) \
-            .next_to(rows, DOWN, buff=0.55)
+            .next_to(rows, DOWN, buff=0.5)
         self.add_fixed_in_frame_mobjects(punch)
+
+        notes = VGroup(
+            cn("粒子按正电荷处理，q 均为电荷量大小；洛伦兹力不做功", 20, MUTED),
+            cn("例：质子，B = 1.2 T，得 T ≈ 54.7 ns，半圈 ≈ 27.3 ns", 20, MUTED),
+        ).arrange(DOWN, buff=0.2).next_to(punch, DOWN, buff=0.42)
+        self.add_fixed_in_frame_mobjects(notes)
 
         self.play(LaggedStart(*[FadeIn(r, shift=RIGHT * 0.2) for r in rows], lag_ratio=0.25),
                   run_time=1.0)
         self.play(Write(punch), run_time=0.9)
-        self.wait(2.0)
+        self.play(FadeIn(notes, shift=UP * 0.1), run_time=0.5)
+        self.wait(2.2)
 
     # ------------------------------------------------------------ U-t 面板
-    def ut_panel(self, periods=6, w=3.3, h=1.2, x0=-5.95, y0=-1.95):
+    def ut_panel(self, periods=6, w=3.0, h=1.2, x0=-6.10, y0=-1.95):
         step = w / periods
         segs = VGroup()
         for k in range(periods):
@@ -501,7 +582,7 @@ class CyclotronScene(ThreeDScene):
         )
         lab = VGroup(
             mth("<i>U</i>", 26, MUTED).next_to(axis[1], UP, buff=0.06),
-            mth("<i>t</i>", 26, MUTED).next_to(axis[0], RIGHT, buff=0.08),
+            mth("<i>t</i>", 26, MUTED).move_to([x0 + w + 0.40, y0 - 0.34, 0]),
             cn("交变电压", 18, MUTED).next_to(axis[1], UP, buff=0.45),
         )
         return VGroup(axis, segs, lab), (lambda k: x0 + k * step)

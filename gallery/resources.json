@@ -175,6 +175,18 @@
       "scene": "ChargedParticleUniformFieldScene"
     },
     {
+      "id": "electron_accelerate_then_deflect",
+      "type": "manim",
+      "title": "电子先加速再偏转（教材第 5 题）",
+      "chapter": "必修三 · 第十章",
+      "chapterName": "静电场中的能量",
+      "topic": "带电粒子的运动",
+      "tags": ["教材第5题", "动能定理", "速度合成"],
+      "desc": "按教材第十章第 5 节第 5 题制作：电子经 1000 V 加速后垂直进入 5000 N/C 匀强电场，分两段推出出射速度与夹角——v_y/v₀ = 3/20、v出 = (√409/20)v₀、θ = arctan(3/20)。",
+      "path": ".github/skills/manim-physics-animator/examples/electron_accelerate_then_deflect.py",
+      "scene": "ElectronAccelerateThenDeflectScene"
+    },
+    {
       "id": "capacitor",
       "type": "manim",
       "title": "电容器课堂动画",
