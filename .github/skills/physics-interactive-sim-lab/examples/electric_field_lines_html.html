@@ -727,10 +727,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
       gTerrain.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
         vertexColors: true, side: THREE.DoubleSide, roughness: 0.9, metalness: 0.02,
-        transparent: true, opacity: 0.98
+        transparent: true, opacity: 0.55
       })));
       gTerrain.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-        color: 0xa8cfe0, wireframe: true, transparent: true, opacity: 0.12
+        color: 0xa8cfe0, wireframe: true, transparent: true, opacity: 0.08
       })));
 
       // 等高线 = 等势线（都按软化后的地形算，保证和曲面一致）
@@ -772,10 +772,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const lines = seedLines(field, Math.max(7, Math.round(state.density * 0.7)));
         for (const ln of lines) {
           for (const mir of [1, -1]) {
+            // 场线画在底面（z≈0），不要"贴"到起伏上：贴上去会在山顶绕成一团
             const pts = ln.pts
               .filter(p => (p[1] > 1e-3 || mir > 0) &&
                 Math.abs(p[0]) < BOUND.x - 0.15 && Math.abs(p[1]) < BOUND.y - 0.15)
-              .map(p => new THREE.Vector3(p[0], p[1] * mir, hgt(p[0], p[1] * mir) + 0.03));
+              .map(p => new THREE.Vector3(p[0], p[1] * mir, 0.05));
             if (pts.length < 4) continue;
             gTerrainArrows.add(new THREE.Line(
               new THREE.BufferGeometry().setFromPoints(pts),
