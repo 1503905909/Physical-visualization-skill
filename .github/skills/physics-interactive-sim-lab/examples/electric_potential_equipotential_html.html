@@ -432,6 +432,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
     let cam = { theta: 0.62, phi: 1.14, dist: 16 };
 
+    const upAxis = cfg.mode === "potential" ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+    persp.up.copy(upAxis);
+    ortho.up.set(0, 1, 0);   // 俯视图：屏幕 y 就是世界 y
+
     function applyCamera() {
       const w = mount.clientWidth, h = mount.clientHeight;
       const aspect = w / h;
@@ -451,8 +455,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
 
     // 灯光
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const key = new THREE.DirectionalLight(0xbfe9ff, 1.2); key.position.set(4, 8, 10); scene.add(key);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+    const key = new THREE.DirectionalLight(0xbfe9ff, 1.5); key.position.set(5, 9, 12); scene.add(key);
+    const fill = new THREE.DirectionalLight(0x88aacc, 0.6); fill.position.set(-6, -4, 6); scene.add(fill);
 
     // 组
     const gSlice = new THREE.Group();
@@ -463,7 +468,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const gArrows = new THREE.Group();
     const gCharges = new THREE.Group();
     const gProbe = new THREE.Group();
-    scene.add(gSlice, gEquipSurface, gEquipLine, gFieldSpace, gFieldPlane, gArrows, gCharges, gProbe);
+    const gTerrain = new THREE.Group();
+    const gTerrainArrows = new THREE.Group();
+    scene.add(gSlice, gEquipSurface, gEquipLine, gFieldSpace, gFieldPlane, gArrows, gCharges, gProbe,
+      gTerrain, gTerrainArrows);
+
+    const ZMAX = 2.6;
+    const ZS = 0.62;                       // 电势 -> 高度 的比例
+    function hgt(x, y) {
+      return ZMAX * Math.tanh(field.potential(x, y, 0) * 0.55);
+    }
 
     let field = makeField(state.scene);
     let probe = { x: 1.6, y: 1.0 };
@@ -594,6 +608,169 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       }
     }
 
+
+    // ---------- 电势地形图：z = φ(x,y) ----------
+    function contourPolysXY(field, level) {
+      const nx = 150, ny = 86;
+      const xmin = -BOUND.x, xmax = BOUND.x, ymin = -BOUND.y, ymax = BOUND.y;
+      const dx = (xmax - xmin) / nx, dy = (ymax - ymin) / ny;
+      const val = new Float32Array((nx + 1) * (ny + 1));
+      for (let j = 0; j <= ny; j++) {
+        for (let i = 0; i <= nx; i++) {
+          val[j * (nx + 1) + i] = field.potential(xmin + i * dx, ymin + j * dy, 0);
+        }
+      }
+      const pt = new Map(), adj = new Map();
+      const kH = (i, j) => "H" + i + "_" + j;
+      const kV = (i, j) => "V" + i + "_" + j;
+      function pointH(i, j) {
+        const k = kH(i, j);
+        if (!pt.has(k)) {
+          const a = val[j * (nx + 1) + i], b = val[j * (nx + 1) + i + 1];
+          const t = (level - a) / ((b - a) || 1e-9);
+          pt.set(k, [xmin + (i + t) * dx, ymin + j * dy]);
+        }
+        return k;
+      }
+      function pointV(i, j) {
+        const k = kV(i, j);
+        if (!pt.has(k)) {
+          const a = val[j * (nx + 1) + i], b = val[(j + 1) * (nx + 1) + i];
+          const t = (level - a) / ((b - a) || 1e-9);
+          pt.set(k, [xmin + i * dx, ymin + (j + t) * dy]);
+        }
+        return k;
+      }
+      function link(a, b) {
+        if (!adj.has(a)) adj.set(a, []);
+        if (!adj.has(b)) adj.set(b, []);
+        adj.get(a).push(b); adj.get(b).push(a);
+      }
+      for (let j = 0; j < ny; j++) {
+        for (let i = 0; i < nx; i++) {
+          const v00 = val[j * (nx + 1) + i], v10 = val[j * (nx + 1) + i + 1];
+          const v01 = val[(j + 1) * (nx + 1) + i], v11 = val[(j + 1) * (nx + 1) + i + 1];
+          let code = 0;
+          if (v00 > level) code |= 1;
+          if (v10 > level) code |= 2;
+          if (v11 > level) code |= 4;
+          if (v01 > level) code |= 8;
+          if (code === 0 || code === 15) continue;
+          const B_ = () => pointH(i, j), R_ = () => pointV(i + 1, j);
+          const T_ = () => pointH(i, j + 1), L_ = () => pointV(i, j);
+          switch (code) {
+            case 1: case 14: link(L_(), B_()); break;
+            case 2: case 13: link(B_(), R_()); break;
+            case 3: case 12: link(L_(), R_()); break;
+            case 4: case 11: link(R_(), T_()); break;
+            case 6: case 9: link(B_(), T_()); break;
+            case 7: case 8: link(L_(), T_()); break;
+            case 5: link(L_(), B_()); link(R_(), T_()); break;
+            case 10: link(L_(), T_()); link(B_(), R_()); break;
+          }
+        }
+      }
+      const used = new Set(), polys = [];
+      function walk(start, closed) {
+        const poly = [];
+        let cur = start, prev = null;
+        while (cur && !used.has(cur)) {
+          used.add(cur);
+          poly.push(pt.get(cur));
+          const nxt = adj.get(cur).find(k => k !== prev && !used.has(k));
+          prev = cur; cur = nxt;
+        }
+        if (poly.length > 2) { if (closed) poly.push(poly[0]); polys.push(poly); }
+      }
+      for (const k of adj.keys()) if (adj.get(k).length === 1) walk(k, false);
+      for (const k of adj.keys()) if (!used.has(k)) walk(k, true);
+      return polys;
+    }
+
+    function buildTerrain() {
+      gTerrain.clear(); gTerrainArrows.clear();
+      if (cfg.mode !== "potential") return;
+
+      const NX = 64, NY = 40;
+      const pos = [], col = [], idx = [];
+      const cPos = new THREE.Color(0xff5a4a), cMid = new THREE.Color(0x22303d), cNeg = new THREE.Color(0x4a7bff);
+      for (let j = 0; j <= NY; j++) {
+        for (let i = 0; i <= NX; i++) {
+          const x = -BOUND.x + (2 * BOUND.x * i) / NX;
+          const y = -BOUND.y + (2 * BOUND.y * j) / NY;
+          const v = field.potential(x, y, 0);
+          pos.push(x, y, ZMAX * Math.tanh(v * 0.55));
+          const t = Math.tanh(v * 1.1);
+          const c = t >= 0
+            ? cMid.clone().lerp(cPos, Math.min(1, t))
+            : cMid.clone().lerp(cNeg, Math.min(1, -t));
+          col.push(c.r, c.g, c.b);
+        }
+      }
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          const a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, d = c + 1;
+          idx.push(a, c, b, b, c, d);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+
+      gTerrain.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        vertexColors: true, side: THREE.DoubleSide, roughness: 0.85, metalness: 0.02,
+        transparent: true, opacity: 0.97
+      })));
+      gTerrain.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color: 0xa8cfe0, wireframe: true, transparent: true, opacity: 0.10
+      })));
+
+      // 等高线 = 等势线
+      if (layers.equip) {
+        for (const lv of levelList()) {
+          if (lv.kind === "plane") continue;
+          const polys = contourPolysXY(field, lv.level);
+          for (const poly of polys) {
+            if (poly.length < 3) continue;
+            const pts = poly.map(q =>
+              new THREE.Vector3(q[0], q[1], ZMAX * Math.tanh(field.potential(q[0], q[1], 0) * 0.55) + 0.03));
+            gTerrain.add(new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints(pts),
+              new THREE.LineBasicMaterial({
+                color: lv.sign > 0 ? 0xffd9b0 : 0xc3d6ff,
+                transparent: true, opacity: 0.95
+              })));
+          }
+        }
+      }
+
+      // 坡度箭头：E 指向电势降低的方向
+      if (layers.field) {
+        for (let y = -2.6; y <= 2.6; y += 1.1) {
+          for (let x = -5.0; x <= 5.0; x += 1.1) {
+            const v = field.potential(x, y, 0);
+            if (Math.abs(v) > 4.6) continue;
+            const e = field.field(x, y, 0);
+            const m = Math.hypot(e.x, e.y) || 1;
+            if (m < 0.12) continue;
+            const z = ZMAX * Math.tanh(v * 0.55);
+            const dzdx = (field.potential(x + 0.06, y, 0) - field.potential(x - 0.06, y, 0)) / 0.12 * ZS;
+            const dzdy = (field.potential(x, y + 0.06, 0) - field.potential(x, y - 0.06, 0)) / 0.12 * ZS;
+            const dir = new THREE.Vector3(
+              -e.x / m - dzdx * 0.15,
+              -e.y / m - dzdy * 0.15,
+              -Math.hypot(dzdx, dzdy)
+            ).normalize();
+            const a = new THREE.ArrowHelper(dir, new THREE.Vector3(x, y, z),
+              0.75, 0xffe066, 0.22, 0.12);
+            gTerrainArrows.add(a);
+          }
+        }
+      }
+    }
+
     // ---------- 电场线 ----------
     function buildFieldLines() {
       gFieldSpace.clear(); gFieldPlane.clear(); gArrows.clear();
@@ -686,7 +863,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           new THREE.SphereGeometry(0.22, 24, 18),
           new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.65, roughness: 0.35 })
         );
-        ball.position.set(c.x, 0, 0);
+        const cz = cfg.mode === "potential" ? hgt(c.x, 0) : 0;
+        ball.position.set(c.x, 0, cz);
         gCharges.add(ball);
 
         const halo = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -698,7 +876,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         gCharges.add(halo);
 
         const lab = makeLabel(c.label, c.q > 0 ? "#ffd0d4" : "#c7d2ff", 0.72);
-        lab.position.set(c.x, 0.52, 0.02);
+        lab.position.set(c.x, cfg.mode === "potential" ? 0 : 0.52, cz + (c.q > 0 ? 0.55 : -0.55));
         gCharges.add(lab);
       }
     }
@@ -740,8 +918,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     gProbe.add(probeMesh, probeRing);
 
     function updateProbe() {
-      probeMesh.position.set(probe.x, probe.y, 0.06);
-      probeRing.position.set(probe.x, probe.y, 0.06);
+      const pz = cfg.mode === "potential" && state.view !== "2d" ? hgt(probe.x, probe.y) + 0.03 : 0.06;
+      probeMesh.position.set(probe.x, probe.y, pz);
+      probeRing.position.set(probe.x, probe.y, pz);
       const v = field.potential(probe.x, probe.y, 0);
       const e = field.field(probe.x, probe.y, 0);
       if (cfg.onProbe) cfg.onProbe({ phi: v, e, scene: field.sc });
@@ -750,11 +929,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // ---------- 显示规则 ----------
     function applyView() {
       const is2d = state.view === "2d";
-      gEquipSurface.visible = !is2d && layers.equip;
-      gFieldSpace.visible = !is2d && layers.field;
-      gFieldPlane.visible = layers.field;
-      gEquipLine.visible = layers.equip;
-      gSlice.visible = layers.heat && !(is2d === false && field.sc.uniform);
+      const terrain = cfg.mode === "potential" && !is2d;
+      gTerrain.visible = terrain && layers.equip;
+      gTerrainArrows.visible = terrain && layers.field;
+      gEquipSurface.visible = !is2d && !terrain && layers.equip;
+      gFieldSpace.visible = !is2d && !terrain && layers.field;
+      gFieldPlane.visible = !terrain && layers.field;
+      gEquipLine.visible = layers.equip && (!terrain || is2d);
+      gArrows.visible = !terrain && layers.field;
+      gSlice.visible = layers.heat && !terrain;
       gSlice.children.forEach(ch => {
         if (ch.material && ch.material.map) ch.material.opacity = is2d ? 1 : 0.12;
       });
@@ -818,6 +1001,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       buildSlice();
       buildEquipotential();
       buildFieldLines();
+      buildTerrain();
       buildCharges();
       updateProbe();
       applyView();
