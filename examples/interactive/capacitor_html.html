@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>平行板电容器交互仿真</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --ink: #eaf2f5;
+      --muted: #9fb6c1;
+      --accent: #7fd6e4;
+      --accent-strong: #0f766e;
+      --warn: #f0b429;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; }
+
+    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; }
+    .hud-panel[hidden] { display: none; }
+
+    /* ---------- 面板可拖动（LAYOUT.md「参数面板必须可拖动」） ---------- */
+    .hud-panel { cursor: default; }
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 8px; touch-action: none; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); z-index: 6; }
+    .panel-grip .grip-title { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
+    .panel-grip .grip-fold { border: 1px solid rgba(255,255,255,.22); border-radius: 6px;
+                             background: rgba(255,255,255,.08); color: var(--ink);
+                             font: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px;
+                             cursor: pointer; }
+    .panel-grip .grip-fold:hover { background: rgba(255,255,255,.18); }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 286px; }
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .hud-toggle[aria-expanded="true"] { right: 232px; }
+    }
+
+    /* ---------- 读数 chips（左上角，≤4 个） ---------- */
+    .hud-readout .tile { display: inline-flex; align-items: baseline; gap: 6px; }
+    .hud-readout .tile + .tile { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.14); }
+    .hud-readout .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+    .hud-readout .tile-value { font-size: 14.5px; font-weight: 800; color: #f2f8fa; line-height: 1.2; }
+    .hud-readout .tile-unit { font-size: 10.5px; font-weight: 700; color: var(--accent); }
+    .hud-readout .tile-badge { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px;
+                               background: rgba(255,255,255,.12); color: #d7e6ec; white-space: nowrap; }
+    .hud-readout .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
+    .hud-readout .tile-badge.up   { background: rgba(248,113,113,.2); color: #fca5a5; }
+    .hud-readout .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
+    .hud-readout .tile-badge.na   { opacity: .45; }
+
+    /* ---------- 图例（左下角，默认一行） ---------- */
+    .lg { display: inline-flex; align-items: center; gap: 4px; margin-right: 9px; white-space: nowrap; }
+    .lg:last-child { margin-right: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+    .dot-red { background: #e73535; }
+    .dot-blue { background: #3558ff; }
+    .dot-green { background: #22c55e; }
+    .arrow-glyph { color: #b45309; font-weight: 900; }
+    .lg.warn { color: #fbbf24; font-weight: 700; }
+    .sw { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+
+    /* ---------- 参数面板（右上角，可折叠） ---------- */
+    .panel-mode { margin: 0 0 8px; font-size: 11.5px; color: var(--muted); }
+    .panel-mode b { color: var(--accent); font-size: 12px; }
+    .panel-title { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted);
+                   text-transform: uppercase; margin-bottom: 2px; }
+    .panel-group + .panel-group { margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.16); }
+
+    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mode-btn { display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+                padding: 6px 7px; min-height: 50px; text-align: left; font: inherit;
+                border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+                background: rgba(255,255,255,.06); color: var(--ink); cursor: pointer; }
+    .mode-btn .mode-title { font-size: 13px; font-weight: 800; line-height: 1.25; }
+    .mode-btn .mode-sub { font-size: 10px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+    .mode-btn:hover { background: rgba(255,255,255,.12); }
+    .mode-btn.active { border-color: transparent; background: var(--accent-strong); }
+    .mode-btn.active .mode-sub { color: rgba(255,255,255,.86); }
+    .mode-btn.active:hover { background: #0d665f; }
+
+    .slider-field { margin-top: 7px; }
+    .slider-field:first-of-type { margin-top: 0; }
+    .slider-field label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2px;
+                          font-size: 11.5px; font-weight: 700; color: #cfe3e9; }
+    .slider-field label span:last-child { color: var(--accent); white-space: nowrap; }
+    input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: #3fc1c9; }
+    input[type="range"]:disabled { opacity: .4; }
+
+    .footnote { margin: 4px 0 0; font-size: 10.5px; line-height: 1.45; color: #8fa6b1; }
+
+    .toggles { display: grid; gap: 5px; margin-top: 9px; padding-top: 8px;
+               border-top: 1px dashed rgba(255,255,255,.16); }
+    .panel-group .toggles { margin-top: 0; padding-top: 0; border-top: 0; }
+    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .toggle input { width: 15px; height: 15px; margin: 0; accent-color: #3fc1c9; }
+
+    .panel-actions, .reset-row { display: flex; gap: 8px; margin-top: 9px; }
+    .panel-actions button, .reset-row button { flex: 1; }
+    .primary-btn { min-height: 32px; border: 1px solid var(--accent-strong); border-radius: 8px;
+                   background: var(--accent-strong); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+    .primary-btn:hover { background: #0d665f; }
+    .panel-actions button:not(.primary-btn) { min-height: 32px; border: 1px solid rgba(255,255,255,.24);
+                   border-radius: 8px; background: rgba(255,255,255,.08); color: var(--ink);
+                   font: inherit; font-weight: 700; cursor: pointer; }
+    .panel-actions button:not(.primary-btn):hover { background: rgba(255,255,255,.16); }
+
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+    .particle-btn { min-height: 32px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+                    background: rgba(255,255,255,.06); color: var(--ink); font: inherit;
+                    font-size: 12.5px; font-weight: 700; cursor: pointer; }
+    .particle-btn:hover { background: rgba(255,255,255,.14); }
+    .particle-btn.active { border-color: transparent; background: var(--accent-strong); color: #fff; }
+
+    /* ---------- 抽屉内容 ---------- */
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+    .mode-tag { font-size: 12px; font-weight: 800; color: var(--accent); }
+    .mode-tag.warn { color: var(--warn); }
+    .drawer-close { border: 0; background: transparent; color: var(--muted); font-size: 18px;
+                    line-height: 1; cursor: pointer; padding: 0 4px; }
+    .drawer-close:hover { color: #fff; }
+    .conclusion-card { margin: 4px 0 6px; padding: 8px 10px; border-radius: 6px;
+                       border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); }
+    .conclusion-card.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); }
+    .conclusion-body { margin: 0 0 4px; font-size: 13px; line-height: 1.55; color: #e2eef2; }
+    .conclusion-key { margin: 0; font-size: 12.5px; font-weight: 700; color: #bfe9ee; }
+    .conclusion-formula { margin: 6px 0; padding: 6px 8px; border: 1px dashed rgba(255,255,255,.22);
+                          border-radius: 6px; font-size: 12px; line-height: 1.5; color: #dbe9ee; }
+    .conclusion-note { margin: 5px 0; font-size: 12px; line-height: 1.55; color: #a9bfc9; }
+    .drawer-eq { margin: 2px 0; font-size: 14px; font-weight: 800; color: #eaf2f5; }
+    .drawer .tile { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px; margin: 4px 0 8px;
+                    border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.04); }
+    .drawer .tile-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+    .drawer .tile-value { font-size: 16px; font-weight: 800; color: #f2f8fa; }
+    .drawer .tile-unit { font-size: 11px; font-weight: 700; color: var(--accent); }
+    .drawer .tile-badge { margin-left: auto; font-size: 10.5px; font-weight: 800; padding: 1px 6px;
+                          border-radius: 999px; background: rgba(255,255,255,.12); color: #d7e6ec; }
+    .drawer .tile-badge.same { background: rgba(240,180,41,.22); color: #fbd38d; }
+    .drawer .tile-badge.up { background: rgba(248,113,113,.2); color: #fca5a5; }
+    .drawer .tile-badge.down { background: rgba(125,211,252,.2); color: #7dd3fc; }
+    .drawer .tile-badge.na { opacity: .45; }
+    .mode-hint { margin: 8px 0 0; padding: 7px 9px; border-radius: 6px; font-size: 12px; line-height: 1.55;
+                 border-left: 3px solid #2dd4bf; background: rgba(45,212,191,.08); color: #bfe9ee; }
+    .mode-hint.warn { border-left-color: var(--warn); background: rgba(240,180,41,.09); color: #f9dda2; }
+    .q-list { margin: 4px 0; padding-left: 18px; }
+    .q-list li { margin: 3px 0; font-size: 12.5px; line-height: 1.55; color: #cfe3e9; }
+    .drawer-keys { margin-top: 10px; font-size: 11px; color: #7f95a0; }
+
+    /* ---------- 舞台提示（回旋加速器） ---------- */
+    .stage-alert { position: absolute; right: 58px; bottom: 12px; max-width: min(560px, 56%);
+                   padding: 7px 12px; border-radius: 8px; z-index: 3;
+                   background: rgba(10,13,20,.9); border: 1px solid rgba(255,209,102,.85);
+                   color: #ffd166; font-size: 12px; font-weight: 700; line-height: 1.45;
+                   text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,.4); pointer-events: none; }
+
+    @media (max-width: 1120px) {
+      .hud-panel { width: 210px; }
+      .hud-toggle[aria-expanded="true"] { right: 234px; }
+      .drawer { width: min(380px, 78%); }
+    }
+</style>
+</head>
+<body>
+  <main class="app">
+    <div class="stage">
+      <div class="stage-frame">
+
+        <canvas id="capCanvas" width="1600" height="900"></canvas>
+
+        <!-- 左上角实时读数：4 个 chips（C、Q、U、E） -->
+        <div class="hud hud-readout" aria-label="实时读数">
+          <div class="tile" id="tileC">
+            <span class="tile-label">C</span>
+            <span class="tile-value">—</span>
+            <span class="tile-unit"></span>
+            <span class="tile-badge na">—</span>
+          </div>
+          <div class="tile" id="tileQ">
+            <span class="tile-label">Q</span>
+            <span class="tile-value">—</span>
+            <span class="tile-unit"></span>
+            <span class="tile-badge na">—</span>
+          </div>
+          <div class="tile" id="tileU">
+            <span class="tile-label">U</span>
+            <span class="tile-value">—</span>
+            <span class="tile-unit"></span>
+            <span class="tile-badge na">—</span>
+          </div>
+          <div class="tile" id="tileE">
+            <span class="tile-label">E</span>
+            <span class="tile-value">—</span>
+            <span class="tile-unit"></span>
+            <span class="tile-badge na">—</span>
+          </div>
+        </div>
+
+        <!-- 左下角图例：一行 -->
+        <div class="hud hud-legend" aria-label="图例">
+          <span class="lg"><i class="dot dot-red"></i>正电荷</span>
+          <span class="lg"><i class="dot dot-blue"></i>负电荷</span>
+          <span class="lg"><b class="arrow-glyph">→</b>E：正极板→负极板</span>
+          <span class="lg"><i class="dot dot-green"></i>板间距 d</span>
+          <span class="lg warn" id="breakdownChip" hidden>E 接近空气击穿（拓展）</span>
+        </div>
+
+        <!-- 右上角参数面板（可折叠） -->
+        <button class="hud-toggle" id="ctrlToggle" type="button" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
+          <div class="panel-grip" id="panelGrip">
+            <span class="grip-title">参数</span>
+            <button type="button" class="grip-fold" id="panelFoldBtn" aria-expanded="true" aria-controls="ctrlPanel" title="折叠 / 展开参数面板">折叠</button>
+          </div>
+
+          <p class="panel-mode">情形：<b id="stageMode">接通电源（U 不变）</b></p>
+
+          <div class="mode-switch" role="group" aria-label="电源开关">
+            <button type="button" class="mode-btn active" data-mode="uconst" aria-pressed="true">
+              <span class="mode-title">接通电源</span>
+              <span class="mode-sub">U 不变 · Q 随 C 变</span>
+            </button>
+            <button type="button" class="mode-btn" data-mode="qconst" aria-pressed="false">
+              <span class="mode-title">断开电源</span>
+              <span class="mode-sub">Q 不变 · U 随 C 变</span>
+            </button>
+          </div>
+
+          <div class="slider-field">
+            <label for="areaSlider"><span>极板面积 S</span><span id="areaValue">300 cm²</span></label>
+            <input id="areaSlider" type="range" min="100" max="1000" value="300" step="10" />
+          </div>
+          <div class="slider-field">
+            <label for="gapSlider"><span>极板间距 d</span><span id="gapValue">3.0 mm</span></label>
+            <input id="gapSlider" type="range" min="0.5" max="10" value="3" step="0.1" />
+          </div>
+          <div class="slider-field">
+            <label for="erSlider"><span>相对介电常数 εᵣ</span><span id="erValue">1.0</span></label>
+            <input id="erSlider" type="range" min="1" max="5" value="1" step="0.1" />
+          </div>
+          <div class="slider-field">
+            <label for="voltSlider"><span>电压 U</span><span id="voltValue">300 V</span></label>
+            <input id="voltSlider" type="range" min="0" max="1000" value="300" step="10" />
+            <p class="footnote" id="voltHint">接通电源时 U 由电源提供。</p>
+          </div>
+
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showField" checked /><span>显示板间场线</span></label>
+            <label class="toggle"><input type="checkbox" id="showCharge" checked /><span>显示极板电荷</span></label>
+            <label class="toggle"><input type="checkbox" id="showFlow" checked /><span>箭头流动（标方向）</span></label>
+          </div>
+          <div class="reset-row">
+            <button type="button" class="primary-btn" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <!-- 右下角「?」抽屉 -->
+        <button class="hud-more" id="moreBtn" type="button" aria-expanded="false" aria-controls="drawer" title="结论与说明">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="结论与说明">
+          <div class="drawer-head">
+            <span class="mode-tag" id="modeTag">U 不变</span>
+            <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭抽屉">×</button>
+          </div>
+
+          <h3>实时结论</h3>
+          <div class="conclusion-card" id="conclusionCard">
+            <p class="conclusion-body" id="conclusionBody">—</p>
+            <p class="conclusion-key" id="conclusionKey">—</p>
+          </div>
+          <p class="conclusion-formula" id="conclusionFormula">—</p>
+          <p class="conclusion-note" id="conclusionExtra">—</p>
+          <p class="mode-hint" id="modeHint">接通电源：极板两端电压由电源决定，始终等于 U。</p>
+
+          <h3>读数明细</h3>
+          <div class="tile" id="tileW">
+            <span class="tile-label">电场能 E_C</span>
+            <span class="tile-value">—</span>
+            <span class="tile-unit"></span>
+            <span class="tile-badge na">—</span>
+          </div>
+          <p class="conclusion-note" id="unitNote">—</p>
+          <p class="conclusion-note" id="extraNote">E_C 为电场能（拓展内容，避免与功的符号 W 混淆）。教材中平行板电容写作 C = εᵣS/(4πkd)，其中 ε₀ = 1/(4πk)，与这里的 C = ε₀εᵣS/d 完全等价。</p>
+          <p class="conclusion-note">板间场线：<span id="stageLines">0 条</span>；极板电荷：<span id="stageState">由电源补充</span>。</p>
+
+          <h3>模型假设</h3>
+          <p class="conclusion-note">理想平行板，忽略边缘效应与极板外电场；介质均匀充满板间，板间为匀强电场。极板高度随 S、电荷符号个数随 Q 单调变化，但都只是示意（非线性），不按真实比例绘制。</p>
+
+          <h3>课堂观察</h3>
+          <ul class="q-list">
+            <li>保持「接通电源」，把 d 从 6 mm 拖到 1 mm：E 的读数怎样变化？为什么 U 不变时 E 反而变大？</li>
+            <li>先接通电源充好电，再切到「断开电源」，只改变 d：E 的读数和场线疏密为什么几乎不变？此时 U 与 d 成什么关系？</li>
+            <li>在「断开电源」下把 εᵣ 从 1 调到 5：Q 不变，为什么 E 变小、E_C 也变小？</li>
+          </ul>
+
+          <h3>关于 ↑↓ 徽标</h3>
+          <p class="conclusion-note" id="deltaHint">—</p>
+
+          <p class="drawer-keys">空格：箭头流动 · R：重置 · P：参数 · ?：本抽屉</p>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+
+  <script>
+    const canvas = document.getElementById("capCanvas");
+    const ctx = canvas.getContext("2d");
+
+    /* 逻辑坐标系：原来 canvas.width / canvas.height 的 1600×900（不要改）。
+       位图改为「CSS 尺寸 × DPR」，绘制一律按逻辑坐标（LAYOUT.md「高清渲染」）。 */
+    const LW = 1600, LH = 900;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
+    const EPS0 = 8.8541878128e-12;
+    const FONT_CN = "'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', Arial, sans-serif";
+
+    const DEFAULTS = { S: 300, d: 3.0, er: 1.0, U: 300, refD: 3.0 };
+
+    const state = {
+      S: DEFAULTS.S,
+      d: DEFAULTS.d,
+      er: DEFAULTS.er,
+      U: DEFAULTS.U,
+      mode: "uconst",
+      Qfrozen: 0,
+      refD: DEFAULTS.refD,
+      time: 0,
+      showField: true,
+      showCharge: true,
+      showFlow: true
+    };
+
+    const el = {
+      s: document.getElementById("areaSlider"),
+      d: document.getElementById("gapSlider"),
+      er: document.getElementById("erSlider"),
+      u: document.getElementById("voltSlider"),
+      sOut: document.getElementById("areaValue"),
+      dOut: document.getElementById("gapValue"),
+      erOut: document.getElementById("erValue"),
+      uOut: document.getElementById("voltValue"),
+      voltHint: document.getElementById("voltHint"),
+      modeButtons: Array.from(document.querySelectorAll(".mode-btn")),
+      modeHint: document.getElementById("modeHint"),
+      modeTag: document.getElementById("modeTag"),
+      showField: document.getElementById("showField"),
+      showCharge: document.getElementById("showCharge"),
+      showFlow: document.getElementById("showFlow"),
+      resetBtn: document.getElementById("resetBtn"),
+      stageMode: document.getElementById("stageMode"),
+      stageLines: document.getElementById("stageLines"),
+      stageState: document.getElementById("stageState"),
+      conclusionCard: document.getElementById("conclusionCard"),
+      conclusionBody: document.getElementById("conclusionBody"),
+      conclusionFormula: document.getElementById("conclusionFormula"),
+      conclusionKey: document.getElementById("conclusionKey"),
+      conclusionExtra: document.getElementById("conclusionExtra"),
+      unitNote: document.getElementById("unitNote"),
+      deltaHint: document.getElementById("deltaHint"),
+      breakdownChip: document.getElementById("breakdownChip"),
+      tiles: {
+        C: document.getElementById("tileC"),
+        Q: document.getElementById("tileQ"),
+        U: document.getElementById("tileU"),
+        E: document.getElementById("tileE"),
+        W: document.getElementById("tileW")
+      }
+    };
+
+    const MODE_TEXT = {
+      uconst: {
+        name: "接通电源（U 不变）",
+        hint: "接通电源：极板两端电压由电源决定，始终等于 U。调节 d 时电源会自动补充或取回电荷，所以 Q 会变，U 不变。",
+        tag: "U 不变",
+        body: "d 减小 → C 增大、Q 增大、E 增大、E_C 增大；d 增大则 C、Q、E、E_C 全部减小。整个过程中 U 保持不变。",
+        formula: "C = ε₀εᵣS/d　　Q = CU　　E = U/d　　E_C = ½CU²（拓展）",
+        key: "关键：E = U/d。电压被电源固定后，板间场强只由板间距 d 决定 —— d 越小，电场越强。",
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，Q 增大，E_C 增大；而 E = U/d 保持不变。"
+      },
+      qconst: {
+        name: "断开电源（Q 不变）",
+        hint: "已断开电源：极板上的电荷无处流走，Q 保持不变，电压由 U = Q/C 决定。此时电压滑块失效。",
+        tag: "Q 不变",
+        body: "d 减小 → C 增大、U 减小、E_C 减小；d 增大则 C 减小、U 增大、E_C 增大。整个过程中 E 保持不变。",
+        formula: "C = ε₀εᵣS/d　　U = Q/C = Qd/(ε₀εᵣS)　　E = U/d = Q/(ε₀εᵣS)　　E_C = ½Q²/C（拓展）",
+        key: "关键：E = Q/(ε₀εᵣS)，式中没有 d。断开电源后「锁住」的电荷量使板间场强不随 d 改变。",
+        extra: "同一情形下增大 S 或 εᵣ：C 增大，U 减小，E 减小，E_C 减小。"
+      }
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function roundRect(x, y, w, h, r) {
+      const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.lineTo(x + w - rr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+      ctx.lineTo(x + w, y + h - rr);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+      ctx.lineTo(x + rr, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+      ctx.lineTo(x, y + rr);
+      ctx.quadraticCurveTo(x, y, x + rr, y);
+      ctx.closePath();
+    }
+
+    function setFont(size, weight) {
+      ctx.font = (weight || "bold") + " " + size + "px " + FONT_CN;
+    }
+
+    const SUP = {
+      "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³",
+      "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
+    };
+
+    function sci(x) {
+      if (!(Math.abs(x) > 0)) return "0";
+      const exp = Math.floor(Math.log10(Math.abs(x)));
+      const mant = x / Math.pow(10, exp);
+      const sup = String(exp).split("").map(function (c) { return SUP[c] || c; }).join("");
+      return mant.toFixed(2) + "×10" + sup;
+    }
+
+    function sig3(v) {
+      if (!isFinite(v) || v === 0) return "0";
+      const a = Math.abs(v);
+      const digits = 2 - Math.floor(Math.log10(a));
+      return v.toFixed(clamp(digits, 0, 6));
+    }
+
+    function fmtCap(C) {
+      if (!(C > 0)) return ["0", "F"];
+      if (C >= 1e-6) return [sig3(C / 1e-6), "μF"];
+      if (C >= 1e-9) return [sig3(C / 1e-9), "nF"];
+      if (C >= 1e-12) return [sig3(C / 1e-12), "pF"];
+      return [sig3(C / 1e-15), "fF"];
+    }
+
+    function fmtCharge(Q) {
+      if (!(Q > 0)) return ["0", "C"];
+      if (Q >= 1e-3) return [sig3(Q / 1e-3), "mC"];
+      if (Q >= 1e-6) return [sig3(Q / 1e-6), "μC"];
+      if (Q >= 1e-9) return [sig3(Q / 1e-9), "nC"];
+      return [sig3(Q / 1e-12), "pC"];
+    }
+
+    function fmtVolt(U) {
+      if (!(U > 0)) return ["0", "V"];
+      if (U >= 1e4) return [sig3(U / 1e3), "kV"];
+      return [sig3(U), "V"];
+    }
+
+    function fmtField(E) {
+      if (!(E > 0)) return ["0", "V/m"];
+      if (E >= 1e6) return [sig3(E / 1e6), "MV/m"];
+      if (E >= 1e3) return [sig3(E / 1e3), "kV/m"];
+      return [sig3(E), "V/m"];
+    }
+
+    function fmtEnergy(Wv) {
+      if (!(Wv > 0)) return ["0", "J"];
+      if (Wv >= 1e-3) return [sig3(Wv / 1e-3), "mJ"];
+      if (Wv >= 1e-6) return [sig3(Wv / 1e-6), "μJ"];
+      if (Wv >= 1e-9) return [sig3(Wv / 1e-9), "nJ"];
+      return [sig3(Wv / 1e-12), "pJ"];
+    }
+
+    function computeAt(dMm) {
+      const S = state.S * 1e-4;
+      const dM = Math.max(dMm, 0.01) * 1e-3;
+      const C = EPS0 * state.er * S / dM;
+      if (state.mode === "uconst") {
+        const U = state.U;
+        return { C: C, Q: C * U, U: U, E: U / dM, W: 0.5 * C * U * U };
+      }
+      const Q = state.Qfrozen;
+      const U = Q / C;
+      return { C: C, Q: Q, U: U, E: U / dM, W: 0.5 * Q * Q / C };
+    }
+
+    function deltaBadge(cur, ref) {
+      if (Math.abs(state.d - state.refD) < 1e-9) return { text: "—", cls: "na" };
+      if (!(Math.abs(ref) > 1e-20)) return { text: "—", cls: "na" };
+      const pct = (cur - ref) / ref;
+      if (Math.abs(pct) < 0.001) return { text: "不变", cls: "same" };
+      const p = Math.round(Math.abs(pct) * 100);
+      return { text: (cur > ref ? "↑ " : "↓ ") + p + "%", cls: cur > ref ? "up" : "down" };
+    }
+
+    function stageGeom() {
+      const cx = 800;
+      const cy = 470;
+      const plateH = 180 + 200 * (state.S - 100) / 900;
+      const gap = 90 + 330 * (state.d - 0.5) / 9.5;
+      return {
+        cx: cx,
+        cy: cy,
+        plateH: plateH,
+        gap: gap,
+        leftInner: cx - gap / 2,
+        rightInner: cx + gap / 2,
+        top: cy - plateH / 2,
+        bottom: cy + plateH / 2,
+        thickness: 16
+      };
+    }
+
+    function fieldLineCount(E) {
+      if (!(E > 1)) return 0;
+      const g = stageGeom();
+      // 条数乘以极板投影长度：密度（条数/板高）= f(E)/200，只由 E 决定，与 S 无关。
+      // f(E) 是单调压缩，只保证「E 越大条数越多」，并非严格正比；取 200 使 S=300 时仍为 6 条。
+      const f = 2 + 3.6 * Math.log10(E / 1e4);
+      const n = Math.round(f * g.plateH / 200);
+      return clamp(n, 2, 16);
+    }
+
+    function chargeCount(Q) {
+      if (!(Q > 1e-15)) return 0;
+      const n = Math.round(3 + 3 * Math.log10(Q / 1e-9));
+      return clamp(n, 2, 14);
+    }
+
+    function arrowHead(x, y, size, color, dir) {
+      const s = dir === -1 ? -1 : 1;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(s, 1);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(size, 0);
+      ctx.lineTo(-size * 0.62, size * 0.58);
+      ctx.lineTo(-size * 0.62, -size * 0.58);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function chip(text, x, y, color, align) {
+      ctx.save();
+      setFont(19, "bold");
+      const w = ctx.measureText(text).width;
+      let left = x - w / 2;
+      if (align === "right") left = x - w;
+      if (align === "left") left = x;
+      ctx.fillStyle = "rgba(8,10,14,0.74)";
+      roundRect(left - 9, y - 16, w + 18, 32, 8);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, left, y + 1);
+      ctx.restore();
+    }
+
+    function drawBackground(g) {
+      const grad = ctx.createLinearGradient(0, 0, 0, LH);
+      grad.addColorStop(0, "#0a0d13");
+      grad.addColorStop(1, "#05070a");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, LW, LH);
+
+      const glow = ctx.createRadialGradient(g.cx, g.cy, 60, g.cx, g.cy, 560);
+      glow.addColorStop(0, "rgba(120, 160, 220, 0.10)");
+      glow.addColorStop(1, "rgba(120, 160, 220, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, LW, LH);
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.045)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= LW; x += 100) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, LH);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= LH; y += 100) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(LW, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawCircuit(g) {
+      const yTop = 190;
+      const lx = g.leftInner - 8;
+      const rx = g.rightInner + 8;
+      const barL = g.cx - 14;
+      const barR = g.cx + 14;
+      const wire = "#94a3b8";
+
+      ctx.save();
+      ctx.strokeStyle = wire;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(lx, g.top);
+      ctx.lineTo(lx, yTop);
+      ctx.moveTo(rx, g.top);
+      ctx.lineTo(rx, yTop);
+      ctx.stroke();
+
+      if (state.mode === "uconst") {
+        ctx.beginPath();
+        ctx.moveTo(lx, yTop);
+        ctx.lineTo(barL, yTop);
+        ctx.moveTo(barR, yTop);
+        ctx.lineTo(rx, yTop);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#e73535";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(barL, yTop - 26);
+        ctx.lineTo(barL, yTop + 26);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#3558ff";
+        ctx.beginPath();
+        ctx.moveTo(barR, yTop - 13);
+        ctx.lineTo(barR, yTop + 13);
+        ctx.stroke();
+
+        setFont(17, "bold");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ff8f8f";
+        ctx.fillText("+", barL - 18, yTop);
+        ctx.fillStyle = "#8fa8ff";
+        ctx.fillText("−", barR + 18, yTop);
+
+        const u = fmtVolt(state.U);
+        chip("U = " + u[0] + " " + u[1] + "　电源接通", g.cx, yTop - 62, "#e2e8f0", "center");
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(lx, yTop);
+        ctx.lineTo(g.cx - 70, yTop);
+        ctx.moveTo(g.cx + 70, yTop);
+        ctx.lineTo(rx, yTop);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(g.cx - 70, yTop, 6, 0, Math.PI * 2);
+        ctx.arc(g.cx + 70, yTop, 6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.save();
+        ctx.setLineDash([9, 8]);
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(g.cx - 58, yTop);
+        ctx.lineTo(g.cx - 14, yTop);
+        ctx.moveTo(g.cx + 14, yTop);
+        ctx.lineTo(g.cx + 58, yTop);
+        ctx.stroke();
+        ctx.restore();
+
+        chip("已断开电源：Q 保持不变", g.cx, yTop - 62, "#fbbf24", "center");
+      }
+      ctx.restore();
+    }
+
+    function drawMedium(g) {
+      if (state.er <= 1.02) return;
+      const alpha = clamp(0.05 + 0.07 * (state.er - 1), 0.05, 0.32);
+      ctx.save();
+      ctx.fillStyle = "rgba(56, 189, 248, " + alpha.toFixed(3) + ")";
+      ctx.fillRect(g.leftInner, g.top, g.gap, g.plateH);
+      ctx.strokeStyle = "rgba(125, 211, 252, 0.45)";
+      ctx.setLineDash([7, 7]);
+      ctx.lineWidth = 1.6;
+      ctx.strokeRect(g.leftInner + 1, g.top + 1, g.gap - 2, g.plateH - 2);
+      ctx.restore();
+    }
+
+    function drawPlates(g) {
+      const t = g.thickness;
+
+      ctx.save();
+      ctx.shadowColor = "rgba(231, 53, 53, 0.55)";
+      ctx.shadowBlur = 26;
+      ctx.fillStyle = "rgba(231, 53, 53, 0.22)";
+      roundRect(g.leftInner - t, g.top, t, g.plateH, 7);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = "#e73535";
+      ctx.lineWidth = 2.6;
+      roundRect(g.leftInner - t, g.top, t, g.plateH, 7);
+      ctx.stroke();
+      ctx.strokeStyle = "#ff6b6b";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(g.leftInner - 3, g.top + 8);
+      ctx.lineTo(g.leftInner - 3, g.bottom - 8);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.shadowColor = "rgba(53, 88, 255, 0.55)";
+      ctx.shadowBlur = 26;
+      ctx.fillStyle = "rgba(53, 88, 255, 0.22)";
+      roundRect(g.rightInner, g.top, t, g.plateH, 7);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = "#3558ff";
+      ctx.lineWidth = 2.6;
+      roundRect(g.rightInner, g.top, t, g.plateH, 7);
+      ctx.stroke();
+      ctx.strokeStyle = "#8fa8ff";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(g.rightInner + 3, g.top + 8);
+      ctx.lineTo(g.rightInner + 3, g.bottom - 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawFieldLines(g, m) {
+      const n = fieldLineCount(m.E);
+      if (n <= 0) {
+        chip("E = 0：板间无电场", g.cx, g.cy - 34, "#cbd5e1", "center");
+        return;
+      }
+      const x0 = g.leftInner + 5;
+      const x1 = g.rightInner - 5;
+      const span = g.plateH * 0.80;
+      const flow = state.showFlow ? (state.time * 0.00035) % 1 : 0;
+      const headScale = clamp((x1 - x0) / 150, 0.55, 1);
+
+      for (let i = 0; i < n; i += 1) {
+        const y = g.cy - span / 2 + span * (i + 0.5) / n;
+        ctx.save();
+        ctx.strokeStyle = "rgba(248, 250, 252, 0.78)";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x1, y);
+        ctx.stroke();
+        ctx.restore();
+
+        arrowHead(x0 + (x1 - x0) * 0.55, y, 10 * headScale, "#f8fafc");
+        arrowHead(x1 - 8, y, 10 * headScale, "#f8fafc");
+
+        if (state.showFlow) {
+          const tt = (flow + i * 0.07) % 1;
+          const fx = x0 + 10 + (x1 - x0 - 20) * tt;
+          arrowHead(fx, y, 12 * headScale, "#ffd166");
+        }
+      }
+    }
+
+    function drawSign(x, y, mark, color) {
+      ctx.save();
+      setFont(24, "bold");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = color;
+      ctx.fillText(mark, x, y);
+      ctx.restore();
+    }
+
+    function drawCharges(g, m) {
+      const n = chargeCount(m.Q);
+      if (n <= 0) {
+        chip("极板未带电：先接通电源充电", g.cx, g.cy + 34, "#fbbf24", "center");
+        return;
+      }
+      const span = g.plateH * 0.72;
+      for (let i = 0; i < n; i += 1) {
+        const y = g.cy - span / 2 + span * (i + 0.5) / n;
+        drawSign(g.leftInner - 9, y, "+", "#ff8080");
+        drawSign(g.rightInner + 9, y, "−", "#8fa8ff");
+      }
+    }
+
+    function drawAnnotations(g, m) {
+      const q = fmtCharge(m.Q);
+
+      chip("正极板　+" + q[0] + " " + q[1], g.leftInner - 34, g.bottom + 38, "#ff9a9a", "right");
+      chip("负极板　−" + q[0] + " " + q[1], g.rightInner + 34, g.bottom + 38, "#a5b8ff", "left");
+
+      chip("S = " + state.S + " cm²　εᵣ = " + state.er.toFixed(1), g.leftInner - 34, g.cy - 18, "#cbd5e1", "right");
+      chip("板高随 S 单调变化（示意）", g.leftInner - 34, g.cy + 18, "#94a3b8", "right");
+
+      const yDim = g.bottom + 104;
+      ctx.save();
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(g.leftInner, yDim - 14);
+      ctx.lineTo(g.leftInner, yDim + 14);
+      ctx.moveTo(g.rightInner, yDim - 14);
+      ctx.lineTo(g.rightInner, yDim + 14);
+      ctx.moveTo(g.leftInner + 14, yDim);
+      ctx.lineTo(g.rightInner - 14, yDim);
+      ctx.stroke();
+      ctx.restore();
+
+      arrowHead(g.leftInner + 14, yDim, 9, "#22c55e", -1);
+      arrowHead(g.rightInner - 14, yDim, 9, "#22c55e", 1);
+
+      chip("d = " + state.d.toFixed(1) + " mm", g.cx, yDim - 34, "#86efac", "center");
+    }
+
+    function drawStage(m) {
+      const g = stageGeom();
+      beginFrame();
+      ctx.clearRect(0, 0, LW, LH);
+      drawBackground(g);
+      drawCircuit(g);
+      drawMedium(g);
+      drawPlates(g);
+      if (state.showField) {
+        drawFieldLines(g, m);
+      }
+      if (state.showCharge) {
+        drawCharges(g, m);
+      }
+      drawAnnotations(g, m);
+    }
+
+    function setTile(key, value, unit, badge) {
+      const tile = el.tiles[key];
+      tile.querySelector(".tile-value").textContent = value;
+      tile.querySelector(".tile-unit").textContent = unit;
+      const b = tile.querySelector(".tile-badge");
+      b.textContent = badge.text;
+      b.className = "tile-badge " + badge.cls;
+    }
+
+    function updateReadouts(m, ref) {
+      const c = fmtCap(m.C);
+      const q = fmtCharge(m.Q);
+      const u = fmtVolt(m.U);
+      const e = fmtField(m.E);
+      const w = fmtEnergy(m.W);
+
+      setTile("C", c[0], c[1], deltaBadge(m.C, ref.C));
+      setTile("Q", q[0], q[1], deltaBadge(m.Q, ref.Q));
+      setTile("U", u[0], u[1], deltaBadge(m.U, ref.U));
+      setTile("E", e[0], e[1], deltaBadge(m.E, ref.E));
+      setTile("W", w[0], w[1], deltaBadge(m.W, ref.W));
+
+      el.stageLines.textContent = fieldLineCount(m.E) + " 条（E 越大条数越多，示意）";
+      el.stageState.textContent = state.mode === "uconst" ? "由电源补充或取回" : "被锁在极板上";
+
+      el.unitNote.textContent = "C = " + c[0] + " " + c[1] + " = " + sci(m.C / 1e-6) + " μF　|　Q = " + q[0] + " " + q[1] + " = " + sci(m.Q / 1e-6) + " μC　|　1 cm² = 10⁻⁴ m²，1 mm = 10⁻³ m，1 μF = 10⁻⁶ F，1 μC = 10⁻⁶ C";
+      el.breakdownChip.hidden = !(m.E >= 1e6);
+    }
+
+    function updateModeText() {
+      const text = MODE_TEXT[state.mode];
+      el.stageMode.textContent = text.name;
+      el.modeTag.textContent = text.tag;
+      el.modeTag.className = state.mode === "uconst" ? "mode-tag" : "mode-tag warn";
+      el.modeHint.textContent = text.hint;
+      el.modeHint.className = state.mode === "uconst" ? "mode-hint" : "mode-hint warn";
+      el.conclusionBody.textContent = text.body;
+      el.conclusionFormula.textContent = text.formula;
+      el.conclusionKey.textContent = text.key;
+      el.conclusionExtra.textContent = text.extra;
+      el.conclusionCard.className = state.mode === "uconst" ? "conclusion-card" : "conclusion-card warn";
+      el.deltaHint.textContent = "读数徽标 ↑↓ 只反映 d 的单独影响：以「基准 d = " + state.refD.toFixed(1) + " mm」为参照，改动 S、εᵣ、电源或电压后基准会重置为当前 d，徽标回到「—」，因此不会与屏幕上的读数相矛盾。";
+    }
+
+    function syncLabels() {
+      el.s.value = state.S;
+      el.d.value = state.d;
+      el.er.value = state.er;
+      el.u.value = state.U;
+      el.sOut.textContent = state.S + " cm²";
+      el.dOut.textContent = state.d.toFixed(1) + " mm";
+      el.erOut.textContent = state.er.toFixed(1);
+      el.uOut.textContent = state.U.toFixed(0) + " V";
+      el.u.disabled = state.mode !== "uconst";
+      el.voltHint.textContent = state.mode === "uconst"
+        ? "接通电源时 U 由电源提供，拖动即改变电源电压。"
+        : "已断开电源：U = Q/C 由电荷量与电容决定，此滑块失效。";
+    }
+
+    function render() {
+      const m = computeAt(state.d);
+      const ref = computeAt(state.refD);
+      updateReadouts(m, ref);
+      drawStage(m);
+    }
+
+    function setMode(mode) {
+      if (mode === state.mode) return;
+      if (mode === "qconst") {
+        state.Qfrozen = computeAt(state.d).Q;
+      }
+      state.mode = mode;
+      state.refD = state.d;
+      el.modeButtons.forEach(function (btn) {
+        const on = btn.dataset.mode === mode;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      updateModeText();
+      syncLabels();
+      render();
+    }
+
+    function animate() {
+      state.time += 16;
+      if (state.showFlow) {
+        render();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    el.s.addEventListener("input", function () {
+      state.S = Number(el.s.value);
+      state.refD = state.d;
+      updateModeText();
+      syncLabels();
+      render();
+    });
+
+    el.d.addEventListener("input", function () {
+      state.d = Number(el.d.value);
+      syncLabels();
+      render();
+    });
+
+    el.er.addEventListener("input", function () {
+      state.er = Number(el.er.value);
+      state.refD = state.d;
+      updateModeText();
+      syncLabels();
+      render();
+    });
+
+    el.u.addEventListener("input", function () {
+      state.U = Number(el.u.value);
+      state.refD = state.d;
+      updateModeText();
+      syncLabels();
+      render();
+    });
+
+    el.modeButtons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setMode(btn.dataset.mode);
+      });
+    });
+
+    el.showField.addEventListener("change", function () {
+      state.showField = el.showField.checked;
+      render();
+    });
+
+    el.showCharge.addEventListener("change", function () {
+      state.showCharge = el.showCharge.checked;
+      render();
+    });
+
+    el.showFlow.addEventListener("change", function () {
+      state.showFlow = el.showFlow.checked;
+      render();
+    });
+
+    el.resetBtn.addEventListener("click", function () {
+      state.S = DEFAULTS.S;
+      state.d = DEFAULTS.d;
+      state.er = DEFAULTS.er;
+      state.U = DEFAULTS.U;
+      state.mode = "uconst";
+      state.Qfrozen = 0;
+      state.refD = DEFAULTS.refD;
+      state.showField = true;
+      state.showCharge = true;
+      state.showFlow = true;
+      el.showField.checked = true;
+      el.showCharge.checked = true;
+      el.showFlow.checked = true;
+      el.modeButtons.forEach(function (btn) {
+        const on = btn.dataset.mode === "uconst";
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      updateModeText();
+      syncLabels();
+      render();
+    });
+
+    window.addEventListener("resize", function () {
+      syncBackingStore();
+      render();
+    });
+
+    updateModeText();
+    syncLabels();
+    render();
+    animate();
+  </script>
+<script>
+(function () {
+  var panel = document.getElementById("ctrlPanel");
+  var toggle = document.getElementById("ctrlToggle");
+  var drawer = document.getElementById("drawer");
+  var more = document.getElementById("moreBtn");
+  var closeBtn = document.getElementById("drawerClose");
+  var foldBtn = document.getElementById("panelFoldBtn");
+
+  function setPanel(open) {
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (foldBtn) foldBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) setDrawer(false);
+  }
+
+  function setDrawer(open) {
+    drawer.hidden = !open;
+    more.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) setPanel(false);
+  }
+
+  toggle.addEventListener("click", function () { setPanel(panel.hidden); });
+  more.addEventListener("click", function () { setDrawer(drawer.hidden); });
+  closeBtn.addEventListener("click", function () { setDrawer(false); });
+  if (foldBtn) {
+    foldBtn.addEventListener("click", function () { setPanel(false); });
+    /* 折叠按钮上的按下不要被 grip 的拖动劫持（否则 pointer capture 会吞掉 click） */
+    foldBtn.addEventListener("pointerdown", function (event) { event.stopPropagation(); });
+    /* 双击折叠按钮不要冒泡到 grip 的 dblclick（否则会再折叠一次） */
+    foldBtn.addEventListener("dblclick", function (event) { event.stopPropagation(); });
+  }
+
+  document.addEventListener("keydown", function (event) {
+    var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : "";
+    if (event.key === "Escape") {
+      setDrawer(false);
+      return;
+    }
+    if (event.key === "p" || event.key === "P") {
+      event.preventDefault();
+      setPanel(panel.hidden);
+      return;
+    }
+    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+      event.preventDefault();
+      setDrawer(drawer.hidden);
+      return;
+    }
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (event.key === "r" || event.key === "R") {
+      event.preventDefault();
+      document.getElementById("resetBtn").click();
+      return;
+    }
+    if (event.key === " " || event.code === "Space") {
+      event.preventDefault();
+      var flow = document.getElementById("showFlow");
+      flow.checked = !flow.checked;
+      flow.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+})();
+</script>
+
+<script>
+// 面板拖动 + 位置记忆：所有仿真页面共用同一份实现（LAYOUT.md 原文照抄）
+(function initDraggablePanel(){
+  const panel = document.getElementById('ctrlPanel');
+  const grip  = panel && panel.querySelector('.panel-grip');
+  if (!panel || !grip) return;
+  const KEY = 'hud-panel-pos:' + location.pathname.split('/').pop();
+
+  function clampToFrame(x, y){
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    return {
+      x: Math.min(Math.max(8, x), f.width  - r.width  - 8),
+      y: Math.min(Math.max(8, y), f.height - r.height - 8)
+    };
+  }
+  function place(x, y){
+    const p = clampToFrame(x, y);
+    panel.style.left = p.x + 'px';
+    panel.style.top  = p.y + 'px';
+    panel.style.right = 'auto';
+  }
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved) place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
+
+  let dx = 0, dy = 0, dragging = false;
+  grip.addEventListener('pointerdown', e => {
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    dragging = true; panel.classList.add('dragging');
+    grip.setPointerCapture(e.pointerId);
+    panel.style.left = (r.left - f.left) + 'px';
+    panel.style.top  = (r.top  - f.top ) + 'px';
+    panel.style.right = 'auto';
+  });
+  grip.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const f = panel.parentElement.getBoundingClientRect();
+    place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+  });
+  grip.addEventListener('pointerup', e => {
+    if (!dragging) return;
+    dragging = false; panel.classList.remove('dragging');
+    grip.releasePointerCapture(e.pointerId);
+    localStorage.setItem(KEY, JSON.stringify({
+      x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
+    }));
+  });
+  grip.addEventListener('dblclick', () => document.getElementById('ctrlToggle').click());
+})();
+
+// 面板上的指针事件不向画布穿透；窗口尺寸变化时把面板拉回舞台内
+(function guardPanel(){
+  const panel = document.getElementById('ctrlPanel');
+  if (!panel) return;
+  ['pointerdown', 'pointermove', 'pointerup', 'click'].forEach(function (type) {
+    panel.addEventListener(type, function (e) { e.stopPropagation(); });
+  });
+  window.addEventListener('resize', function () {
+    if (panel.hidden || !panel.style.left) return;
+    const f = panel.parentElement.getBoundingClientRect();
+    const r = panel.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = Math.min(Math.max(8, parseFloat(panel.style.left)), Math.max(8, f.width - r.width - 8));
+    const y = Math.min(Math.max(8, parseFloat(panel.style.top)), Math.max(8, f.height - r.height - 8));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+    panel.style.right = 'auto';
+  });
+})();
+</script>
+</body>
+</html>

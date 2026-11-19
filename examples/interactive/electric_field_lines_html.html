@@ -1,0 +1,1065 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title>点电荷电场线可视化资源</title>
+  <style>
+    :root {
+      --accent: #0f766e;
+      --stage: #080a0e;
+      --positive: #e73535;
+      --negative: #3558ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    #fieldCanvas { cursor: crosshair; touch-action: none; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; align-items: center; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+
+    .chip { display: inline-flex; align-items: baseline; gap: 4px;
+            padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,.06); }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; gap: 14px; align-items: center;
+                  white-space: nowrap; overflow: hidden; }
+    .hud-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
+
+    .sw { display: inline-block; width: 18px; height: 2px; border-radius: 1px;
+          background: #ffffff; flex: 0 0 auto; }
+    .sw.yellow { background: #ffd166; height: 3px; }
+    .sw.dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3030;
+              border: 1px solid #ffffff; }
+
+    /* 默认放左上（读数 chips 下方）：避开画面中央的电荷与右上角的初始试探电荷 */
+    .hud-panel { left: 12px; top: 68px; right: auto; width: 300px;
+                 max-height: calc(100% - 80px);
+                 overflow-y: auto; padding: 10px 12px; font-size: 12.5px; cursor: default; }
+    .hud-panel[hidden] { display: none; }
+
+    /* —— 参数面板拖动条（LAYOUT.md「参数面板必须可拖动」） —— */
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; gap: 8px; margin: -2px 0 8px;
+                             padding: 0 0 5px; border-bottom: 1px solid rgba(255,255,255,.12);
+                             font-size: 12px; font-weight: 700; color: #cfe3e9;
+                             touch-action: none; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-title { letter-spacing: .08em; }
+    .panel-fold { flex: 0 0 auto; padding: 2px 8px; border-radius: 6px; cursor: pointer;
+                  font: inherit; font-size: 11.5px; font-weight: 400; line-height: 1.4;
+                  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
+                  color: #cfe3e9; }
+    .panel-fold:hover { background: rgba(255,255,255,.14); color: #fff; }
+    .panel-body[hidden] { display: none; }
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                font-size: 15px;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-more:hover { background: rgba(20,40,48,.9); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer h3:first-of-type { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ul { margin: 2px 0 6px; padding-left: 18px; }
+    .drawer-close { position: absolute; right: 8px; top: 6px; width: 26px; height: 26px;
+                    min-height: 0; padding: 0; border-radius: 6px; cursor: pointer;
+                    border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06);
+                    color: #cfe3e9; font-size: 16px; line-height: 1; }
+    .drawer .metric-value { font-weight: 700; font-size: 13px; color: #7fd6e4; }
+    .drawer .metric-value.positive { color: #ff8b8b; }
+    .drawer .metric-value.negative { color: #9aa8ff; }
+    .drawer .metric-value.neutral { color: #7fd6e4; }
+    .drawer .metric-note { color: #b9ccd3; font-size: 12.5px; line-height: 1.6; }
+
+    /* —— HUD 面板内部控件（深色） —— */
+    .scene-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .scene-btn { min-height: 28px; height: 28px; padding: 0 4px; border-radius: 6px; cursor: pointer;
+                 border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
+                 color: #d7e5ea; font: inherit; font-size: 12px; }
+    .scene-btn:hover { background: rgba(255,255,255,.14); }
+    .scene-btn.active { background: var(--accent); border-color: var(--accent); color: #ffffff; font-weight: 700; }
+
+    .row { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 6px; color: #b9ccd3; font-size: 11.5px; margin-top: 6px; }
+    .row b { color: #7fd6e4; font-size: 11.5px; }
+    input[type="range"] { width: 100%; height: 18px; margin: 2px 0 0;
+                          accent-color: var(--accent); background: transparent; }
+    input[type="range"]:disabled { opacity: .45; }
+
+    .toggles { display: grid; gap: 4px; margin-top: 8px; }
+    .toggle { display: flex; align-items: flex-start; gap: 6px; font-size: 12px;
+              color: #d7e5ea; user-select: none; line-height: 1.35; }
+    .toggle input { width: 14px; height: 14px; margin-top: 2px; accent-color: var(--accent); flex: 0 0 auto; }
+
+    .reset-row { margin-top: 8px; }
+    .primary-btn { width: 100%; height: 28px; min-height: 28px; border-radius: 8px;
+                   border: 1px solid var(--accent); background: var(--accent); color: #ffffff;
+                   font-weight: 700; font-size: 12.5px; cursor: pointer; }
+    .primary-btn:hover { background: #0d665f; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+      .scene-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="fieldCanvas" width="1600" height="900"></canvas>
+
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip">场景 <b id="stageScene">正点电荷</b></span>
+          <span class="chip">电场线 <b id="stageDirection">向外发散</b></span>
+          <span class="chip">线条 <b id="stageCount">14 条</b></span>
+          <span class="chip">试探电荷 <b id="stageTest">显示</b></span>
+        </div>
+
+        <div class="hud hud-legend" id="legend" aria-label="图例">
+          <span class="lg"><i class="sw"></i>电场线（箭头示方向）</span>
+          <span class="lg"><i class="sw dot"></i>正试探电荷</span>
+          <span class="lg"><i class="sw yellow"></i>F 箭头：长度固定，只表示受力方向</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
+          <div class="panel-grip" title="拖动移动面板，双击折叠">
+            <span class="panel-title">参数</span>
+            <button type="button" class="panel-fold" id="ctrlToggle" aria-expanded="true" aria-controls="panelBody" aria-label="折叠参数面板">收起</button>
+          </div>
+
+          <div class="panel-body" id="panelBody">
+            <div class="scene-row" role="group" aria-label="电场线场景">
+              <button type="button" class="scene-btn active" data-scene="singlePositive">正点电荷</button>
+              <button type="button" class="scene-btn" data-scene="singleNegative">负点电荷</button>
+              <button type="button" class="scene-btn" data-scene="dipole">等量异种</button>
+              <button type="button" class="scene-btn" data-scene="samePositive">等量同种</button>
+            </div>
+
+            <div class="row"><label for="densitySlider">每个电荷线条数</label><b id="densityValue">14 条/电荷</b></div>
+            <input id="densitySlider" type="range" min="8" max="20" value="14" step="2" aria-label="每个电荷线条数" />
+
+            <div class="row"><label for="distanceSlider">两电荷距离</label><b id="distanceValue">3.0</b></div>
+            <input id="distanceSlider" type="range" min="2.0" max="4.8" value="3.0" step="0.2" aria-label="两电荷距离" />
+
+            <div class="toggles">
+              <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>显示背景场方向（等长箭头）</span></label>
+              <label class="toggle"><input type="checkbox" id="showTestCharge" checked /><span>显示正试探电荷</span></label>
+              <label class="toggle"><input type="checkbox" id="animateArrows" checked /><span>箭头流动提示</span></label>
+            </div>
+
+            <div class="reset-row">
+              <button type="button" class="primary-btn" id="resetBtn">重置资源</button>
+            </div>
+          </div>
+        </aside>
+
+        <button type="button" class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="说明与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="说明与课堂问题">
+          <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭">×</button>
+
+          <h3>结论</h3>
+          <p>电场线从正电荷出发、终止于负电荷（或伸向无穷远）；某点的场方向就是正试探电荷在该点的受力方向。</p>
+
+          <h3>当前情境</h3>
+          <p><b class="metric-value neutral" id="sceneName">正点电荷</b>　<span id="fieldDirection">由电荷向外发散</span></p>
+          <p>试探电荷受力：<span id="forceDirection">与该点电场方向一致</span></p>
+
+          <h3>教学提示</h3>
+          <p class="metric-note" id="teachingTip">电场线方向表示该点电场强度方向，也就是正试探电荷在该点所受电场力方向。</p>
+
+          <h3>模型假设</h3>
+          <ul>
+            <li>电场线是描述电场的模型，不是真实存在的线；线条密度只定性表示场强相对大小。</li>
+            <li>背景短箭头等长，只表示该点电场方向，不表示场强大小。</li>
+            <li>场线在画面外绕回时会被画布边缘截断，所以「线条总数」可能多于每电荷条数。</li>
+            <li>电场线不相交；等量同种电荷连线中点处合场强为 0。</li>
+          </ul>
+
+          <h3>操作</h3>
+          <p>在画布中拖动黄色正试探电荷，观察该点的电场方向（黄色 F 箭头长度固定，只表示方向，不表示受力大小）。</p>
+
+          <h3>单位说明</h3>
+          <p>画面为无量纲示意：两电荷距离以格（相对单位）计，电场线密度以条/电荷计，不涉及真实单位换算。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
+            <li>比较正点电荷和负点电荷：箭头方向分别指向哪里？</li>
+            <li>等量异种电荷中，电场线为什么从正电荷出发并指向负电荷？</li>
+            <li>等量同种电荷之间的电场线为什么向外弯曲且不相交？</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("fieldCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // —— 高清渲染（HiDPI）：LAYOUT.md「高清渲染」 ——
+    // LW / LH = 该页原来的 canvas.width / canvas.height，作为逻辑坐标系（不要改）
+    const LW = 1600, LH = 900;
+
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
+    const controls = {
+      densitySlider: document.getElementById("densitySlider"),
+      distanceSlider: document.getElementById("distanceSlider"),
+      showVectors: document.getElementById("showVectors"),
+      showTestCharge: document.getElementById("showTestCharge"),
+      animateArrows: document.getElementById("animateArrows"),
+      resetBtn: document.getElementById("resetBtn"),
+      sceneButtons: Array.from(document.querySelectorAll(".scene-btn"))
+    };
+
+    const output = {
+      densityValue: document.getElementById("densityValue"),
+      distanceValue: document.getElementById("distanceValue"),
+      stageScene: document.getElementById("stageScene"),
+      stageDirection: document.getElementById("stageDirection"),
+      stageCount: document.getElementById("stageCount"),
+      stageTest: document.getElementById("stageTest"),
+      sceneName: document.getElementById("sceneName"),
+      fieldDirection: document.getElementById("fieldDirection"),
+      forceDirection: document.getElementById("forceDirection"),
+      teachingTip: document.getElementById("teachingTip")
+    };
+
+    const SCENES = {
+      singlePositive: {
+        name: "正点电荷",
+        direction: "由电荷向外发散",
+        stageDirection: "向外发散",
+        force: "沿电场线切线向外",
+        tip: "正点电荷周围电场线向外发散，箭头方向表示正试探电荷所受电场力方向。"
+      },
+      singleNegative: {
+        name: "负点电荷",
+        direction: "由外部指向电荷",
+        stageDirection: "指向电荷",
+        force: "沿电场线切线指向电荷",
+        tip: "负点电荷周围电场线指向电荷，说明正试探电荷会受到指向负电荷的电场力。"
+      },
+      dipole: {
+        name: "等量异种点电荷",
+        direction: "从正电荷出发并终止于负电荷",
+        stageDirection: "+Q → -Q",
+        force: "沿电场线切线方向",
+        tip: "等量异种点电荷的电场线从正电荷出发，最终指向负电荷。部分场线在画面外绕回，同一条线被画布边缘截成两段，因此“线条总数”会多于每电荷条数；从画面边缘进入并终止于负电荷的线段就是这些绕回场线的另一端。"
+      },
+      samePositive: {
+        name: "等量同种点电荷",
+        direction: "分别从两个正电荷向外发散",
+        stageDirection: "向外弯曲",
+        force: "沿电场线切线方向",
+        tip: "等量同种正电荷的电场线从两个电荷向外发散，中间区域场线向两侧弯曲，电场线不能相交；连线中点处合场强为 0。"
+      }
+    };
+
+    const state = {
+      scene: "singlePositive",
+      density: 14,
+      distance: 3.0,
+      test: { x: 1.3, y: 1.1 },
+      draggingTest: false,
+      time: 0
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function worldBounds() {
+      return { xmin: -5.6, xmax: 5.6, ymin: -3.15, ymax: 3.15 };
+    }
+
+    function worldToCanvas(point) {
+      const b = worldBounds();
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.78;
+      const ox = LW / 2;
+      const oy = LH / 2;
+      return {
+        x: ox + point.x * s,
+        y: oy - point.y * s
+      };
+    }
+
+    function canvasToWorld(point) {
+      const b = worldBounds();
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.78;
+      return {
+        x: clamp((point.x - LW / 2) / s, b.xmin + 0.2, b.xmax - 0.2),
+        y: clamp((LH / 2 - point.y) / s, b.ymin + 0.25, b.ymax - 0.25)
+      };
+    }
+
+    function sceneCharges() {
+      const d = state.distance;
+      if (state.scene === "singlePositive") {
+        return [{ q: 1, x: 0, y: 0, label: "+Q" }];
+      }
+      if (state.scene === "singleNegative") {
+        return [{ q: -1, x: 0, y: 0, label: "-Q" }];
+      }
+      if (state.scene === "dipole") {
+        return [
+          { q: 1, x: -d / 2, y: 0, label: "+Q" },
+          { q: -1, x: d / 2, y: 0, label: "-Q" }
+        ];
+      }
+      return [
+        { q: 1, x: -d / 2, y: 0, label: "+Q" },
+        { q: 1, x: d / 2, y: 0, label: "+Q" }
+      ];
+    }
+
+    function fieldAt(x, y, charges) {
+      let ex = 0;
+      let ey = 0;
+      for (const c of charges) {
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const r2 = dx * dx + dy * dy + 0.025;
+        const r = Math.sqrt(r2);
+        const scale = c.q / (r2 * r);
+        ex += scale * dx;
+        ey += scale * dy;
+      }
+      return { x: ex, y: ey, m: Math.hypot(ex, ey) };
+    }
+
+    function chargeColor(q) {
+      if (q > 0) return "#ff3030";
+      if (q < 0) return "#5363ff";
+      return "#aab4c4";
+    }
+
+    function isNearCharge(x, y, charges, radius = 0.31) {
+      return charges.some(c => Math.hypot(x - c.x, y - c.y) < radius);
+    }
+
+    function inIntegrationBounds(x, y) {
+      /* 与 worldBounds 保持一致：电场线画到世界边框就停，画面四周才留得出白边 */
+      const b = worldBounds();
+      return x > b.xmin - 0.15 && x < b.xmax + 0.15 && y > b.ymin - 0.15 && y < b.ymax + 0.15;
+    }
+
+    function angleDifference(a, b) {
+      return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, lineWidth, headLength = 13) {
+      const length = Math.hypot(x2 - x1, y2 - y1);
+      if (!Number.isFinite(length) || length < 0.5) return;
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const actualHeadLength = Math.min(headLength, Math.max(4, length * 0.48));
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(
+        x2 - actualHeadLength * Math.cos(angle - Math.PI / 6),
+        y2 - actualHeadLength * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        x2 - actualHeadLength * Math.cos(angle + Math.PI / 6),
+        y2 - actualHeadLength * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function isFiniteCanvasPoint(point) {
+      return point && Number.isFinite(point.x) && Number.isFinite(point.y);
+    }
+
+    function drawArrowHeadOnPath(path, color, ratio = 0.5) {
+      if (path.length < 12) return;
+      const points = path.map(worldToCanvas);
+      const visible = [];
+      for (let i = 4; i < points.length - 5; i += 1) {
+        const p = points[i];
+        if (isFiniteCanvasPoint(p) && p.x >= 0 && p.x <= LW && p.y >= 0 && p.y <= LH) {
+          visible.push(i);
+        }
+      }
+      if (visible.length < 6) return;
+      const position = clamp(ratio, 0.04, 0.96);
+      const idx = visible[Math.min(visible.length - 1, Math.floor((visible.length - 1) * position))];
+      const center = points[idx];
+      if (!isFiniteCanvasPoint(center)) return;
+
+      let beforeIdx = idx;
+      let afterIdx = idx;
+      const targetDistance = 18;
+      for (let i = idx - 1; i >= 0; i -= 1) {
+        const p = points[i];
+        if (isFiniteCanvasPoint(p) && Math.hypot(p.x - center.x, p.y - center.y) >= targetDistance) {
+          beforeIdx = i;
+          break;
+        }
+      }
+      for (let i = idx + 1; i < points.length; i += 1) {
+        const p = points[i];
+        if (isFiniteCanvasPoint(p) && Math.hypot(p.x - center.x, p.y - center.y) >= targetDistance) {
+          afterIdx = i;
+          break;
+        }
+      }
+      if (beforeIdx === idx || afterIdx === idx) return;
+
+      const p1 = points[beforeIdx];
+      const p2 = points[afterIdx];
+      if (!isFiniteCanvasPoint(p1) || !isFiniteCanvasPoint(p2)) return;
+      if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 22) return;
+      drawArrow(p1.x, p1.y, p2.x, p2.y, color, 2.35, 12);
+    }
+
+    function drawWorldPath(path, color, width = 2.2, alpha = 0.82) {
+      if (path.length < 2) return;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      const first = worldToCanvas(path[0]);
+      ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < path.length; i += 1) {
+        const p = worldToCanvas(path[i]);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function normalizedField(x, y, charges) {
+      const e = fieldAt(x, y, charges);
+      if (e.m < 1e-5) return null;
+      return { x: e.x / e.m, y: e.y / e.m, m: e.m };
+    }
+
+    function rk4FieldStep(x, y, charges, direction, step) {
+      const k1 = normalizedField(x, y, charges);
+      if (!k1) return null;
+      const k2 = normalizedField(x + direction * k1.x * step / 2, y + direction * k1.y * step / 2, charges);
+      const k3 = normalizedField(x + direction * (k2 || k1).x * step / 2, y + direction * (k2 || k1).y * step / 2, charges);
+      const k4 = normalizedField(x + direction * (k3 || k1).x * step, y + direction * (k3 || k1).y * step, charges);
+      const vx = (k1.x + 2 * (k2 || k1).x + 2 * (k3 || k1).x + (k4 || k1).x) / 6;
+      const vy = (k1.y + 2 * (k2 || k1).y + 2 * (k3 || k1).y + (k4 || k1).y) / 6;
+      const m = Math.hypot(vx, vy);
+      if (m < 1e-5) return null;
+      return { x: x + direction * (vx / m) * step, y: y + direction * (vy / m) * step };
+    }
+
+    function reachedOppositeCharge(x, y, charges, source) {
+      return charges.some(c => c !== source && c.q * source.q < 0 && Math.hypot(x - c.x, y - c.y) < 0.34);
+    }
+
+    function integrateLine(start, charges, source, direction = 1) {
+      const path = [{ x: start.x, y: start.y }];
+      let x = start.x;
+      let y = start.y;
+      const step = 0.035;
+      for (let i = 0; i < 2600; i += 1) {
+        const next = rk4FieldStep(x, y, charges, direction, step);
+        if (!next) break;
+        x = next.x;
+        y = next.y;
+        path.push({ x, y });
+        if (i > 10 && reachedOppositeCharge(x, y, charges, source)) break;
+        if (!inIntegrationBounds(x, y)) break;
+      }
+      return path;
+    }
+
+    function seedAnglesForCharge(charge, charges, count) {
+      const blocked = charges
+        .filter(other => other !== charge && other.q * charge.q > 0)
+        .map(other => Math.atan2(other.y - charge.y, other.x - charge.x));
+      const candidates = [];
+      const samples = Math.max(96, count * 12);
+      for (let i = 0; i < samples; i += 1) {
+        const angle = (i / samples) * Math.PI * 2;
+        const pointsTowardSameCharge = blocked.some(blockedAngle => Math.abs(angleDifference(angle, blockedAngle)) < 0.42);
+        if (!pointsTowardSameCharge) {
+          candidates.push(angle);
+        }
+      }
+      if (candidates.length === 0) return [];
+      const angles = [];
+      for (let i = 0; i < count; i += 1) {
+        const index = Math.floor((i + 0.5) * candidates.length / count) % candidates.length;
+        angles.push(candidates[index]);
+      }
+      return angles;
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, LW, LH);
+      ctx.fillStyle = "#080a0e";
+      ctx.fillRect(0, 0, LW, LH);
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.055)";
+      ctx.lineWidth = 1;
+      for (let x = -5; x <= 5; x += 1) {
+        const p1 = worldToCanvas({ x, y: -3 });
+        const p2 = worldToCanvas({ x, y: 3 });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      for (let y = -3; y <= 3; y += 1) {
+        const p1 = worldToCanvas({ x: -5.4, y });
+        const p2 = worldToCanvas({ x: 5.4, y });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawVectorGrid(charges) {
+      if (!controls.showVectors.checked) return;
+      ctx.save();
+      const rowStep = 0.86;
+      const colStep = 1.16;
+      let row = 0;
+      for (let y = -2.55; y <= 2.55; y += rowStep, row += 1) {
+        const halfWidth = 4.95 - Math.abs(y) * 0.62;
+        const offset = row % 2 === 0 ? 0 : colStep * 0.5;
+        for (let x = -halfWidth + offset; x <= halfWidth; x += colStep) {
+          if (isNearCharge(x, y, charges, 0.55)) continue;
+          const e = fieldAt(x, y, charges);
+          if (e.m < 0.0001) continue;
+          const start = worldToCanvas({ x, y });
+          const edgeFade = clamp(1 - (Math.abs(x) / 5.3) ** 2 - (Math.abs(y) / 3.1) ** 2, 0.15, 1);
+          const length = 16;
+          const alpha = 0.26 * edgeFade;
+          const end = {
+            x: start.x + (e.x / e.m) * length,
+            y: start.y - (e.y / e.m) * length
+          };
+          drawArrow(start.x, start.y, end.x, end.y, `rgba(255,255,255,${alpha})`, 1.25, 5);
+        }
+      }
+      ctx.restore();
+    }
+
+    function canvasHalfExtent() {
+      const b = worldBounds();
+      const sx = LW / (b.xmax - b.xmin);
+      const sy = LH / (b.ymax - b.ymin);
+      const s = Math.min(sx, sy) * 0.78;
+      return { s, halfWidth: LW / (2 * s), halfHeight: LH / (2 * s) };
+    }
+
+    function singleFieldLines(charges) {
+      const charge = charges[0];
+      const count = state.density;
+      const innerRadius = 0.34;
+      const { halfWidth, halfHeight } = canvasHalfExtent();
+      const paths = [];
+      const segments = 96;
+      for (let i = 0; i < count; i += 1) {
+        const angle = (i / count) * Math.PI * 2;
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        const tx = Math.abs(dirX) > 1e-9 ? halfWidth / Math.abs(dirX) : Infinity;
+        const ty = Math.abs(dirY) > 1e-9 ? halfHeight / Math.abs(dirY) : Infinity;
+        const outerRadius = Math.min(tx, ty);
+        const path = [];
+        for (let j = 0; j <= segments; j += 1) {
+          const radius = innerRadius + (outerRadius - innerRadius) * (j / segments);
+          path.push({
+            x: charge.x + dirX * radius,
+            y: charge.y + dirY * radius
+          });
+        }
+        if (charge.q < 0) {
+          path.reverse();
+        }
+        paths.push(path);
+      }
+      return paths;
+    }
+
+    function dipoleFieldLines(charges) {
+      const positive = charges.find(c => c.q > 0);
+      const negative = charges.find(c => c.q < 0);
+      if (!positive || !negative) return [];
+      const paths = [];
+      const escapedSeeds = [];
+      const angles = seedAnglesForCharge(positive, charges, state.density);
+      for (const angle of angles) {
+        const start = {
+          x: positive.x + Math.cos(angle) * 0.42,
+          y: positive.y + Math.sin(angle) * 0.42
+        };
+        const path = integrateLine(start, charges, positive, 1);
+        if (path.length <= 12) continue;
+        paths.push(path);
+        const end = path[path.length - 1];
+        if (!reachedOppositeCharge(end.x, end.y, charges, positive)) {
+          escapedSeeds.push(angle);
+        }
+      }
+      for (const angle of escapedSeeds) {
+        const mirrorAngle = angle + Math.PI;
+        const start = {
+          x: negative.x + Math.cos(mirrorAngle) * 0.42,
+          y: negative.y + Math.sin(mirrorAngle) * 0.42
+        };
+        const path = integrateLine(start, charges, negative, -1);
+        if (path.length > 16) {
+          paths.push(path.reverse());
+        }
+      }
+      return paths;
+    }
+
+    function pairFieldLines(charges) {
+      if (state.scene === "dipole") return dipoleFieldLines(charges);
+      const paths = [];
+      const positiveCharges = charges.filter(c => c.q > 0);
+      for (const c of positiveCharges) {
+        for (const angle of seedAnglesForCharge(c, charges, state.density)) {
+          const start = {
+            x: c.x + Math.cos(angle) * 0.42,
+            y: c.y + Math.sin(angle) * 0.42
+          };
+          const path = integrateLine(start, charges, c, 1);
+          if (path.length > 12) paths.push(path);
+        }
+      }
+      return paths;
+    }
+
+    function buildFieldLines(charges) {
+      return charges.length === 1 ? singleFieldLines(charges) : pairFieldLines(charges);
+    }
+
+    function drawFieldLines(paths) {
+      const phase = controls.animateArrows.checked ? Math.sin(state.time * 0.04) * 0.06 : 0;
+      const radial = state.scene.startsWith("single");
+      for (const path of paths) {
+        drawWorldPath(path, "#f8fafc", 2.2, 0.78);
+        if (radial) {
+          for (const ratio of [0.2, 0.5, 0.8]) {
+            drawArrowHeadOnPath(path, "#f8fafc", ratio + phase);
+          }
+        } else {
+          drawArrowHeadOnPath(path, "#f8fafc", 0.5 + phase);
+        }
+      }
+    }
+
+    function drawCharge(c) {
+      const p = worldToCanvas(c);
+      const radius = 22;
+      const gradient = ctx.createRadialGradient(p.x - 12, p.y - 12, 5, p.x, p.y, radius);
+      gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+      gradient.addColorStop(0.23, chargeColor(c.q));
+      gradient.addColorStop(1, chargeColor(c.q));
+
+      ctx.save();
+      ctx.shadowColor = c.q > 0 ? "rgba(255, 62, 62, 0.48)" : "rgba(83, 99, 255, 0.48)";
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(255,255,255,0.82)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 24px Arial";
+      ctx.fillText(c.q > 0 ? "+" : "-", p.x, p.y - 9);
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(c.label, p.x, p.y + 16);
+      ctx.restore();
+    }
+
+    function testDisplayPosition(charges) {
+      const test = state.test;
+      return {
+        x: test.x,
+        y: test.y + (isNearCharge(test.x, test.y, charges, 0.48) ? 0.15 : 0)
+      };
+    }
+
+    function drawTestCharge(charges) {
+      if (!controls.showTestCharge.checked) return;
+      const test = state.test;
+      const e = fieldAt(test.x, test.y, charges);
+      const p = worldToCanvas(testDisplayPosition(charges));
+      ctx.save();
+      ctx.fillStyle = "#ffd166";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.shadowColor = "rgba(255, 209, 102, 0.5)";
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+      ctx.fillStyle = "#172033";
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("+", p.x, p.y);
+      ctx.restore();
+
+      if (e.m > 0.0001) {
+        const end = {
+          x: p.x + (e.x / e.m) * 70,
+          y: p.y - (e.y / e.m) * 70
+        };
+        drawArrow(p.x, p.y, end.x, end.y, "#ffd166", 5, 16);
+        ctx.save();
+        ctx.fillStyle = "#ffd166";
+        ctx.font = "bold 18px Arial";
+        ctx.textAlign = "left";
+        ctx.fillText("F", end.x + 8, end.y + 4);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.strokeStyle = "#ffd166";
+        ctx.fillStyle = "#ffd166";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 24, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = "bold 16px Microsoft YaHei, Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("E≈0", p.x, p.y - 30);
+        ctx.restore();
+      }
+    }
+
+    function drawModelLabel() {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "bold 18px Microsoft YaHei, Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("电场线方向 = 正试探电荷受力方向", LW / 2, LH - 22);
+      ctx.restore();
+    }
+
+    function updateOutputs(fieldLineCount) {
+      const scene = SCENES[state.scene];
+      output.densityValue.textContent = `${state.density} 条/电荷`;
+      output.stageCount.textContent = `${fieldLineCount} 条`;
+      output.distanceValue.textContent = state.scene.startsWith("single") ? "单电荷" : `${state.distance.toFixed(1)}`;
+      output.stageScene.textContent = scene.name;
+      output.stageDirection.textContent = scene.stageDirection;
+      output.stageTest.textContent = controls.showTestCharge.checked ? "显示" : "隐藏";
+      output.sceneName.textContent = scene.name;
+      output.fieldDirection.textContent = scene.direction;
+      output.forceDirection.textContent = scene.force;
+      output.teachingTip.textContent = scene.tip;
+      output.sceneName.className = state.scene === "singleNegative" ? "metric-value negative" : "metric-value neutral";
+      controls.distanceSlider.disabled = state.scene.startsWith("single");
+    }
+
+    function drawAll() {
+      const charges = sceneCharges();
+      const paths = buildFieldLines(charges);
+      updateOutputs(paths.length);
+      drawBackground();
+      drawVectorGrid(charges);
+      drawFieldLines(paths);
+      for (const c of charges) {
+        drawCharge(c);
+      }
+      drawTestCharge(charges);
+      drawModelLabel();
+    }
+
+    function render() {
+      beginFrame();   // 每帧绘制前先按 CSS 尺寸 × DPR 重设位图，再把映射设回逻辑坐标
+      drawAll();
+    }
+
+    function animate() {
+      state.time += 1;
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    function canvasPoint(event) {
+      return toLogical(event);   // 逻辑坐标换算见 toLogical（LW / rect.width）
+    }
+
+    function hitTestCharge(point, charges) {
+      const p = worldToCanvas(testDisplayPosition(charges));
+      return Math.hypot(point.x - p.x, point.y - p.y) < 28;
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (!controls.showTestCharge.checked) return;
+      const point = canvasPoint(event);
+      if (!hitTestCharge(point, sceneCharges())) return;
+      state.draggingTest = true;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!state.draggingTest) return;
+      state.test = canvasToWorld(canvasPoint(event));
+      render();
+    });
+
+    canvas.addEventListener("pointerup", () => {
+      state.draggingTest = false;
+    });
+
+    canvas.addEventListener("pointercancel", () => {
+      state.draggingTest = false;
+    });
+
+    controls.sceneButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.scene = button.dataset.scene;
+        controls.sceneButtons.forEach(btn => btn.classList.toggle("active", btn === button));
+        state.test = state.scene === "singleNegative" ? { x: -1.2, y: 1.1 } : { x: 1.3, y: 1.1 };
+        render();
+      });
+    });
+
+    controls.densitySlider.addEventListener("input", () => {
+      state.density = Number(controls.densitySlider.value);
+      render();
+    });
+
+    controls.distanceSlider.addEventListener("input", () => {
+      state.distance = Number(controls.distanceSlider.value);
+      render();
+    });
+
+    controls.showVectors.addEventListener("change", render);
+    controls.showTestCharge.addEventListener("change", render);
+    controls.animateArrows.addEventListener("change", render);
+
+    controls.resetBtn.addEventListener("click", () => {
+      state.scene = "singlePositive";
+      state.density = 14;
+      state.distance = 3.0;
+      state.test = { x: 1.3, y: 1.1 };
+      controls.densitySlider.value = state.density;
+      controls.distanceSlider.value = state.distance;
+      controls.showVectors.checked = true;
+      controls.showTestCharge.checked = true;
+      controls.animateArrows.checked = true;
+      controls.sceneButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.scene === state.scene));
+      render();
+    });
+
+    window.addEventListener("resize", render);
+
+    // —— 外壳交互：参数面板折叠 / 「?」抽屉（不涉及物理与拖拽逻辑） ——
+    const ctrlToggle = document.getElementById("ctrlToggle");
+    const ctrlPanel = document.getElementById("ctrlPanel");
+    const panelBody = document.getElementById("panelBody");
+    const moreBtn = document.getElementById("moreBtn");
+    const drawer = document.getElementById("drawer");
+    const drawerClose = document.getElementById("drawerClose");
+    let clampPanelPosition = null;
+
+    function setPanelOpen(open) {
+      panelBody.hidden = !open;
+      ctrlToggle.setAttribute("aria-expanded", String(open));
+      ctrlToggle.textContent = open ? "收起" : "展开";
+      ctrlToggle.setAttribute("aria-label", open ? "折叠参数面板" : "展开参数面板");
+      if (clampPanelPosition) clampPanelPosition();
+    }
+
+    function setDrawerOpen(open) {
+      drawer.hidden = !open;
+      moreBtn.setAttribute("aria-expanded", String(open));
+    }
+
+    ctrlToggle.addEventListener("click", () => setPanelOpen(panelBody.hidden));
+    moreBtn.addEventListener("click", () => setDrawerOpen(drawer.hidden));
+    drawerClose.addEventListener("click", () => setDrawerOpen(false));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { setDrawerOpen(false); return; }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const el = event.target;
+      const tag = el && el.tagName;
+      if (event.key === " " || event.code === "Space") {
+        // 空格 = 播放/暂停箭头流动；焦点在控件上时让浏览器保留原生行为。
+        if (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A", "SUMMARY"].includes(tag)) return;
+        event.preventDefault();
+        controls.animateArrows.checked = !controls.animateArrows.checked;
+        render();
+        return;
+      }
+      const typing = tag === "TEXTAREA" || tag === "SELECT"
+        || (tag === "INPUT" && ["text", "number", "search", "email", "url", "password", "tel"].includes(el.type));
+      if (typing) return;
+      const key = event.key.toLowerCase();
+      if (key === "p") { event.preventDefault(); setPanelOpen(panelBody.hidden); }
+      else if (key === "r") { event.preventDefault(); controls.resetBtn.click(); }
+      else if (event.key === "?") { event.preventDefault(); setDrawerOpen(drawer.hidden); }
+    });
+
+    // —— 面板拖动 + 位置记忆：LAYOUT.md「参数面板必须可拖动」的共用实现 ——
+    (function initDraggablePanel(){
+      const panel = document.getElementById("ctrlPanel");
+      const grip = panel && panel.querySelector(".panel-grip");
+      if (!panel || !grip) return;
+      const frame = panel.parentElement;
+      const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+
+      function clampToFrame(x, y) {
+        const f = frame.getBoundingClientRect();
+        const r = panel.getBoundingClientRect();
+        return {
+          x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+          y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+        };
+      }
+      function place(x, y) {
+        const p = clampToFrame(x, y);
+        panel.style.left = p.x + "px";
+        panel.style.top = p.y + "px";
+        panel.style.right = "auto";
+      }
+      clampPanelPosition = function () {
+        if (!panel.style.left) return;
+        place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+      };
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (error) { saved = null; }
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+        place(saved.x, saved.y);        // 恢复上次位置；无记录则用 CSS 默认角落
+      }
+
+      let dx = 0, dy = 0, dragging = false;
+      function endDrag(event) {
+        if (!dragging) return;
+        dragging = false;
+        panel.classList.remove("dragging");
+        if (event && event.pointerId !== undefined && grip.hasPointerCapture(event.pointerId)) {
+          grip.releasePointerCapture(event.pointerId);
+        }
+        try {
+          localStorage.setItem(KEY, JSON.stringify({
+            x: parseFloat(panel.style.left), y: parseFloat(panel.style.top)
+          }));
+        } catch (error) { /* 隐私模式下写入失败也不影响拖动 */ }
+      }
+
+      grip.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button")) return;   // 折叠按钮不是拖动手柄
+        if (event.button !== 0) return;
+        const f = frame.getBoundingClientRect();
+        const r = panel.getBoundingClientRect();
+        dx = event.clientX - r.left; dy = event.clientY - r.top;
+        dragging = true;
+        panel.classList.add("dragging");
+        grip.setPointerCapture(event.pointerId);
+        panel.style.left = (r.left - f.left) + "px";
+        panel.style.top = (r.top - f.top) + "px";
+        panel.style.right = "auto";
+        event.preventDefault();
+        event.stopPropagation();   // 面板浮在画布之上，拖动不穿透到 canvas
+      });
+      grip.addEventListener("pointermove", (event) => {
+        if (!dragging) return;
+        const f = frame.getBoundingClientRect();
+        place(event.clientX - f.left - dx, event.clientY - f.top - dy);
+      });
+      grip.addEventListener("pointerup", endDrag);
+      grip.addEventListener("pointercancel", endDrag);
+
+      grip.addEventListener("dblclick", (event) => {
+        if (event.target.closest("button")) return;
+        const toggle = document.getElementById("ctrlToggle");
+        if (toggle) toggle.click();
+      });
+
+      window.addEventListener("resize", () => {
+        if (!dragging && clampPanelPosition) clampPanelPosition();
+      });
+    })();
+
+    animate();
+  </script>
+</body>
+</html>

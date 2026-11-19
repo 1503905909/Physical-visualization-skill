@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>质谱仪可视化资源</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --accent: #0f766e;
+      --cyan: #7fd6e4;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: var(--cyan); }
+    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+    .hud-readout .chip + .chip { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.14); }
+    .hud-readout .k { font-size: 11px; color: #93aab4; }
+    .hud-readout b.ok { color: #4ade80; }
+    .hud-readout b.amber { color: #ffd166; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .hud-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .sw { display: inline-block; width: 16px; height: 4px; border-radius: 2px; flex: 0 0 auto; }
+    .sw-ion { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; }
+    .sw-track { background: #22c55e; }
+    .sw-ghost { background: repeating-linear-gradient(90deg, #86efac 0 5px, transparent 5px 9px); }
+    .sw-rej { background: repeating-linear-gradient(90deg, #fb923c 0 4px, transparent 4px 8px); }
+    .sw-field { height: 2px; background: #ffd166; }
+
+    .hud-panel { right: 12px; top: 12px; width: 258px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin;
+                 cursor: default; }
+    .hud-panel[hidden] { display: none; }
+
+    /* 首行拖拽把手：标题 + 折叠按钮；拖动改位置，双击标题折叠 */
+    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
+                             display: flex; align-items: center; justify-content: space-between;
+                             gap: 8px; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em;
+                              color: var(--cyan); }
+    .hud-panel .grip-btn { width: 22px; height: 22px; padding: 0; line-height: 1; font-size: 12px;
+                           border-radius: 6px; cursor: pointer; }
+
+    .hud-panel h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                    color: var(--cyan); }
+    .panel-grip + h4 { margin-top: 0; }
+
+    .field { margin-top: 7px; }
+    .field > label { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px;
+                     color: #b9cdd6; }
+    .field > label > span:last-child { color: var(--cyan); font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 2px 0 0;
+                          accent-color: #22d3ee; }
+
+    select { width: 100%; margin-top: 3px; padding: 4px 6px; font: inherit; font-size: 12px;
+             color: #eaf2f5; background: rgba(255,255,255,.08);
+             border: 1px solid rgba(255,255,255,.22); border-radius: 6px; }
+
+    .hud-panel button { font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
+                        cursor: pointer; color: #eaf2f5; background: rgba(255,255,255,.08);
+                        border: 1px solid rgba(255,255,255,.22); }
+    .hud-panel button:hover { background: rgba(255,255,255,.16); }
+    .hud-panel button.active, .hud-panel button.primary { background: var(--accent);
+                        border-color: var(--accent); color: #ffffff; }
+    .hud-panel button.active:hover, .hud-panel button.primary:hover { background: #0d665f; }
+
+    .iso-grid, .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
+    .toggles { display: grid; gap: 6px; margin-top: 7px; }
+    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #b9cdd6;
+              cursor: pointer; }
+    .toggle input { width: 15px; height: 15px; accent-color: #22d3ee; }
+
+    /* 面板展开时折叠按钮在面板首行，此按钮只在折叠后出现 */
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                  display: none; }
+    .hud-toggle[aria-expanded="false"] { display: inline-block; }
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-more:hover { background: rgba(255,255,255,.16); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px;
+              scrollbar-width: thin; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: var(--cyan); }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ol { margin: 4px 0; padding-left: 18px; }
+    .drawer .eq { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--cyan); }
+    .drawer p.warn { color: #ffd166; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+    }
+
+    /* 窄屏：面板收窄，避开 ② 偏转磁场区的右边界 */
+    @media (max-width: 1100px) {
+      .hud-panel { width: 246px; }
+    }
+
+    /* 短屏（如 1024×768 的 4:3 投影）：面板内容略收紧，保证参数全部可见 */
+    @media (max-height: 800px) {
+      .hud-panel { padding: 10px 12px; font-size: 12px; }
+      .hud-panel h4 { margin: 8px 0 2px; }
+      .field { margin-top: 5px; }
+      .toggles { gap: 4px; margin-top: 6px; }
+      .btn-row { margin-top: 7px; }
+    }
+
+    /* 4:3 投影（1024×768）：舞台只有 567px 高，再收紧一档，保证播放/重置不被截断 */
+    @media (max-width: 1100px) and (max-height: 800px) {
+      .hud-panel { padding: 8px 10px; }
+      .hud-panel h4 { margin: 6px 0 2px; }
+      .field { margin-top: 3px; }
+      .iso-grid, .segmented { margin-top: 4px; }
+      .toggles { gap: 3px; margin-top: 5px; }
+      .btn-row { margin-top: 5px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="spectrometerCanvas" width="960" height="540"></canvas>
+
+        <!-- 读数：左上角 ≤4 chips -->
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip"><span class="k">v</span><b id="mSpeed">—</b></span>
+          <span class="chip"><span class="k">r₁</span><b class="ok" id="mRadius">—</b></span>
+          <span class="chip"><span class="k">x₁</span><b class="ok" id="mLanding">—</b></span>
+          <span class="chip"><span class="k">Δx</span><b class="amber" id="mDelta">—</b></span>
+        </div>
+
+        <!-- 图例：左下角一行 -->
+        <div class="hud hud-legend" id="legend" aria-label="图例">
+          <span><i class="sw sw-ion"></i>正离子</span>
+          <span><i class="sw sw-track"></i>离子轨迹</span>
+          <span><i class="sw sw-ghost"></i>对比同位素</span>
+          <span><i class="sw sw-rej"></i>被挡掉的离子</span>
+          <span><i class="sw sw-field"></i>电场 E</span>
+        </div>
+
+        <!-- 参数：可拖动 + 可折叠（首行把手） -->
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数调节">
+          <div class="panel-grip" id="panelGrip">
+            <span class="panel-name">参数</span>
+            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
+                    title="折叠（双击标题行也可）">◂</button>
+          </div>
+          <h4>电场与磁场</h4>
+          <div class="field">
+            <label for="eSlider"><span>选择器电场 E</span><span id="eValue">2.0×10⁴ V/m</span></label>
+            <input id="eSlider" type="range" min="1" max="3" step="0.1" value="2" />
+          </div>
+          <div class="field">
+            <label for="b1Slider"><span>选择器磁场 B₁</span><span id="b1Value">0.10 T</span></label>
+            <input id="b1Slider" type="range" min="0.08" max="0.20" step="0.01" value="0.10" />
+          </div>
+          <div class="field">
+            <label for="b2Slider"><span>偏转磁场 B₂</span><span id="b2Value">0.50 T</span></label>
+            <input id="b2Slider" type="range" min="0.30" max="0.90" step="0.05" value="0.50" />
+          </div>
+
+          <h4>离子与电荷</h4>
+          <div class="iso-grid">
+            <button type="button" class="iso-btn" data-iso="c12">¹²C⁺</button>
+            <button type="button" class="iso-btn" data-iso="c13">¹³C⁺</button>
+            <button type="button" class="iso-btn active" data-iso="ne20">²⁰Ne⁺</button>
+            <button type="button" class="iso-btn" data-iso="ne22">²²Ne⁺</button>
+          </div>
+          <div class="field">
+            <label for="massSlider"><span>主离子质量数 A</span><span id="massValue">A = 20</span></label>
+            <input id="massSlider" type="range" min="12" max="24" step="1" value="20" />
+          </div>
+          <div class="segmented">
+            <button type="button" class="charge-btn active" data-z="1">电荷 +e</button>
+            <button type="button" class="charge-btn" data-z="2">电荷 +2e</button>
+          </div>
+
+          <h4>量程与播放</h4>
+          <div class="field">
+            <label for="rangeSelect"><span>底片量程</span><span id="rangeValue">0–20 cm</span></label>
+            <select id="rangeSelect">
+              <option value="10">0 – 10 cm</option>
+              <option value="20" selected>0 – 20 cm</option>
+              <option value="40">0 – 40 cm</option>
+            </select>
+          </div>
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>速度与受力矢量</span></label>
+            <label class="toggle"><input type="checkbox" id="showGhost" checked /><span>对比同位素</span></label>
+            <label class="toggle"><input type="checkbox" id="showRejected" checked /><span>被挡掉的离子</span></label>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="primary" id="playBtn">播放</button>
+            <button type="button" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数 ◂</button>
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="结论、假设与课堂问题">?</button>
+
+        <!-- 结论 / 读数明细 / 模型假设 / 课堂问题：默认折叠 -->
+        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂观察">
+          <h3>结论</h3>
+          <p>速度选择器只放行 v = E/B₁；进入 B₂ 后 r = mv/(qB₂)，落点 x = 2r。同速同电荷时落点 x ∝ m，越远质量越大。</p>
+          <p class="eq">x = 2mv/(qB₂) = 2mE/(qB₁B₂)　⇒　m = qB₁B₂x/(2E)</p>
+
+          <h3>装置与公式</h3>
+          <ol>
+            <li>① 速度选择器（E ⊥ B₁）：只放行 v = E/B₁ 的离子。</li>
+            <li>② 偏转磁场（B₂ ⊙ 垂直纸面向外）：半圆半径 r = mv/(qB₂)。</li>
+            <li>③ 照相底片（刻度 x / cm）：落点 x = 2r。</li>
+          </ol>
+          <p class="eq">v = E/B₁　r = mv/(qB₂)　x = 2r　m = qB₁B₂x/(2E)</p>
+
+          <h3>当前读数明细</h3>
+          <p>主离子 <b id="dIon1">²⁰Ne⁺</b>，m = <span id="dM1">—</span>；对比离子 <b id="dIon2">²²Ne⁺</b>，m = <span id="dM2">—</span></p>
+          <p>r₁ / r₂ = <span id="dR">—</span>；x₁ / x₂ = <span id="dX">—</span></p>
+          <p>底片量程 0–<span id="dSpan">20</span> cm，刻度 <span id="dStep">2</span> cm/格</p>
+          <p id="dNote">—</p>
+
+          <h3>模型假设</h3>
+          <p>忽略重力；非相对论（v ≪ c）；忽略边缘场与离子间相互作用；底片处为真空。本页只演示正离子：若换成负离子，电场力与洛伦兹力同时反向，v = E/B₁ 仍成立，但轨迹向上偏。</p>
+
+          <h3>课堂观察</h3>
+          <ol>
+            <li>把 B₂ 从 0.50 T 调到 0.90 T，速度 v 变不变？半径 r 与落点 x 怎样变化？</li>
+            <li>²⁰Ne⁺ 与 ²²Ne⁺ 进入偏转磁场时速度相同，为什么半径不同？质量大的落点更远还是更近？</li>
+            <li>把电荷量从 +e 换成 +2e，两个落点的间距会怎样变化？这与 r ∝ m/q 一致吗？</li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const canvas = document.getElementById("spectrometerCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // ---------------- 高清渲染（HiDPI）----------------
+      // 逻辑坐标系仍是原来的 960 × 540：几何常量、字号一律照旧，
+      // 变的只是位图密度（位图 = CSS 显示尺寸 × devicePixelRatio，≤3），
+      // 再把绘制映射回逻辑坐标，画布铺满大屏时不再被拉伸放大而发虚。
+      const LW = 960;
+      const LH = 540;
+
+      function syncBackingStore() {
+        const r = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        const w = Math.max(1, Math.round(r.width * dpr));
+        const h = Math.max(1, Math.round(r.height * dpr));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+      }
+
+      // 每个绘制入口的第一行：先同步位图与映射，之后一律按逻辑坐标绘制
+      function beginFrame() {
+        syncBackingStore();
+        ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+      }
+
+      // 指针一律换算成逻辑坐标。本页没有画布指针交互（拖动只发生在 DOM 参数面板上），
+      // 保留这一个入口：以后给画布加叠加层/命中测试时直接用，禁止再写 canvas.width / rect.width
+      function toLogical(evt) {
+        const r = canvas.getBoundingClientRect();
+        return {
+          x: (evt.clientX - r.left) * (LW / r.width),
+          y: (evt.clientY - r.top) * (LH / r.height)
+        };
+      }
+
+      const U_ATOMIC = 1.6605390666e-27;   // kg，原子质量单位
+      const Q_E = 1.602176634e-19;         // C，元电荷
+      const FONT = '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif';
+
+      const COLORS = {
+        bg: "#070a10",
+        ink: "#e6ebf5",
+        muted: "#8fa0b8",
+        line: "rgba(255,255,255,0.16)",
+        panel: "rgba(255,255,255,0.035)",
+        plate: "#94a3b8",
+        positive: "#ef4444",
+        negative: "#60a5fa",
+        vector: "#ffffff",
+        forceE: "#ffd166",
+        lorentz: "#7dd3fc",
+        track: "#22c55e",
+        ghost: "#86efac",
+        warn: "#fb923c",
+        field: "#7c8ba1"
+      };
+
+      // 画面几何：画布固定 960 × 540，保证投影时布局稳定
+      const GEO = {
+        plateX: 340,
+        plateTopY: 110,
+        entryY: 150,
+        plateBottomY: 480,
+        b2: { x: 340, y: 96, w: 366, h: 396 },
+        side: { x: 718, y: 96, w: 226, h: 388 },
+        sel: { x: 20, y: 78, w: 276, h: 162 },
+        selPlateX0: 100,
+        selPlateX1: 280,
+        selTop: 128,
+        selBottom: 174,
+        beamY: 150,
+        beamStart: 86,
+        source: { x: 24, y: 134, w: 62, h: 32 }
+      };
+
+      const DEFAULTS = { E: 2e4, B1: 0.10, B2: 0.50, A1: 20, dA: 2, z: 1, rangeCm: 20 };
+
+      const state = {
+        E: DEFAULTS.E,
+        B1: DEFAULTS.B1,
+        B2: DEFAULTS.B2,
+        A1: DEFAULTS.A1,
+        dA: DEFAULTS.dA,
+        z: DEFAULTS.z,
+        rangeCm: DEFAULTS.rangeCm,
+        playing: false,
+        t: Number.POSITIVE_INFINITY,
+        showVectors: true,
+        showGhost: true,
+        showRejected: true
+      };
+
+      const controls = {
+        eSlider: document.getElementById("eSlider"),
+        b1Slider: document.getElementById("b1Slider"),
+        b2Slider: document.getElementById("b2Slider"),
+        massSlider: document.getElementById("massSlider"),
+        rangeSelect: document.getElementById("rangeSelect"),
+        showVectors: document.getElementById("showVectors"),
+        showGhost: document.getElementById("showGhost"),
+        showRejected: document.getElementById("showRejected"),
+        playBtn: document.getElementById("playBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        isoButtons: Array.from(document.querySelectorAll(".iso-btn")),
+        chargeButtons: Array.from(document.querySelectorAll(".charge-btn"))
+      };
+
+      const output = {
+        eValue: document.getElementById("eValue"),
+        b1Value: document.getElementById("b1Value"),
+        b2Value: document.getElementById("b2Value"),
+        massValue: document.getElementById("massValue"),
+        rangeValue: document.getElementById("rangeValue"),
+        mSpeed: document.getElementById("mSpeed"),
+        mRadius: document.getElementById("mRadius"),
+        mLanding: document.getElementById("mLanding"),
+        mDelta: document.getElementById("mDelta"),
+        dIon1: document.getElementById("dIon1"),
+        dIon2: document.getElementById("dIon2"),
+        dM1: document.getElementById("dM1"),
+        dM2: document.getElementById("dM2"),
+        dR: document.getElementById("dR"),
+        dX: document.getElementById("dX"),
+        dSpan: document.getElementById("dSpan"),
+        dStep: document.getElementById("dStep"),
+        dNote: document.getElementById("dNote")
+      };
+
+      // 同位素预设：主离子 A1，对比离子 A2 = A1 + dA
+      const ISOTOPES = {
+        c12: { A1: 12, dA: 1 },
+        c13: { A1: 13, dA: -1 },
+        ne20: { A1: 20, dA: 2 },
+        ne22: { A1: 22, dA: -2 }
+      };
+
+      // 只有同位素预设才给出核素名；其余质量数一律只显示 A=xx，不用质量数暗示元素
+      const NUCLIDE = { 12: "¹²C", 13: "¹³C", 20: "²⁰Ne", 22: "²²Ne" };
+
+      const SUP = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻" };
+      function sup(n) {
+        return String(n).split("").map(function (c) { return SUP[c] || c; }).join("");
+      }
+
+      function sci(value, digits) {
+        if (!isFinite(value) || value === 0) { return "0"; }
+        const exp = Math.floor(Math.log10(Math.abs(value)));
+        const mant = value / Math.pow(10, exp);
+        return mant.toFixed(digits === undefined ? 2 : digits) + "×10" + sup(exp);
+      }
+
+      // 长度统一保留 2 位小数，学生可以直接用 2r 与落点读数互相验算
+      function fmtLen(cm) {
+        if (!isFinite(cm)) { return "—"; }
+        return cm.toFixed(2);
+      }
+
+      function ionLabel(A) {
+        const core = NUCLIDE[A] || ("A=" + A);
+        return core + (state.z === 2 ? "²⁺" : "⁺");
+      }
+
+      function clamp(value, lo, hi) {
+        return Math.min(hi, Math.max(lo, value));
+      }
+
+      // ---------------- 物理模型 ----------------
+      // 底片显示跨度：不小于所选量程，但一定要装得下最远落点，保证轨迹永不越出画面
+      const SPAN_LADDER = [10, 20, 30, 40, 60, 80, 100, 150, 200, 300];
+
+      function displaySpan(minSpan, xMaxCm) {
+        const need = Math.max(minSpan, xMaxCm);
+        for (let i = 0; i < SPAN_LADDER.length; i += 1) {
+          if (SPAN_LADDER[i] >= need) { return SPAN_LADDER[i]; }
+        }
+        return SPAN_LADDER[SPAN_LADDER.length - 1];
+      }
+
+      function metrics() {
+        const v = state.E / state.B1;                    // m/s，速度选择器
+        const q = state.z * Q_E;                          // C
+        const m1 = state.A1 * U_ATOMIC;                   // kg
+        const m2 = state.A2 * U_ATOMIC;
+        const r1 = (m1 * v) / (q * state.B2);             // m
+        const r2 = (m2 * v) / (q * state.B2);
+        const r1cm = r1 * 100;
+        const r2cm = r2 * 100;
+        const x1cm = 2 * r1cm;
+        const x2cm = 2 * r2cm;
+        const xMaxCm = Math.max(x1cm, x2cm);
+        const spanCm = displaySpan(state.rangeCm, xMaxCm);
+        const pxPerCm = (GEO.plateBottomY - GEO.entryY) / spanCm;
+        const R1 = r1cm * pxPerCm;
+        const R2 = r2cm * pxPerCm;
+        return {
+          v: v,
+          q: q,
+          m1: m1,
+          m2: m2,
+          r1cm: r1cm,
+          r2cm: r2cm,
+          x1cm: x1cm,
+          x2cm: x2cm,
+          dx: Math.abs(x2cm - x1cm),
+          spanCm: spanCm,
+          pxPerCm: pxPerCm,
+          R1: R1,
+          R2: R2,
+          rMaxPx: Math.max(R1, R2),
+          xMaxCm: xMaxCm
+        };
+      }
+
+      const PATH_SPEED = 150;   // 画布像素 / 秒
+      const SEL_TIME = (GEO.plateX - GEO.beamStart) / PATH_SPEED;
+
+      function arcPoint(R, u) {
+        const phi = -Math.PI / 2 + u;
+        return {
+          x: GEO.plateX + R * Math.cos(phi),
+          y: GEO.entryY + R + R * Math.sin(phi)
+        };
+      }
+
+      function ionState(t, R) {
+        if (t <= SEL_TIME) {
+          return { phase: "select", x: GEO.beamStart + PATH_SPEED * t, y: GEO.beamY, u: 0, R: R };
+        }
+        const s = (t - SEL_TIME) * PATH_SPEED;
+        const u = Math.min(Math.PI, s / R);
+        const p = arcPoint(R, u);
+        return { phase: "arc", x: p.x, y: p.y, u: u, R: R };
+      }
+
+      function totalTime(m) {
+        return SEL_TIME + (Math.PI * m.rMaxPx) / PATH_SPEED;
+      }
+
+      // ---------------- 绘图工具 ----------------
+      function roundRectPath(x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + w - radius, y);
+        ctx.arcTo(x + w, y, x + w, y + radius, radius);
+        ctx.lineTo(x + w, y + h - radius);
+        ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+        ctx.lineTo(x + radius, y + h);
+        ctx.arcTo(x, y + h, x, y + h - radius, radius);
+        ctx.lineTo(x, y + radius);
+        ctx.arcTo(x, y, x + radius, y, radius);
+        ctx.closePath();
+      }
+
+      function text(str, x, y, opts) {
+        const o = opts || {};
+        const size = o.size || 13;
+        const weight = o.weight || "400";
+        const align = o.align || "left";
+        const baseline = o.baseline || "middle";
+        ctx.save();
+        ctx.font = weight + " " + size + "px " + FONT;
+        ctx.textAlign = align;
+        ctx.textBaseline = baseline;
+        if (o.halo) {
+          ctx.strokeStyle = o.halo;
+          ctx.lineWidth = o.haloWidth || 4;
+          ctx.lineJoin = "round";
+          ctx.strokeText(str, x, y);
+        }
+        ctx.fillStyle = o.color || COLORS.ink;
+        ctx.fillText(str, x, y);
+        ctx.restore();
+      }
+
+      function arrow(x1, y1, x2, y2, color, width, head) {
+        const w = width || 3;
+        const h = head || 9;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = w;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - h * Math.cos(angle - Math.PI / 6), y2 - h * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - h * Math.cos(angle + Math.PI / 6), y2 - h * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function dotSymbol(x, y, r, color) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ---------------- 各功能区绘制 ----------------
+      function drawBackground() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, LW, LH);
+        const grad = ctx.createLinearGradient(0, 0, 0, LH);
+        grad.addColorStop(0, "rgba(45,72,110,0.28)");
+        grad.addColorStop(0.55, "rgba(10,14,22,0)");
+        grad.addColorStop(1, "rgba(8,11,17,0.6)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, LW, LH);
+      }
+
+      function drawB2Zone() {
+        const z = GEO.b2;
+        roundRectPath(z.x, z.y, z.w, z.h, 10);
+        ctx.save();
+        ctx.fillStyle = COLORS.panel;
+        ctx.fill();
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+
+        // 垂直纸面向外的磁场符号 ⊙
+        for (let y = 136; y <= 466; y += 44) {
+          for (let x = 372; x <= 690; x += 44) {
+            dotSymbol(x, y, 3.6, "rgba(148,163,184,0.34)");
+          }
+        }
+
+        text("偏转磁场 B₂ ⊙", 470, 116, { size: 12, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
+      }
+
+      function drawPlate(m) {
+        // 照相底片（同时是偏转区边界）：入射点处留 7px 狭缝，束流从缝中进入
+        const slit = 7;
+        ctx.save();
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(GEO.plateX, GEO.plateTopY);
+        ctx.lineTo(GEO.plateX, GEO.entryY - slit);
+        ctx.moveTo(GEO.plateX, GEO.entryY + slit);
+        ctx.lineTo(GEO.plateX, GEO.plateBottomY + 6);
+        ctx.stroke();
+        ctx.restore();
+
+        const stepPx = (GEO.plateBottomY - GEO.entryY) / 10;
+        for (let i = 0; i <= 10; i += 1) {
+          const y = GEO.entryY + i * stepPx;
+          ctx.save();
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(GEO.plateX - 9, y);
+          ctx.lineTo(GEO.plateX, y);
+          ctx.stroke();
+          ctx.restore();
+          const tickVal = (i * m.spanCm) / 10;
+          const tickText = Number.isInteger(tickVal) ? String(tickVal) : tickVal.toFixed(1);
+          // 0 刻度标在入射束上方，避免文字压住束流
+          text(tickText, GEO.plateX - 14, i === 0 ? y - 13 : y, {
+            size: 11,
+            align: "right",
+            color: "#9fb0c6",
+            halo: COLORS.bg,
+            haloWidth: 3
+          });
+        }
+
+        text("照相底片", GEO.plateX + 12, 108, { size: 13, weight: "700", color: "#c7d2e2", halo: COLORS.bg });
+        text("x / cm", GEO.plateX + 12, 126, { size: 11, color: COLORS.field, halo: COLORS.bg });
+      }
+
+      function drawArcProgress(R, u, color, width, dashed) {
+        const end = -Math.PI / 2 + u;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        if (dashed) { ctx.setLineDash([7, 6]); }
+        ctx.beginPath();
+        ctx.arc(GEO.plateX, GEO.entryY + R, R, -Math.PI / 2, end, false);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawTrajectories(m) {
+        const t = state.t;
+        const s1 = ionState(t, m.R1);
+        const s2 = ionState(t, m.R2);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(GEO.b2.x, GEO.b2.y, GEO.b2.w, GEO.b2.h);
+        ctx.clip();
+
+        if (state.showGhost) {
+          drawArcProgress(m.R2, s2.u, "rgba(134,239,172,0.75)", 2, true);
+        }
+        drawArcProgress(m.R1, s1.u, COLORS.track, 3, false);
+
+        // 半径标注（圆心在底片上）
+        if (m.R1 > 8) {
+          const cy = GEO.entryY + m.R1;
+          ctx.save();
+          ctx.setLineDash([5, 5]);
+          ctx.strokeStyle = "rgba(255,209,102,0.55)";
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(GEO.plateX, cy);
+          ctx.lineTo(GEO.plateX + m.R1, cy);
+          ctx.stroke();
+          ctx.restore();
+          ctx.fillStyle = "#ffd166";
+          ctx.beginPath();
+          ctx.arc(GEO.plateX, cy, 3, 0, Math.PI * 2);
+          ctx.fill();
+          text("r₁", GEO.plateX + m.R1 * 0.45, cy - 14, { size: 12, color: "#ffd166", align: "center", halo: COLORS.bg });
+        }
+
+        // 落点标记（两落点很近时把 x₂ 标签继续下移，避免文字重叠）
+        const crowded = Math.abs(2 * (m.R2 - m.R1)) < 22;
+        if (s1.u >= Math.PI - 1e-6) {
+          drawLanding(m.R1, "x₁", m.x1cm, COLORS.track, 0);
+        }
+        if (state.showGhost && s2.u >= Math.PI - 1e-6) {
+          drawLanding(m.R2, "x₂", m.x2cm, COLORS.ghost, crowded ? 16 : 0);
+        }
+        ctx.restore();
+      }
+
+      function drawLanding(R, tag, xcm, color, extra) {
+        const y = GEO.entryY + 2 * R;
+        if (y > GEO.b2.y + GEO.b2.h - 2) { return; }
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(GEO.plateX, y);
+        ctx.lineTo(GEO.plateX + 9, y - 6);
+        ctx.lineTo(GEO.plateX + 9, y + 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        let labelY = y + 14 + (extra || 0);
+        if (labelY > GEO.b2.y + GEO.b2.h - 8) {
+          labelY = y - 16 - (extra || 0);
+        }
+        text(tag + " " + fmtLen(xcm) + " cm", GEO.plateX + 14, labelY, {
+          size: 11,
+          weight: "700",
+          color: color,
+          halo: COLORS.bg,
+          haloWidth: 3
+        });
+      }
+
+      function drawSelector(m) {
+        const z = GEO.sel;
+        roundRectPath(z.x, z.y, z.w, z.h, 10);
+        ctx.save();
+        ctx.fillStyle = COLORS.panel;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+
+        text("速度选择器", 30, 100, { size: 13, weight: "700", color: "#c7d2e2" });
+        text("B₁ ⊙", 286, 100, { size: 12, align: "right", color: COLORS.field });
+
+        // 入射直线（选速正确的离子）
+        ctx.save();
+        ctx.strokeStyle = COLORS.track;
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(GEO.beamStart, GEO.beamY);
+        ctx.lineTo(GEO.plateX, GEO.beamY);
+        ctx.stroke();
+        ctx.restore();
+
+        // 被挡掉的离子（v 偏小向上、v 偏大向下）
+        if (state.showRejected) {
+          ctx.save();
+          ctx.setLineDash([4, 5]);
+          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = "rgba(251,146,60,0.55)";
+          ctx.beginPath();
+          ctx.moveTo(GEO.beamStart, GEO.beamY);
+          ctx.quadraticCurveTo(140, GEO.beamY, 196, GEO.selTop + 3);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(GEO.beamStart, GEO.beamY);
+          ctx.quadraticCurveTo(140, GEO.beamY, 196, GEO.selBottom - 3);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 极板：上板为负、下板为正，E 竖直向上
+        ctx.save();
+        ctx.strokeStyle = COLORS.plate;
+        ctx.lineWidth = 7;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(GEO.selPlateX0, GEO.selTop);
+        ctx.lineTo(GEO.selPlateX1, GEO.selTop);
+        ctx.moveTo(GEO.selPlateX0, GEO.selBottom);
+        ctx.lineTo(GEO.selPlateX1, GEO.selBottom);
+        ctx.stroke();
+        ctx.restore();
+
+        text("−", 190, 116, { size: 18, weight: "700", align: "center", color: COLORS.negative });
+        text("+", 190, 186, { size: 18, weight: "700", align: "center", color: COLORS.positive });
+
+        [150, 195, 240].forEach(function (x) {
+          arrow(x, GEO.selBottom - 4, x, GEO.selTop + 4, COLORS.forceE, 2.2, 7);
+        });
+        text("E", 262, 140, { size: 13, weight: "700", color: COLORS.forceE });
+
+        dotSymbol(124, 139, 3.4, "rgba(148,163,184,0.55)");
+        dotSymbol(124, 161, 3.4, "rgba(148,163,184,0.55)");
+        dotSymbol(268, 161, 3.4, "rgba(148,163,184,0.55)");
+      }
+
+      function drawSource() {
+        const s = GEO.source;
+        roundRectPath(s.x, s.y, s.w, s.h, 6);
+        ctx.save();
+        ctx.fillStyle = "#131b28";
+        ctx.fill();
+        ctx.strokeStyle = COLORS.plate;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = COLORS.positive;
+        ctx.beginPath();
+        ctx.arc(s.x + 22, s.y + s.h / 2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        text("+", s.x + 22, s.y + s.h / 2 + 1, { size: 12, weight: "700", align: "center", color: "#ffffff" });
+        text("离子源", s.x + s.w / 2, s.y - 13, { size: 12, color: COLORS.muted, align: "center" });
+      }
+
+      // 仅初始态把离子停在半圆最右端（u=π/2）便于看清 v 与 F洛；
+      // 播放中、暂停、播完都使用真实进度 state.t，离子停在它真正到达的位置
+      function displayTime(R) {
+        if (state.t === Number.POSITIVE_INFINITY) {
+          return SEL_TIME + (Math.PI / 2) * (R / PATH_SPEED);
+        }
+        return state.t;
+      }
+
+      function drawIons(m) {
+        const s2 = ionState(displayTime(m.R2), m.R2);
+        const s1 = ionState(displayTime(m.R1), m.R1);
+
+        if (state.showGhost) {
+          drawIonDot(s2, m.R2, 6, "rgba(134,239,172,0.9)");
+        }
+        drawIonDot(s1, m.R1, 8, COLORS.positive);
+
+        // 已经打到（或停在）底片上时不再画 v / F洛，避免压住落点读数
+        if (state.showVectors && s1.u < Math.PI - 0.08) {
+          drawVectors(s1, m.R1);
+        }
+      }
+
+      function drawIonDot(s, R, radius, color) {
+        ctx.save();
+        ctx.shadowColor = "rgba(255,255,255,0.35)";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        text("+", s.x, s.y + 1, { size: radius * 1.5, weight: "700", align: "center", color: "#ffffff" });
+      }
+
+      function drawVectors(s, R) {
+        if (s.phase === "select") {
+          // 电场力向上（画布向上为 -y），洛伦兹力向下，大小相等 => 合力为零
+          arrow(s.x, s.y, s.x, s.y - 26, COLORS.forceE, 2.4, 8);
+          arrow(s.x, s.y, s.x, s.y + 26, COLORS.lorentz, 2.4, 8);
+          text("F电", s.x + 9, s.y - 17, { size: 10, color: COLORS.forceE, halo: COLORS.bg });
+          text("F洛", s.x + 9, s.y + 17, { size: 10, color: COLORS.lorentz, halo: COLORS.bg });
+          return;
+        }
+        const phi = -Math.PI / 2 + s.u;
+        const tx = -Math.sin(phi);
+        const ty = Math.cos(phi);
+        const cx = GEO.plateX - s.x;
+        const cy = GEO.entryY + R - s.y;
+        arrow(s.x, s.y, s.x + tx * 42, s.y + ty * 42, COLORS.vector, 2.6, 9);
+        arrow(s.x, s.y, s.x + (cx / R) * 40, s.y + (cy / R) * 40, COLORS.lorentz, 2.6, 9);
+        text("v", s.x + tx * 54, s.y + ty * 54, { size: 13, weight: "700", align: "center", color: COLORS.vector, halo: COLORS.bg });
+        text("F洛", s.x + (cx / R) * 50, s.y + (cy / R) * 50 + 15, { size: 12, align: "center", color: COLORS.lorentz, halo: COLORS.bg });
+      }
+
+      function updateDom(m) {
+        output.eValue.textContent = (state.E / 1e4).toFixed(1) + "×10⁴ V/m";
+        output.b1Value.textContent = state.B1.toFixed(2) + " T";
+        output.b2Value.textContent = state.B2.toFixed(2) + " T";
+        output.massValue.textContent = "A = " + state.A1;
+        output.rangeValue.textContent = "0–" + m.spanCm + " cm" + (m.spanCm > state.rangeCm ? "（自动）" : "");
+        output.mSpeed.textContent = sci(m.v, 2) + " m/s";
+        output.mRadius.textContent = fmtLen(m.r1cm) + " cm";
+        output.mLanding.textContent = fmtLen(m.x1cm) + " cm";
+        output.mDelta.textContent = fmtLen(m.dx) + " cm";
+
+        // 抽屉里的读数明细与提示（原先画在画布右侧）
+        output.dIon1.textContent = ionLabel(state.A1);
+        output.dIon2.textContent = ionLabel(state.A2);
+        output.dM1.textContent = sci(m.m1, 2) + " kg";
+        output.dM2.textContent = sci(m.m2, 2) + " kg";
+        output.dR.textContent = fmtLen(m.r1cm) + " / " + fmtLen(m.r2cm) + " cm";
+        output.dX.textContent = fmtLen(m.x1cm) + " / " + fmtLen(m.x2cm) + " cm";
+        output.dSpan.textContent = String(m.spanCm);
+        const stepVal = m.spanCm / 10;
+        output.dStep.textContent = Number.isInteger(stepVal) ? String(stepVal) : stepVal.toFixed(1);
+
+        let noteText;
+        let isWarn = false;
+        if (m.xMaxCm > m.spanCm) {
+          noteText = "落点超出显示范围：请增大 B₂、减小 E 或增大 B₁。";
+          isWarn = true;
+        } else if (m.rMaxPx < 40) {
+          noteText = "半径过小，建议把底片量程调到 10 cm 观察。";
+          isWarn = true;
+        } else {
+          noteText = "同速、同电荷时 r ∝ m：落点越远，质量越大。";
+        }
+        output.dNote.textContent = noteText;
+        output.dNote.classList.toggle("warn", isWarn);
+      }
+
+      function render() {
+        beginFrame();          // 每帧绘制前同步位图并把映射设回逻辑坐标
+        const m = metrics();
+        drawBackground();
+        drawB2Zone();
+        drawTrajectories(m);
+        drawPlate(m);
+        drawSelector(m);
+        drawSource();
+        drawIons(m);
+        updateDom(m);
+      }
+
+      // ---------------- 交互 ----------------
+      function syncIsoButtons() {
+        controls.isoButtons.forEach(function (btn) {
+          const preset = ISOTOPES[btn.dataset.iso];
+          const active = preset && preset.A1 === state.A1 && preset.dA === state.dA;
+          btn.classList.toggle("active", Boolean(active));
+        });
+      }
+
+      function setPlaying(value) {
+        state.playing = value;
+        controls.playBtn.textContent = value ? "暂停" : "播放";
+      }
+
+      function restartPlayback() {
+        state.t = 0;
+        setPlaying(true);
+        render();
+      }
+
+      controls.eSlider.addEventListener("input", function () {
+        state.E = Number(controls.eSlider.value) * 1e4;
+        render();
+      });
+
+      controls.b1Slider.addEventListener("input", function () {
+        state.B1 = Number(controls.b1Slider.value);
+        render();
+      });
+
+      controls.b2Slider.addEventListener("input", function () {
+        state.B2 = Number(controls.b2Slider.value);
+        render();
+      });
+
+      controls.massSlider.addEventListener("input", function () {
+        state.A1 = Number(controls.massSlider.value);
+        state.A2 = clamp(state.A1 + state.dA, 1, 40);
+        syncIsoButtons();
+        render();
+      });
+
+      controls.rangeSelect.addEventListener("change", function () {
+        state.rangeCm = Number(controls.rangeSelect.value);
+        render();
+      });
+
+      controls.showVectors.addEventListener("change", function () {
+        state.showVectors = controls.showVectors.checked;
+        render();
+      });
+
+      controls.showGhost.addEventListener("change", function () {
+        state.showGhost = controls.showGhost.checked;
+        render();
+      });
+
+      controls.showRejected.addEventListener("change", function () {
+        state.showRejected = controls.showRejected.checked;
+        render();
+      });
+
+      controls.isoButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          const preset = ISOTOPES[btn.dataset.iso];
+          if (!preset) { return; }
+          state.A1 = preset.A1;
+          state.dA = preset.dA;
+          state.A2 = preset.A1 + preset.dA;
+          controls.massSlider.value = String(state.A1);
+          syncIsoButtons();
+          render();
+        });
+      });
+
+      controls.chargeButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          state.z = Number(btn.dataset.z);
+          controls.chargeButtons.forEach(function (other) {
+            other.classList.toggle("active", other === btn);
+          });
+          render();
+        });
+      });
+
+      controls.playBtn.addEventListener("click", function () {
+        if (state.playing) {
+          setPlaying(false);
+          render();
+          return;
+        }
+        restartPlayback();
+      });
+
+      controls.resetBtn.addEventListener("click", function () {
+        state.E = DEFAULTS.E;
+        state.B1 = DEFAULTS.B1;
+        state.B2 = DEFAULTS.B2;
+        state.A1 = DEFAULTS.A1;
+        state.dA = DEFAULTS.dA;
+        state.A2 = DEFAULTS.A1 + DEFAULTS.dA;
+        state.z = DEFAULTS.z;
+        state.rangeCm = DEFAULTS.rangeCm;
+        state.showVectors = true;
+        state.showGhost = true;
+        state.showRejected = true;
+
+        controls.eSlider.value = String(DEFAULTS.E / 1e4);
+        controls.b1Slider.value = String(DEFAULTS.B1);
+        controls.b2Slider.value = String(DEFAULTS.B2);
+        controls.massSlider.value = String(DEFAULTS.A1);
+        controls.rangeSelect.value = String(DEFAULTS.rangeCm);
+        controls.showVectors.checked = true;
+        controls.showGhost.checked = true;
+        controls.showRejected.checked = true;
+        controls.chargeButtons.forEach(function (btn) {
+          btn.classList.toggle("active", Number(btn.dataset.z) === DEFAULTS.z);
+        });
+
+        syncIsoButtons();
+        state.t = Number.POSITIVE_INFINITY;
+        setPlaying(false);
+        render();
+      });
+
+      let lastTs = 0;
+      function loop(ts) {
+        const dt = lastTs ? (ts - lastTs) / 1000 : 0;
+        lastTs = ts;
+        if (state.playing) {
+          const m = metrics();
+          const total = totalTime(m);
+          state.t += dt;
+          if (state.t >= total) {
+            state.t = total;
+            setPlaying(false);
+          }
+          render();
+        }
+        requestAnimationFrame(loop);
+      }
+
+      // 窗口尺寸（或设备像素比）变化后：重设位图并重画
+      window.addEventListener("resize", render);
+
+      // ---------------- 外壳交互：面板折叠 / 抽屉 / 键盘 ----------------
+      const shell = {
+        panel: document.getElementById("ctrlPanel"),
+        toggle: document.getElementById("ctrlToggle"),
+        more: document.getElementById("moreBtn"),
+        drawer: document.getElementById("drawer")
+      };
+
+      function setPanelOpen(open) {
+        shell.panel.hidden = !open;
+        shell.toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        shell.toggle.textContent = open ? "参数 ◂" : "参数 ▸";
+        if (open) { shell.panel.dispatchEvent(new CustomEvent("panel:open")); }
+      }
+
+      function setDrawerOpen(open) {
+        shell.drawer.hidden = !open;
+        shell.more.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      shell.toggle.addEventListener("click", function () { setPanelOpen(shell.panel.hidden); });
+      shell.more.addEventListener("click", function () { setDrawerOpen(shell.drawer.hidden); });
+
+      window.addEventListener("keydown", function (ev) {
+        const tag = ev.target && ev.target.tagName;
+        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON") { return; }
+        if (ev.code === "Space") {
+          ev.preventDefault();
+          controls.playBtn.click();
+        } else if (ev.key === "r" || ev.key === "R") {
+          ev.preventDefault();
+          controls.resetBtn.click();
+        } else if (ev.key === "p" || ev.key === "P") {
+          ev.preventDefault();
+          setPanelOpen(shell.panel.hidden);
+        } else if (ev.key === "?") {
+          ev.preventDefault();
+          setDrawerOpen(shell.drawer.hidden);
+        } else if (ev.key === "Escape") {
+          setDrawerOpen(false);
+        }
+      });
+
+      // ---------------- 参数面板：拖动 + 位置记忆 ----------------
+      // 首行 .panel-grip 负责拖动；位置存 localStorage，刷新后恢复；双击标题行折叠/展开
+      (function initDraggablePanel() {
+        const panel = document.getElementById("ctrlPanel");
+        const grip = panel && panel.querySelector(".panel-grip");
+        const collapseBtn = document.getElementById("panelCollapse");
+        if (!panel || !grip) { return; }
+
+        const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+        const MIN_VISIBLE_H = 220;   // 拖到画面下方时至少留这么高，超出部分面板内滚动
+
+        function readSaved() {
+          try { return JSON.parse(localStorage.getItem(KEY) || "null"); }
+          catch (err) { return null; }
+        }
+        function writeSaved(pos) {
+          try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch (err) { /* 隐私模式忽略 */ }
+        }
+
+        function place(x, y) {
+          const f = panel.parentElement.getBoundingClientRect();
+          const w = panel.offsetWidth;
+          const px = Math.min(Math.max(8, x), Math.max(8, f.width - w - 8));
+          const py = Math.min(Math.max(8, y), Math.max(8, f.height - MIN_VISIBLE_H - 8));
+          panel.style.left = px + "px";
+          panel.style.top = py + "px";
+          panel.style.right = "auto";
+          panel.style.maxHeight = Math.max(MIN_VISIBLE_H, f.height - py - 8) + "px";
+        }
+
+        const saved = readSaved();
+        if (saved && isFinite(saved.x) && isFinite(saved.y)) { place(saved.x, saved.y); }
+
+        let dx = 0, dy = 0, dragging = false;
+        grip.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0) { return; }
+          const f = panel.parentElement.getBoundingClientRect();
+          const r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+        });
+        grip.addEventListener("pointermove", function (e) {
+          if (!dragging) { return; }
+          const f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+        function endDrag(e) {
+          if (!dragging) { return; }
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture(e.pointerId)) { grip.releasePointerCapture(e.pointerId); }
+          writeSaved({ x: parseFloat(panel.style.left), y: parseFloat(panel.style.top) });
+        }
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+
+        // 双击标题行 = 点折叠按钮；落在按钮上时交给按钮自己处理
+        grip.addEventListener("dblclick", function (e) {
+          if (e.target.closest("button")) { return; }
+          setPanelOpen(panel.hidden);
+        });
+        if (collapseBtn) {
+          collapseBtn.addEventListener("click", function () { setPanelOpen(false); });
+        }
+
+        // 窗口尺寸变化后把面板重新夹回舞台内
+        window.addEventListener("resize", function () {
+          if (panel.hidden || panel.style.left === "") { return; }
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        });
+        // 折叠期间改过窗口尺寸时，展开后同样重新夹回
+        panel.addEventListener("panel:open", function () {
+          if (panel.style.left === "") { return; }
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        });
+      })();
+
+      setPanelOpen(true);
+      setDrawerOpen(false);
+
+      state.A2 = state.A1 + state.dA;
+      syncIsoButtons();
+      render();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

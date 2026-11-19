@@ -1,0 +1,1162 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>带电粒子在匀强电场中的偏转（真实 SI 单位）</title>
+  <link rel="icon" href="data:," />
+  <style>
+    * { box-sizing: border-box; }
+
+    /* —— LAYOUT.md 必需样式 —— */
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; }
+
+    /* 参数面板默认贴右上角：画布右侧 260px 留作面板列，极板右缘停在 686，
+       面板左缘（1366×768）约在 790，互不遮挡；面板可拖动并记忆位置。 */
+    .hud-panel { right: 12px; left: auto; top: 12px; bottom: auto;
+                 width: 236px; max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 10px; font-size: 12px; cursor: default; }
+    .hud-panel[hidden] { display: none; }
+
+    /* 首行把手：标题 + 折叠按钮；拖动改位置，双击折叠（LAYOUT.md「参数面板必须可拖动」） */
+    .hud-panel .panel-grip { cursor: grab; user-select: none; touch-action: none;
+                             display: flex; align-items: center; justify-content: space-between;
+                             gap: 6px; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .panel-name { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #7fd6e4; }
+    .hud-panel .grip-btn { width: 20px; height: 20px; padding: 0; line-height: 1; font-size: 12px;
+                           border-radius: 6px; cursor: pointer; color: #eaf2f5;
+                           background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); }
+    .hud-panel .grip-btn:hover { background: rgba(255,255,255,.18); }
+
+    /* 折叠后「参数」按钮才出现；展开时首行把手上已有折叠按钮 */
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+                  font: inherit; font-size: 12.5px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                  display: none; }
+    .hud-toggle[aria-expanded="false"] { display: inline-block; }
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 206px; padding: 8px; font-size: 11.5px; }
+    }
+
+    /* —— 叠加层内部样式（只影响外观） —— */
+    .hud-readout > span { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; color: #9fb6bf; }
+    .hud-readout > span + span { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.16); }
+    .hud-readout b { font-weight: 800; }
+
+    .hud-legend { display: flex; align-items: center; gap: 11px; flex-wrap: nowrap; overflow: hidden; }
+    .lg-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .lg-line { width: 18px; height: 4px; border-radius: 999px; background: #ffd166; flex: 0 0 auto; }
+    .lg-arrow { width: 0; height: 0; border-left: 11px solid rgba(255,209,102,.85);
+                border-top: 4px solid transparent; border-bottom: 4px solid transparent; flex: 0 0 auto; }
+    .lg-plate { width: 14px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, #ff3030 50%, #5363ff 50%); flex: 0 0 auto; }
+    .lg-dim { width: 18px; height: 3px; border-radius: 2px; background: #7ee0a1; flex: 0 0 auto; }
+
+    .hud-panel::-webkit-scrollbar, .drawer::-webkit-scrollbar { width: 6px; }
+    .hud-panel::-webkit-scrollbar-thumb, .drawer::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
+
+    .hud button { font-family: inherit; cursor: pointer; }
+    .hud-panel .field { margin-top: 8px; }
+    .hud-panel .field label { display: flex; flex-wrap: wrap; justify-content: space-between;
+                              gap: 0 6px; font-size: 11.5px; color: #cfe3e9; }
+    .hud-panel .field label b { color: #7fd6e4; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .hud-panel input[type="range"] { width: 100%; margin: 3px 0 0; accent-color: #7fd6e4; }
+    .hud-panel .segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .hud-panel .segmented button { min-height: 27px; padding: 0 2px; font-size: 11.5px; font-weight: 700; color: #dbe9ee;
+                                   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.22); border-radius: 7px; }
+    .hud-panel .segmented button:hover { background: rgba(255,255,255,.12); }
+    .hud-panel .segmented button.active { background: #0f766e; border-color: #0f766e; color: #fff; }
+    .hud-panel .toggles { display: grid; gap: 5px; margin-top: 10px; }
+    .hud-panel .toggle { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .hud-panel .toggle input { width: 14px; height: 14px; accent-color: #7fd6e4; flex: 0 0 auto; }
+    .hud-panel .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .hud-panel .btn-row button { min-height: 30px; border-radius: 8px; font-size: 12px; font-weight: 700;
+                                 border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #eaf2f5; }
+    .hud-panel .btn-row button:hover { background: rgba(255,255,255,.14); }
+    .hud-panel .btn-row button.primary-btn { background: #0f766e; border-color: #0f766e; color: #fff; }
+    .hud-panel .btn-row button.primary-btn:hover { background: #0d665f; }
+    .hud-panel .ctl-hint { margin: 8px 0 0; font-size: 10.5px; line-height: 1.45; color: #8aa2ac; }
+
+    .drawer .formula-line { margin: 6px 0 6px; padding: 7px 10px; border-radius: 8px;
+                            background: rgba(127,214,228,.08); color: #bfeaf2; font-size: 12.5px; line-height: 1.6; }
+    .drawer ul { margin: 4px 0 0; padding-left: 18px; }
+    .drawer .note { font-size: 12px; color: #9fb6bf; }
+    .drawer .formula-note { color: #93acb6; font-size: 11.5px; }
+    .drawer .formula-live { background: rgba(255,196,84,.10); color: #ffd98a; }
+    .drawer details.derive { margin: 2px 0 8px; font-size: 12px; color: #9fb6bf; }
+    .drawer details.derive summary { cursor: pointer; color: #7fd6e4; outline: none; }
+    .drawer details.derive p { margin: 6px 0 0; line-height: 1.7; }
+    .metric-value { font-weight: 800; color: #7fd6e4; font-variant-numeric: tabular-nums; }
+    .metric-value.warm { color: #ffb0b0; }
+    .metric-value.cool { color: #a8b4ff; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="motionCanvas" width="960" height="540"></canvas>
+
+        <div class="hud hud-readout">
+          <span>粒子 <b id="stageParticle">电子</b></span>
+          <span>v₀ <b id="stageSpeed">1.88×10⁷ m/s</b></span>
+          <span>y <b id="stageDeflection">6.3 mm</b></span>
+          <span>打板 <b id="stageHit">否</b></span>
+        </div>
+
+        <div class="hud hud-legend" id="legend" aria-hidden="true">
+          <span class="lg-item"><span class="lg-line"></span>轨迹</span>
+          <span class="lg-item"><span class="lg-arrow"></span>F = qE</span>
+          <span class="lg-item"><span class="lg-line" style="background:rgba(255,255,255,.8)"></span>vₓ</span><span class="lg-item"><span class="lg-line" style="background:#ff8fb0"></span>v_y</span>
+          <span class="lg-item"><span class="lg-plate"></span>极板</span>
+          <span class="lg-item"><span class="lg-dim"></span>L / d 标尺</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数与开关">
+          <div class="panel-grip" id="panelGrip" title="拖动可移动面板（双击折叠）">
+            <span class="panel-name">参数</span>
+            <button type="button" class="grip-btn" id="panelCollapse" aria-label="折叠参数面板"
+                    title="折叠（双击标题行也可）">▸</button>
+          </div>
+
+          <div class="field">
+            <label for="u0Slider"><span>加速电压 U₀</span><b id="u0Value">1000 V</b></label>
+            <input id="u0Slider" type="range" min="200" max="2000" step="10" value="1000" />
+          </div>
+          <div class="field">
+            <label for="uSlider"><span>偏转电压 U</span><b id="uValue">+200 V</b></label>
+            <input id="uSlider" type="range" min="-400" max="400" step="10" value="200" />
+          </div>
+          <div class="field">
+            <label for="lSlider"><span>板长 L</span><b id="lValue">5.0 cm</b></label>
+            <input id="lSlider" type="range" min="2" max="10" step="0.1" value="5" />
+          </div>
+          <div class="field">
+            <label for="dSlider"><span>板距 d</span><b id="dValue">2.0 cm</b></label>
+            <input id="dSlider" type="range" min="1" max="5" step="0.1" value="2" />
+          </div>
+
+          <div class="segmented" role="group" aria-label="粒子种类">
+            <button type="button" class="particle-btn active" data-particle="electron">电子</button>
+            <button type="button" class="particle-btn" data-particle="proton">质子</button>
+            <button type="button" class="particle-btn" data-particle="alpha">α 粒子</button>
+          </div>
+
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showVectors" checked /><span>力和速度箭头</span></label>
+            <label class="toggle"><input type="checkbox" id="showGhosts" checked /><span>中线与出板辅助线</span></label>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" class="primary-btn" id="playBtn">播放</button>
+            <button type="button" id="resetBtn" title="回到完整轨迹；重新观看请按播放">重置</button>
+          </div>
+
+          <p class="ctl-hint">板间 E = U/d；U &gt; 0 时上板为正、场强向下。</p>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂问题">
+          <h3>结论</h3>
+          <p>同一加速电压 U₀ 下，电子、质子、α 粒子进入同一偏转电场后<strong>偏转量完全相同</strong>：轻粒子 v₀ 大、穿越时间 t 短，重粒子 v₀ 小、t 长，两者恰好抵消。</p>
+          <p class="formula-line">y = U·L² / (4·d·U₀)　<span class="formula-note">与粒子种类、电荷量无关，方向由 q 与 U 的符号共同决定</span></p>
+          <p class="formula-line formula-live" id="substLine">代入当前参数：—</p>
+          <details class="derive">
+            <summary>推导</summary>
+            <p>v₀ = √(2|q|U₀/m)，E = U/d，a = |q|U/(md)，t = L/v₀；<br>
+               y = ½·a·t² = |q|U·L²/(2m·d·v₀²)；把 v₀² = 2|q|U₀/m 代入，得 y = U·L²/(4·d·U₀)。</p>
+          </details>
+          <p>打板判据：|y| ≥ d/2。此时 t_hit = √(2·(d/2)/|a|)，y 停在 d/2，轨迹在撞板处截断。</p>
+
+          <h3>实时量值</h3>
+          <p>电场 E = <span class="metric-value" id="valE">1.0×10⁴ V/m</span></p>
+          <p>加速度 a = <span class="metric-value" id="valA">1.76×10¹⁵ m/s²</span></p>
+          <p>初速度 v₀ = <span class="metric-value" id="valV0">1.88×10⁷ m/s</span>，穿越时间 t = <span class="metric-value" id="valT">2.67 ns</span></p>
+          <p><span id="deflectionLabel">离开电场时偏转</span>：<span class="metric-value" id="deflectionValue">6.3 mm</span>（占半板距 <span id="deflectionPct">62.5%</span>）</p>
+          <p class="note" id="deflectionNote"></p>
+          <p class="note" id="motionNote"></p>
+          <p class="note">画布上的 F、v₀ 箭头按对数缩放，只表示大小关系；精确数值以上面各项为准。</p>
+
+          <h3>模型假设</h3>
+          <ul>
+            <li>板间为匀强电场，E = U/d，忽略边缘效应；</li>
+            <li>忽略重力（mg 远小于 qE）；</li>
+            <li>非相对论近似（v₀ ≪ c），质量取静止质量；</li>
+            <li>粒子沿中线垂直入射，入口 y = 0，出板后不再受力。</li>
+          </ul>
+
+          <h3>课堂观察</h3>
+          <ul>
+            <li>电子与质子的 v₀ 相差约 43 倍、穿越时间也相差约 43 倍，为什么偏转量 y 完全相同？</li>
+            <li>把 U 由 +200 V 调到 −200 V，电子分别打向哪块极板？轨迹形状变不变？</li>
+            <li>要让 y/(d/2) 保持不变，把 L 加倍时 d 应怎样调整？（提示：y ∝ L²/d）</li>
+          </ul>
+
+          <p class="note">快捷键：空格 播放/暂停 · R 重置 · P 折叠参数 · ? 打开/关闭本说明</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("motionCanvas");
+    const ctx = canvas.getContext("2d");
+
+    /* —— 逻辑坐标系与画布内的固定布局（LAYOUT.md「高清渲染」）——
+       960×540 逻辑坐标；极板左缘 196、最长 490px（L = 10 cm），右缘 686；
+       右侧 686~960 留给参数面板列与右下读数，互不遮挡。 */
+    const LW = 960, LH = 540;
+    const VIEW = { left: 252, midY: 252, pxPerM: 3600, plateThick: 20, textRight: 700 };
+
+    const PARTICLES = {
+      electron: { label: "电子",   m: 9.109e-31, q: -1.602e-19 },
+      proton:   { label: "质子",   m: 1.673e-27, q:  1.602e-19 },
+      alpha:    { label: "α 粒子", m: 6.645e-27, q:  3.204e-19 }
+    };
+
+    const state = {
+      particle: "electron",
+      U0: 1000,        // 加速电压 V
+      U: 200,          // 偏转电压 V（可正可负）
+      Lcm: 5,          // 板长 cm
+      dcm: 2,          // 板距 cm
+      progress: 1,     // 归一化飞行进度 0~1
+      playing: false
+    };
+
+    const controls = {
+      u0Slider: document.getElementById("u0Slider"),
+      uSlider: document.getElementById("uSlider"),
+      lSlider: document.getElementById("lSlider"),
+      dSlider: document.getElementById("dSlider"),
+      showVectors: document.getElementById("showVectors"),
+      showGhosts: document.getElementById("showGhosts"),
+      playBtn: document.getElementById("playBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      particleButtons: Array.from(document.querySelectorAll(".particle-btn"))
+    };
+
+    const output = {
+      u0Value: document.getElementById("u0Value"),
+      uValue: document.getElementById("uValue"),
+      lValue: document.getElementById("lValue"),
+      dValue: document.getElementById("dValue"),
+      stageParticle: document.getElementById("stageParticle"),
+      stageSpeed: document.getElementById("stageSpeed"),
+      stageDeflection: document.getElementById("stageDeflection"),
+      stageHit: document.getElementById("stageHit"),
+      valE: document.getElementById("valE"),
+      valA: document.getElementById("valA"),
+      valV0: document.getElementById("valV0"),
+      valT: document.getElementById("valT"),
+      deflectionLabel: document.getElementById("deflectionLabel"),
+      deflectionValue: document.getElementById("deflectionValue"),
+      deflectionPct: document.getElementById("deflectionPct"),
+      deflectionNote: document.getElementById("deflectionNote"),
+      motionNote: document.getElementById("motionNote"),
+      substLine: document.getElementById("substLine")
+    };
+
+    /* —— 高清渲染（HiDPI）—— */
+    function syncBackingStore() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+
+    function beginFrame() {
+      syncBackingStore();
+      ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+    }
+
+    function toLogical(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (LW / r.width),
+               y: (e.clientY - r.top) * (LH / r.height) };
+    }
+
+    /* —— 数值格式化（SI 单位）—— */
+    const SUPS = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻" };
+    function supNum(n) { return String(n).split("").map(c => SUPS[c] || c).join(""); }
+
+    function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+    function fmtSci(v, sig) {
+      const av = Math.abs(v);
+      if (!isFinite(av) || av === 0) return "0";
+      const exp0 = Math.floor(Math.log10(av));
+      let mant = Number((av / Math.pow(10, exp0)).toFixed(sig - 1));
+      let exp = exp0;
+      if (mant >= 10) { mant = mant / 10; exp += 1; }
+      return mant.toFixed(sig - 1) + "×10" + supNum(exp);
+    }
+
+    function fmtTime(sec) {
+      const av = Math.abs(sec);
+      if (!isFinite(av)) return "—";
+      if (av >= 1e-6) return (sec * 1e6).toFixed(2) + " µs";
+      if (av >= 1e-9) return (sec * 1e9).toFixed(2) + " ns";
+      return (sec * 1e12).toFixed(2) + " ps";
+    }
+
+    function fmtMm(mm) {
+      const av = Math.abs(mm);
+      if (av < 100) return (Math.round(av * 10 + 1e-9) / 10).toFixed(1);
+      return String(Math.round(av));
+    }
+
+    function fmtPct(ratio) { return (Math.round(ratio * 1000 + 1e-9) / 10).toFixed(1) + "%"; }
+
+    /* —— 物理模型：全部为 SI 单位 ——
+       y 以「向下为正」。U > 0 时上极板为正，E = U/d 竖直向下。
+       v₀ = √(2|q|U₀/m)，a = qU/(md)，t = L/v₀，y = ½at² = sign(q)·U·L²/(4·d·U₀)。 */
+    function derive() {
+      const p = PARTICLES[state.particle];
+      const L = state.Lcm / 100;
+      const d = state.dcm / 100;
+      const U0 = state.U0;
+      const U = state.U;
+      const qAbs = Math.abs(p.q);
+
+      const v0 = Math.sqrt((2 * qAbs * U0) / p.m);
+      const E = U / d;                       // V/m，向下为正
+      const a = (p.q * E) / p.m;             // m/s²，向下为正
+      const tExit = L / v0;
+      const yExit = Math.sign(p.q) * (U * L * L) / (4 * d * U0);   // m，向下为正
+      const halfGap = d / 2;
+
+      let hits = false;
+      let tHit = null;
+      let tEnd = tExit;
+      let yEnd = yExit;
+      const aAbs = Math.abs(a);
+      if (aAbs > 0) {
+        const candidate = Math.sqrt((2 * halfGap) / aAbs);
+        if (candidate <= tExit) {
+          hits = true;
+          tHit = candidate;
+          tEnd = candidate;
+          yEnd = Math.sign(a) * halfGap;
+        }
+      }
+
+      return {
+        p, L, d, U0, U, v0, E, a, tExit, yExit, halfGap,
+        hits, tHit, tEnd, yEnd,
+        plateName: a >= 0 ? "下极板" : "上极板",
+        xHit: v0 * (tHit || 0)
+      };
+    }
+
+    function geom(m) {
+      const gapPx = m.d * VIEW.pxPerM;
+      return {
+        left: VIEW.left,
+        right: VIEW.left + m.L * VIEW.pxPerM,
+        midY: VIEW.midY,
+        topInner: VIEW.midY - gapPx / 2,
+        bottomInner: VIEW.midY + gapPx / 2,
+        gapPx
+      };
+    }
+
+    // 水平匀速 + 竖直匀加速：y(t) = yExit·(t/tExit)²
+    function posAt(g, m, t) {
+      const frac = m.tExit > 0 ? t / m.tExit : 0;
+      return {
+        x: g.left + m.v0 * t * VIEW.pxPerM,
+        y: g.midY + m.yExit * frac * frac * VIEW.pxPerM
+      };
+    }
+
+    /* —— 绘图工具 —— */
+    function drawArrow(x1, y1, x2, y2, color, width, headLength) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function roundRectPath(x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.arcTo(x + w, y, x + w, y + radius, radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+      ctx.lineTo(x + radius, y + h);
+      ctx.arcTo(x, y + h, x, y + h - radius, radius);
+      ctx.lineTo(x, y + radius);
+      ctx.arcTo(x, y, x + radius, y, radius);
+      ctx.closePath();
+    }
+
+    function drawTag(lines, x, y, color, maxRight) {
+      const bound = maxRight || VIEW.textRight;
+      ctx.save();
+      ctx.font = "bold 15px Microsoft YaHei, Arial";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      const padX = 9, padY = 7, lineH = 21;
+      const textW = Math.max.apply(null, lines.map(line => ctx.measureText(line).width));
+      const boxW = textW + padX * 2;
+      const boxH = lines.length * lineH + padY * 2;
+      const bx = clamp(x, 8, Math.max(8, bound - boxW));
+      const by = clamp(y, 8, Math.max(8, LH - 8 - boxH));
+      ctx.fillStyle = "rgba(8,10,14,0.88)";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      roundRectPath(bx, by, boxW, boxH, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      lines.forEach((line, index) => ctx.fillText(line, bx + padX, by + padY + index * lineH));
+      ctx.restore();
+    }
+
+    /* —— 场景 —— */
+    function drawScene(m) {
+      const g = geom(m);
+      ctx.clearRect(0, 0, LW, LH);
+      const bg = ctx.createRadialGradient(LW * 0.42, LH * 0.44, 40, LW * 0.42, LH * 0.44, 660);
+      bg.addColorStop(0, "#0d1a23");
+      bg.addColorStop(1, "#06090c");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, LW, LH);
+
+      drawField(g, m);
+      drawPlate(g, "top", m);
+      drawPlate(g, "bottom", m);
+      drawGuide(g, m);
+      drawPath(g, m);
+      drawDimensions(g, m);
+      drawParticle(g, m);
+      if (m.hits) drawImpact(g, m);
+      drawReadout(g, m);
+      drawFormulaStrip(g, m);
+    }
+
+    function drawField(g, m) {
+      const gap = g.gapPx;
+      const sign = m.E > 0 ? 1 : m.E < 0 ? -1 : 0;
+
+      // 电场数值与方向：贴在极板上方，随板距一起移动
+      ctx.save();
+      ctx.font = "13.5px Microsoft YaHei, Arial";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = "rgba(143,227,240,0.92)";
+      const eText = sign === 0
+        ? "E = 0（无偏转）"
+        : `E = ${fmtSci(Math.abs(m.E), 2)} V/m ${sign > 0 ? "↓" : "↑"}`;
+      ctx.fillText(eText, g.left + 2, g.topInner - 30);
+      ctx.restore();
+
+      if (sign === 0) return;
+
+      const pad = Math.min(16, gap * 0.24);
+      const yA = sign > 0 ? g.topInner + pad : g.bottomInner - pad;
+      const yB = sign > 0 ? g.bottomInner - pad : g.topInner + pad;
+
+      const wide = (g.right - g.left) > 190;
+      const startX = g.left + (wide ? 82 : 46);
+      const endX = g.right - 14;
+      const n = Math.max(1, Math.round((endX - startX) / 86));
+      ctx.save();
+      for (let i = 0; i < n; i += 1) {
+        const x = n === 1 ? (startX + endX) / 2 : startX + ((endX - startX) * i) / (n - 1);
+        drawArrow(x, yA, x, yB, "rgba(255,255,255,0.30)", 1.6, 8);
+      }
+      ctx.restore();
+    }
+
+    function drawPlate(g, side, m) {
+      const positive = side === "top" ? m.U > 0 : m.U < 0;
+      const neutral = m.U === 0;
+      const y = side === "top" ? g.topInner - VIEW.plateThick : g.bottomInner;
+      const col = neutral ? "#9fb6bf" : positive ? "#ff5d6c" : "#6b7cff";
+      const fill = neutral ? "rgba(159,182,191,0.12)" : positive ? "rgba(255,93,108,0.16)" : "rgba(107,124,255,0.18)";
+
+      ctx.save();
+      ctx.fillStyle = fill;
+      roundRectPath(g.left, y, g.right - g.left, VIEW.plateThick, 6);
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = col;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      ctx.font = "bold 20px Arial";
+      const signText = neutral ? "0" : positive ? "+" : "−";
+      const labelY = y + VIEW.plateThick / 2 + 1;
+      const wide = (g.right - g.left) > 190;
+      ctx.fillText(signText, g.left + (wide ? 14 : 10), labelY);
+      if (wide) {
+        ctx.font = "13px Microsoft YaHei, Arial";
+        ctx.fillText("极板", g.left + 36, labelY);
+      }
+      ctx.restore();
+    }
+
+    function drawGuide(g, m) {
+      if (!controls.showGhosts.checked) return;
+      const end = posAt(g, m, m.tEnd);
+      ctx.save();
+      ctx.setLineDash([7, 7]);
+      ctx.strokeStyle = "rgba(255,255,255,0.24)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(g.left - 22, g.midY);
+      ctx.lineTo(g.right + 26, g.midY);
+      ctx.stroke();
+      if (Math.abs(end.y - g.midY) > 3) {
+        ctx.beginPath();
+        ctx.moveTo(end.x, g.midY);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawPath(g, m) {
+      ctx.save();
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.shadowColor = "rgba(255,209,102,0.35)";
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      const steps = 150;
+      for (let i = 0; i <= steps; i += 1) {
+        const p = posAt(g, m, (m.tEnd * i) / steps);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 板长 L 与板距 d 的绿色标尺
+    function drawDimensions(g, m) {
+      const green = "#7ee0a1";
+      ctx.save();
+      ctx.strokeStyle = green;
+      ctx.fillStyle = green;
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = "round";
+
+      // L：极板下方
+      const yL = g.bottomInner + VIEW.plateThick + 24;
+      ctx.beginPath();
+      ctx.moveTo(g.left, yL);
+      ctx.lineTo(g.right, yL);
+      ctx.moveTo(g.left, yL - 7);
+      ctx.lineTo(g.left, yL + 7);
+      ctx.moveTo(g.right, yL - 7);
+      ctx.lineTo(g.right, yL + 7);
+      ctx.stroke();
+      const armL = Math.min(24, (g.right - g.left) * 0.3);
+      drawArrow(g.left + armL, yL, g.left, yL, green, 1.6, 9);
+      drawArrow(g.right - armL, yL, g.right, yL, green, 1.6, 9);
+      ctx.font = "bold 14px Microsoft YaHei, Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(`L = ${state.Lcm.toFixed(1)} cm`, (g.left + g.right) / 2, yL + 21);
+
+      // d：极板左侧
+      const xD = g.left - 34;
+      const armD = Math.min(24, g.gapPx * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(xD, g.topInner);
+      ctx.lineTo(xD, g.bottomInner);
+      ctx.moveTo(xD - 7, g.topInner);
+      ctx.lineTo(xD + 7, g.topInner);
+      ctx.moveTo(xD - 7, g.bottomInner);
+      ctx.lineTo(xD + 7, g.bottomInner);
+      ctx.stroke();
+      drawArrow(xD, g.topInner + armD, xD, g.topInner, green, 1.6, 9);
+      drawArrow(xD, g.bottomInner - armD, xD, g.bottomInner, green, 1.6, 9);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`d = ${state.dcm.toFixed(1)} cm`, xD - 12, g.midY);
+
+      // y：出板处从中线量到轨迹；撞板时 y 恒为 d/2，标尺会挤在板边，改由撞板标签说明
+      const end = posAt(g, m, m.tEnd);
+      if (!m.hits && Math.abs(end.y - g.midY) > 4) {
+        const xY = Math.max(g.left + 16, end.x - 36);
+        ctx.strokeStyle = "#ffd166";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(xY, g.midY);
+        ctx.lineTo(xY, end.y);
+        ctx.moveTo(xY - 6, g.midY);
+        ctx.lineTo(xY + 6, g.midY);
+        ctx.moveTo(xY - 6, end.y);
+        ctx.lineTo(xY + 6, end.y);
+        ctx.stroke();
+        const armY = Math.min(18, Math.abs(end.y - g.midY) * 0.35);
+        const dirY = end.y > g.midY ? 1 : -1;
+        drawArrow(xY, g.midY + dirY * armY, xY, g.midY, "#ffd166", 1.5, 7);
+        drawArrow(xY, end.y - dirY * armY, xY, end.y, "#ffd166", 1.5, 7);
+        ctx.font = "bold 15px Arial";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(6,10,14,0.9)";
+        const labelY = g.midY + (end.y - g.midY) * 0.3;
+        ctx.strokeText("y", xY - 8, labelY);
+        ctx.fillStyle = "#ffd166";
+        ctx.fillText("y", xY - 8, labelY);
+      }
+      ctx.restore();
+    }
+
+    function drawParticle(g, m) {
+      const t = clamp(state.progress, 0, 1) * m.tEnd;
+      const p = posAt(g, m, t);
+      const color = m.p.q < 0 ? "#5b8cff" : "#ff5d6c";
+
+      ctx.save();
+      ctx.shadowColor = m.p.q < 0 ? "rgba(91,140,255,0.55)" : "rgba(255,93,108,0.55)";
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(m.p.q < 0 ? "−" : "+", p.x, p.y + 1);
+      ctx.restore();
+
+      if (!controls.showVectors.checked) return;
+
+      const force = Math.abs(m.p.q * m.E);
+      const dir = m.a >= 0 ? 1 : -1;
+      // 力箭头不得穿过极板：按粒子到板内沿的余量截断；贴板时只剩箭头本身
+      const room = dir > 0 ? (g.bottomInner - 2 - p.y) : (p.y - (g.topInner + 2));
+      const fLen = Math.min(room, clamp(32 + 15 * Math.log10(1 + force / 1e-16), 32, 96));
+      const tNow = clamp(state.progress, 0, 1) * m.tEnd;
+      const vLen = clamp(96 + 18 * Math.log10(1 + m.v0 / 1e6), 96, 150);
+      const tipX = clamp(p.x + vLen, 8, VIEW.textRight);
+
+      if (fLen >= 10) {
+        drawArrow(p.x, p.y, p.x, p.y + dir * fLen, "#ffd166", 4, 11);
+      }
+
+      // —— 速度分解：vₓ 恒定、v_y 随 t 线性变大，虚线补成平行四边形 ——
+      const vyNow = Math.abs(m.a) * tNow;
+      const vyLen = Math.max(18, clamp(vLen * (vyNow / Math.max(m.v0, 1)), 0, vLen * 1.15));
+      const cornerX = tipX;
+      const cornerY = p.y + dir * vyLen;
+
+      drawArrow(p.x, p.y, tipX, p.y, "rgba(255,255,255,0.88)", 3.2, 10);          // vₓ
+      if (vyLen > 4) {
+        drawArrow(p.x, p.y, p.x, cornerY, "#ff8fb0", 3.2, 10);                      // v_y
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(tipX, p.y); ctx.lineTo(cornerX, cornerY);
+        ctx.moveTo(p.x, cornerY); ctx.lineTo(cornerX, cornerY);
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y); ctx.lineTo(cornerX, cornerY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 标签加描边，压在轨迹或极板上也清晰
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(6,10,14,0.92)";
+      ctx.font = "bold 14px Arial";
+      ctx.textBaseline = "middle";
+      if (fLen >= 10) {
+        const fx = p.x - 11;
+        const fy = p.y + dir * fLen * 0.5;
+        ctx.textAlign = "right";
+        ctx.strokeText("F", fx, fy);
+        ctx.fillStyle = "#ffd166";
+        ctx.fillText("F", fx, fy);
+      }
+      ctx.textAlign = "center";
+      const vxLabel = (p.x + tipX) / 2;
+      const vyLabel = p.y - 22;
+      ctx.strokeText("vₓ", vxLabel, vyLabel);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fillText("vₓ", vxLabel, vyLabel);
+      if (vyLen > 18) {
+        ctx.textAlign = "left";
+        const vyx = p.x - 16;
+        const vyy = p.y + dir * vyLen * 0.55;
+        ctx.strokeText("v_y", vyx, vyy);
+        ctx.fillStyle = "#ff8fb0";
+        ctx.fillText("v_y", vyx, vyy);
+        if (vyLen > 30) {
+          ctx.textAlign = "center";
+          ctx.strokeText("v", cornerX + 14, cornerY + dir * 12);
+          ctx.fillStyle = "rgba(255,255,255,0.8)";
+          ctx.fillText("v", cornerX + 14, cornerY + dir * 12);
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawImpact(g, m) {
+      const p = posAt(g, m, m.tEnd);
+      const dir = m.a >= 0 ? 1 : -1;
+      ctx.save();
+      ctx.strokeStyle = "#ff5d5d";
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (let i = 0; i < 4; i += 1) {
+        const angle = Math.PI / 4 + (i * Math.PI) / 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(angle) * 21, p.y + Math.sin(angle) * 21);
+        ctx.lineTo(p.x + Math.cos(angle) * 29, p.y + Math.sin(angle) * 29);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 单行撞板标签，放在两板之间的空处，避免压住 L 标尺
+      drawTag([
+        `撞板 x = ${(m.xHit * 100).toFixed(1)} cm · t = ${fmtTime(m.tHit)}`
+      ], p.x + 30, dir > 0 ? p.y - 46 : p.y + 10, "#ff8a8a", VIEW.textRight);
+    }
+
+    /* 底部公式链：把“怎么算出来的”留在画面上，别只给一个结果 */
+    function drawFormulaStrip(g, m) {
+      const U = Math.abs(Math.round(state.U));
+      const U0 = Math.max(1, Math.round(state.U0));
+      const Lm = state.Lcm / 100;
+      const dm = state.dcm / 100;
+      const den = 4 * dm * U0;
+      const mm = den > 0 ? (U * Lm * Lm / den) * 1000 : 0;
+
+      const x = VIEW.left - 84;
+      const y1 = 396;
+      const y2 = 422;
+
+      ctx.save();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+
+      ctx.font = "12.5px Microsoft YaHei, Arial";
+      ctx.fillStyle = "rgba(143,163,189,0.8)";
+      ctx.fillText("推导", x, y1);
+
+      ctx.font = "14.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(127,214,228,0.92)";
+      ctx.fillText("y = ½at²", x + 36, y1);
+      ctx.font = "12.5px Microsoft YaHei, Arial";
+      ctx.fillStyle = "rgba(143,163,189,0.7)";
+      ctx.fillText("→", x + 116, y1);
+      ctx.font = "14.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(127,214,228,0.92)";
+      ctx.fillText("a = qU/(md)", x + 138, y1);
+      ctx.font = "12.5px Microsoft YaHei, Arial";
+      ctx.fillStyle = "rgba(143,163,189,0.7)";
+      ctx.fillText("→", x + 236, y1);
+      ctx.font = "14.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(255,209,102,0.95)";
+      ctx.fillText("y = UL²/(4dU₀)", x + 258, y1);
+
+      // 第二行：把当前参数代进去，滑动条一动数字就跟着变
+      ctx.font = "13.5px Cambria, Georgia, serif";
+      ctx.fillStyle = "rgba(143,163,189,0.85)";
+      ctx.fillText("代入：", x + 36, y2);
+      ctx.fillStyle = "rgba(255,209,102,0.95)";
+      ctx.fillText(
+        `y = ${U}×${Lm.toFixed(2)}² / (4×${dm.toFixed(2)}×${U0}) ≈ ${mm.toFixed(1)} mm`,
+        x + 84, y2);
+      ctx.restore();
+    }
+
+    function drawReadout(g, m) {
+      // 抽屉展开时它正好盖住右下角，画布读数让位（抽屉里有一模一样的数值）
+      if (!drawer.hidden) return;
+      const yMm = Math.abs(m.yEnd) * 1000;
+      const pct = fmtPct(Math.abs(m.yEnd) / m.halfGap);
+      const atEnd = state.progress >= 0.999;
+      const stateText = !atEnd
+        ? "仍偏转中（未离开电场）"
+        : (m.hits ? `已打到${m.plateName}` : "已离开电场");
+
+      ctx.save();
+      ctx.textAlign = "right";
+      ctx.textBaseline = "alphabetic";
+      ctx.shadowColor = "rgba(0,0,0,0.9)";
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#ffd166";
+      ctx.font = "bold 21px Microsoft YaHei, Arial";
+      ctx.fillText(`偏转量 y = ${fmtMm(yMm)} mm`, VIEW.textRight, 318);
+      ctx.fillStyle = "#cfe3e9";
+      ctx.font = "14.5px Microsoft YaHei, Arial";
+      ctx.fillText(`占半板距 ${pct} · ${stateText}`, VIEW.textRight, 344);
+      ctx.restore();
+    }
+
+    /* —— 读数与面板文字 —— */
+    function updateOutputs(m) {
+      const yMm = Math.abs(m.yEnd) * 1000;
+      const pct = fmtPct(Math.abs(m.yEnd) / m.halfGap);
+
+      output.u0Value.textContent = `${Math.round(state.U0)} V`;
+      output.uValue.textContent = `${state.U > 0 ? "+" : ""}${Math.round(state.U)} V`;
+      output.lValue.textContent = `${state.Lcm.toFixed(1)} cm`;
+      output.dValue.textContent = `${state.dcm.toFixed(1)} cm`;
+
+      output.stageParticle.textContent = m.p.label;
+      output.stageSpeed.textContent = `${fmtSci(m.v0, 3)} m/s`;
+      output.stageDeflection.textContent = `${fmtMm(yMm)} mm`;
+      output.stageHit.textContent = m.hits ? `是 · ${m.plateName}` : "否";
+
+      const eDir = m.E > 0 ? "向下" : m.E < 0 ? "向上" : "为零";
+      const aDir = m.a > 0 ? "向下" : m.a < 0 ? "向上" : "为零";
+      output.valE.textContent = m.E === 0 ? "0（无电场）" : `${fmtSci(Math.abs(m.E), 2)} V/m（${eDir}）`;
+      output.valA.textContent = m.a === 0 ? "0" : `${fmtSci(Math.abs(m.a), 3)} m/s²（${aDir}）`;
+      output.valV0.textContent = `${fmtSci(m.v0, 3)} m/s`;
+      output.valT.textContent = fmtTime(m.hits ? m.tHit : m.tExit);
+
+      if (m.hits) {
+        output.deflectionLabel.textContent = "打到极板时偏转";
+        output.deflectionValue.textContent = `${fmtMm(yMm)} mm`;
+        output.deflectionPct.textContent = "100.0%";
+        output.deflectionNote.textContent =
+          `t = ${fmtTime(m.tHit)}（x = ${(m.xHit * 100).toFixed(1)} cm = ${(m.xHit / m.L).toFixed(2)}L）时打到${m.plateName}，` +
+          `粒子未离开电场，轨迹在撞板处截断；该值为撞板瞬间的偏转量 d/2。`;
+      } else {
+        output.deflectionLabel.textContent = "离开电场时偏转";
+        output.deflectionValue.textContent = `${fmtMm(yMm)} mm`;
+        output.deflectionPct.textContent = pct;
+        output.deflectionNote.textContent =
+          `t = L/v₀ = ${fmtTime(m.tExit)}（x = L = ${state.Lcm.toFixed(1)} cm）时离开电场，` +
+          `|y| = ${fmtMm(yMm)} mm < d/2 = ${fmtMm(m.halfGap * 1000)} mm，未打板。`;
+      }
+
+      const dirText = m.p.q < 0
+        ? "电场力与 E 反向"
+        : "电场力与 E 同向";
+      output.motionNote.textContent =
+        `水平方向匀速（v₀ 恒定），竖直方向匀加速（a 恒定），合成为抛物线；${dirText}。`;
+
+      /* 结论式代入当前参数：y = U·L²/(4·d·U₀) */
+      const Lu = state.Lcm / 100;
+      const du = state.dcm / 100;
+      const yFormula = Math.abs(state.U) * Lu * Lu / (4 * du * state.U0);
+      const head =
+        `y = ${Math.abs(Math.round(state.U))} V × (${state.Lcm.toFixed(1)} cm)² ÷ ` +
+        `(4 × ${state.dcm.toFixed(1)} cm × ${Math.round(state.U0)} V)`;
+      let tail;
+      if (Math.round(state.U) === 0) {
+        tail = "= 0（偏转电压为 0，无偏转）";
+      } else if (m.hits) {
+        const halfMm = m.halfGap * 1000;
+        tail = `= ${fmtMm(yFormula * 1000)} mm ＞ d/2 = ${fmtMm(halfMm)} mm，已打板，` +
+               `实际停在 ${fmtMm(halfMm)} mm`;
+      } else {
+        tail = `= ${fmtMm(yFormula * 1000)} mm`;
+      }
+      output.substLine.textContent = `代入当前参数：${head} ${tail}`;
+
+      controls.particleButtons.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.particle === state.particle);
+      });
+    }
+
+    /* —— 渲染主循环 —— */
+    function render() {
+      const m = derive();
+      updateOutputs(m);
+      beginFrame();
+      drawScene(m);
+    }
+
+    // 按真实时间推进，120Hz 屏和 60Hz 屏的动画时长一致
+    let lastFrameTime = 0;
+    function animate(now) {
+      const stamp = typeof now === "number" ? now : performance.now();
+      if (!lastFrameTime) lastFrameTime = stamp;
+      const dt = Math.min(0.05, (stamp - lastFrameTime) / 1000);
+      lastFrameTime = stamp;
+      if (state.playing) {
+        state.progress += dt / 2.4;
+        if (state.progress >= 1) {
+          state.progress = 1;
+          state.playing = false;
+          controls.playBtn.textContent = "播放";
+        }
+        render();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    /* —— 参数联动 —— */
+    function syncControlsFromState() {
+      controls.u0Slider.value = String(state.U0);
+      controls.uSlider.value = String(state.U);
+      controls.lSlider.value = String(state.Lcm);
+      controls.dSlider.value = String(state.dcm);
+    }
+
+    // URL 预设：?p=proton&U0=1000&U=200&L=5&d=2（便于教师直接给出参数组合）
+    (function applyQuery() {
+      const q = new URLSearchParams(location.search);
+      const key = q.get("p");
+      if (key && PARTICLES[key]) state.particle = key;
+      const take = (name, lo, hi) => {
+        const v = parseFloat(q.get(name));
+        return isFinite(v) ? clamp(v, lo, hi) : null;
+      };
+      const u0 = take("U0", 200, 2000); if (u0 !== null) state.U0 = u0;
+      const u = take("U", -400, 400); if (u !== null) state.U = u;
+      const l = take("L", 2, 10); if (l !== null) state.Lcm = l;
+      const d = take("d", 1, 5); if (d !== null) state.dcm = d;
+    })();
+    syncControlsFromState();
+
+    controls.u0Slider.addEventListener("input", () => { state.U0 = Number(controls.u0Slider.value); render(); });
+    controls.uSlider.addEventListener("input", () => { state.U = Number(controls.uSlider.value); render(); });
+    controls.lSlider.addEventListener("input", () => { state.Lcm = Number(controls.lSlider.value); render(); });
+    controls.dSlider.addEventListener("input", () => { state.dcm = Number(controls.dSlider.value); render(); });
+    controls.showVectors.addEventListener("change", render);
+    controls.showGhosts.addEventListener("change", render);
+    controls.particleButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        state.particle = button.dataset.particle;
+        render();
+      });
+    });
+
+    controls.playBtn.addEventListener("click", () => {
+      if (state.playing) {
+        state.playing = false;
+        controls.playBtn.textContent = "播放";
+      } else {
+        if (state.progress >= 1) state.progress = 0;
+        state.playing = true;
+        controls.playBtn.textContent = "暂停";
+      }
+      render();
+    });
+
+    controls.resetBtn.addEventListener("click", () => {
+      state.playing = false;
+      state.progress = 1;
+      controls.playBtn.textContent = "播放";
+      render();
+    });
+
+    /* —— 外壳交互：参数折叠 / 「?」抽屉 / 快捷键 —— */
+    const panel = document.getElementById("ctrlPanel");
+    const ctrlToggle = document.getElementById("ctrlToggle");
+    const moreBtn = document.getElementById("moreBtn");
+    const drawer = document.getElementById("drawer");
+
+    function setPanel(open) {
+      panel.hidden = !open;
+      ctrlToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    // 打开「?」抽屉时收起参数面板，避免两块叠加层互相遮挡；关闭时恢复原状态。
+    let restorePanelOnDrawerClose = false;
+
+    function setDrawer(open) {
+      drawer.hidden = !open;
+      moreBtn.setAttribute("aria-expanded", String(open));
+      if (open && !panel.hidden) {
+        restorePanelOnDrawerClose = true;
+        setPanel(false);
+      } else if (!open && restorePanelOnDrawerClose) {
+        restorePanelOnDrawerClose = false;
+        setPanel(true);
+      }
+      render();
+    }
+
+    ctrlToggle.addEventListener("click", () => setPanel(panel.hidden));
+    moreBtn.addEventListener("click", () => setDrawer(drawer.hidden));
+
+    document.addEventListener("keydown", (event) => {
+      const tag = event.target && event.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (event.code === "Space") {
+        if (tag === "BUTTON") return;
+        event.preventDefault();
+        controls.playBtn.click();
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "r") {
+        controls.resetBtn.click();
+        event.preventDefault();
+      } else if (key === "p") {
+        setPanel(panel.hidden);
+        event.preventDefault();
+      } else if (event.key === "?") {
+        setDrawer(drawer.hidden);
+        event.preventDefault();
+      } else if (key === "escape") {
+        setDrawer(false);
+      }
+    });
+
+    /* —— 参数面板：拖动 + 位置记忆（LAYOUT.md「参数面板必须可拖动」）—— */
+    (function initDraggablePanel() {
+      const panelEl = document.getElementById("ctrlPanel");
+      const grip = panelEl && panelEl.querySelector(".panel-grip");
+      const collapseBtn = document.getElementById("panelCollapse");
+      if (!panelEl || !grip) return;
+      const KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+
+      function clampToFrame(x, y) {
+        const f = panelEl.parentElement.getBoundingClientRect();
+        const r = panelEl.getBoundingClientRect();
+        return {
+          x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+          y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+        };
+      }
+      function place(x, y) {
+        const p = clampToFrame(x, y);
+        panelEl.style.left = p.x + "px";
+        panelEl.style.top = p.y + "px";
+        panelEl.style.right = "auto";
+        panelEl.style.bottom = "auto";
+      }
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (err) { saved = null; }
+      if (saved && isFinite(saved.x) && isFinite(saved.y)) place(saved.x, saved.y);
+
+      let dx = 0, dy = 0, dragging = false, moved = false;
+      grip.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 || e.target.closest("button")) return;
+        const f = panelEl.parentElement.getBoundingClientRect();
+        const r = panelEl.getBoundingClientRect();
+        dx = e.clientX - r.left; dy = e.clientY - r.top;
+        dragging = true; moved = false;
+        panelEl.classList.add("dragging");
+        grip.setPointerCapture(e.pointerId);
+        panelEl.style.left = (r.left - f.left) + "px";
+        panelEl.style.top = (r.top - f.top) + "px";
+        panelEl.style.right = "auto";
+        panelEl.style.bottom = "auto";
+      });
+      grip.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const f = panelEl.parentElement.getBoundingClientRect();
+        const nx = e.clientX - f.left - dx;
+        const ny = e.clientY - f.top - dy;
+        if (Math.abs(nx - parseFloat(panelEl.style.left)) > 1 ||
+            Math.abs(ny - parseFloat(panelEl.style.top)) > 1) moved = true;
+        place(nx, ny);
+      });
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        panelEl.classList.remove("dragging");
+        if (grip.hasPointerCapture(e.pointerId)) grip.releasePointerCapture(e.pointerId);
+        if (!moved) return;
+        try {
+          localStorage.setItem(KEY, JSON.stringify({
+            x: parseFloat(panelEl.style.left), y: parseFloat(panelEl.style.top)
+          }));
+        } catch (err) { /* 隐私模式下忽略 */ }
+      }
+      grip.addEventListener("pointerup", endDrag);
+      grip.addEventListener("pointercancel", endDrag);
+      if (collapseBtn) collapseBtn.addEventListener("click", () => setPanel(false));
+      grip.addEventListener("dblclick", (e) => {
+        if (e.target.closest("button")) return;
+        ctrlToggle.click();
+      });
+      window.addEventListener("resize", () => {
+        if (panelEl.hidden || !panelEl.style.left) return;
+        place(parseFloat(panelEl.style.left), parseFloat(panelEl.style.top));
+      });
+    })();
+
+    window.addEventListener("resize", render);
+    render();
+    animate();
+  </script>
+</body>
+</html>

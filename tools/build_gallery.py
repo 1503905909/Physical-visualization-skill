@@ -13,6 +13,7 @@ import argparse
 import html
 import json
 import os
+import shutil
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,6 +23,13 @@ OUT = os.path.join(ROOT, "index.html")
 EXAMPLE_DIRS = [
     ".github/skills/physics-interactive-sim-lab/examples",
     ".github/skills/manim-physics-animator/examples",
+]
+
+# GitHub Pages 不发布 .github 目录，因此把示例镜像到站点根下的 examples/ 供线上访问。
+# 源文件仍以 .github/skills/ 为准，镜像由本脚本自动生成。
+MIRROR = [
+    (".github/skills/physics-interactive-sim-lab/examples", "examples/interactive", (".html",)),
+    (".github/skills/manim-physics-animator/examples", "examples/manim", (".py", ".mp4", ".srt")),
 ]
 TEMPLATE_EXCLUDE = {
     "template_streamlit.py",
@@ -52,11 +60,49 @@ def posix(p: str) -> str:
 VIDEO_DIR = ".github/skills/manim-physics-animator/examples/videos"
 
 
+def served_path(src_rel: str) -> str:
+    """把 .github 下的源文件路径映射为站点可访问的镜像路径。"""
+    rel = posix(src_rel)
+    for src_dir, dst_dir, _exts in MIRROR:
+        if rel.startswith(src_dir + "/"):
+            return dst_dir + "/" + rel[len(src_dir) + 1:]
+    return rel
+
+
+def mirror_examples() -> int:
+    """把示例复制到站点根下的 examples/（Pages 不发布 .github），并清理已失效的镜像文件。"""
+    copied = 0
+    for src_dir, dst_dir, exts in MIRROR:
+        src_root = os.path.join(ROOT, src_dir)
+        dst_root = os.path.join(ROOT, dst_dir)
+        live = set()
+        for dirpath, _dirnames, filenames in os.walk(src_root):
+            for fn in filenames:
+                if not fn.lower().endswith(tuple(e.lower() for e in exts)):
+                    continue
+                src = os.path.join(dirpath, fn)
+                rel = os.path.relpath(src, src_root)
+                dst = os.path.join(dst_root, rel)
+                live.add(os.path.normcase(dst))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                if not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
+                    shutil.copy2(src, dst)
+                    copied += 1
+        # 删除源里已经不存在的镜像文件
+        for dirpath, _dirnames, filenames in os.walk(dst_root):
+            for fn in filenames:
+                dst = os.path.normcase(os.path.join(dirpath, fn))
+                if dst not in live:
+                    os.remove(dst)
+    return copied
+
+
 def video_for(rid: str) -> str | None:
-    """找已渲染的 MP4：优先 examples/videos（随仓库发布），其次 build/videos/manim（本地渲染产物，被 gitignore）。"""
+    """找已渲染的 MP4：优先 skill 的 examples/videos，其次 build/videos/manim（本地渲染产物，被 gitignore）。"""
     for rel in (f"{VIDEO_DIR}/{rid}.mp4", f"build/videos/manim/{rid}.mp4"):
         if os.path.exists(os.path.join(ROOT, rel)):
-            return rel
+            served = served_path(rel)
+            return served if os.path.exists(os.path.join(ROOT, served)) else rel
     return None
 
 
@@ -76,7 +122,7 @@ def esc(s: str) -> str:
 
 def card_html(r: dict, video: str | None) -> str:
     typ = r["type"]
-    path = posix(r["path"])
+    path = served_path(posix(r["path"]))
     search = " ".join(
         [r["title"], r.get("topic", ""), r["chapter"], r.get("chapterName", "")] + r.get("tags", [])
     )
@@ -420,6 +466,8 @@ def main() -> int:
     if args.check:
         return check(reg)
 
+    n = mirror_examples()
+    print(f'镜像示例文件：{n} 个 -> examples/')
     page = build_page(reg)
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(page)

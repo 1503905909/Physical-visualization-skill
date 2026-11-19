@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>交变电流与变压器可视化资源</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --accent: #0f766e;
+      --cyan: #7fd6e4;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; color: #eaf2f5; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：标签页切换，同一时刻只有一块画布铺满整个舞台 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #080a0e; }
+
+    /* 每个 tabpanel 都占满舞台；画布按各自逻辑坐标系的宽高比铺满可用区域，
+       在 16:9 舞台里等比居中（不拉伸，内部坐标系不变）。
+       位图 = CSS 显示尺寸 × DPR，见 JS 的 syncBackingStore()。 */
+    .scene { position: absolute; inset: 0; overflow: hidden;
+             display: flex; align-items: center; justify-content: center; }
+    .scene[hidden] { display: none; }
+    .scene > canvas { display: block; width: 100%; height: auto;
+                      max-width: 100%; max-height: 100%;
+                      object-fit: contain; object-position: center; }
+    #acCanvas { aspect-ratio: 1000 / 562; }
+    #tfCanvas { aspect-ratio: 680 / 320; }
+
+    /* 标签页页签：顶部居中浮层 */
+    .hud-tabs { left: 50%; top: 10px; transform: translateX(-50%); z-index: 4;
+                display: flex; gap: 4px; padding: 4px; }
+    .hud-tabs [role="tab"] { font: inherit; font-size: 12.5px; padding: 5px 16px; border-radius: 7px;
+                             cursor: pointer; border: 1px solid transparent; background: transparent;
+                             color: #b9cdd6; }
+    .hud-tabs [role="tab"]:hover { background: rgba(255,255,255,.08); color: #eaf2f5; }
+    .hud-tabs [role="tab"][aria-selected="true"] { background: rgba(34,211,238,.16); color: #eaf2f5;
+                                                   border-color: rgba(34,211,238,.55); }
+    .hud-tabs [role="tab"]:focus-visible { outline: 2px solid #22d3ee; outline-offset: 1px; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: var(--cyan); }
+    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+    .hud-readout .chip + .chip { padding-left: 9px; border-left: 1px solid rgba(255,255,255,.14); }
+    .hud-readout .k { font-size: 11px; color: #93aab4; }
+    .hud-readout b.ok { color: #4ade80; }
+    .hud-readout b.dim { font-size: 12.5px; font-weight: 600; color: #ffd166; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .hud-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .sw { display: inline-block; width: 16px; height: 4px; border-radius: 2px; flex: 0 0 auto; }
+    .sw-field { background: rgba(226,232,240,.72); }
+    .sw-neutral { width: 2px; height: 12px; border-left: 2px dashed #fb923c; border-radius: 0; }
+    .sw-current { background: #fbbf24; }
+
+    /* 默认落在左下角（本页左侧只有磁感线装饰，内容最少）；可拖动并记住位置。
+       max-height 留出顶部读数条与底部图例，矮屏（1024×768）也不会压住读数。 */
+    .hud-panel { left: 8px; bottom: 52px; right: auto; top: auto; width: 258px;
+                 max-height: calc(100% - 116px);
+                 overflow-y: auto; padding: 12px; font-size: 12.5px; scrollbar-width: thin;
+                 cursor: default; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 8px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip h4 { margin: 0; }
+    .grip-fold { padding: 0 7px; font-size: 11px; line-height: 18px; }
+
+    .hud-panel h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                    color: var(--cyan); }
+    .hud-panel h4:first-child { margin-top: 0; }
+
+    .field { margin-top: 7px; }
+    .field > label { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px;
+                     color: #b9cdd6; }
+    .field > label > span:last-child { color: var(--cyan); font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 16px; margin: 2px 0 0;
+                          accent-color: #22d3ee; }
+
+    .hud-panel button { font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
+                        cursor: pointer; color: #eaf2f5; background: rgba(255,255,255,.08);
+                        border: 1px solid rgba(255,255,255,.22); }
+    .hud-panel button:hover { background: rgba(255,255,255,.16); }
+    .hud-panel button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+    .hud-panel button.primary:hover { background: #0d665f; }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
+    .toggles { display: grid; gap: 6px; margin-top: 7px; }
+    .toggle { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #b9cdd6;
+              cursor: pointer; }
+    .toggle input { width: 15px; height: 15px; accent-color: #22d3ee; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-more:hover { background: rgba(255,255,255,.16); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px;
+              scrollbar-width: thin; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: var(--cyan); }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ol { margin: 4px 0; padding-left: 18px; }
+    .drawer .eq { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--cyan); }
+    .drawer .dim { color: #93aab4; font-size: 12px; }
+
+    @media (max-width: 1180px) {
+      /* 窄屏时页签让到右上，避免与左上读数相撞 */
+      .hud-tabs { left: auto; right: 104px; transform: none; }
+    }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 210px; font-size: 12px; }
+    }
+
+    /* 短屏（如 1024×768 的 4:3 投影）：面板内容略收紧，保证参数全部可见 */
+    @media (max-height: 800px) {
+      .hud-panel { padding: 10px 12px; font-size: 12px; }
+      .hud-panel h4 { margin: 8px 0 2px; }
+      .field { margin-top: 5px; }
+      .toggles { gap: 4px; margin-top: 6px; }
+      .btn-row { margin-top: 7px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="stage">
+      <div class="stage-frame">
+        <!-- 标签页：同一时刻只显示一块画布，各占满整个舞台 -->
+        <div class="hud hud-tabs" role="tablist" aria-label="画面切换">
+          <button type="button" role="tab" id="tabAc" data-scene="ac" aria-selected="true"
+                  aria-controls="panelAc" tabindex="0">发电机</button>
+          <button type="button" role="tab" id="tabTf" data-scene="tf" aria-selected="false"
+                  aria-controls="panelTf" tabindex="-1">变压器</button>
+        </div>
+
+        <div class="scene" id="panelAc" role="tabpanel" aria-labelledby="tabAc">
+          <canvas id="acCanvas" width="1000" height="562" aria-label="交流发电机与 e–t 波形"></canvas>
+        </div>
+        <div class="scene" id="panelTf" role="tabpanel" aria-labelledby="tabTf" hidden>
+          <canvas id="tfCanvas" width="680" height="320" aria-label="理想变压器示意"></canvas>
+        </div>
+
+        <!-- 读数：左上角 ≤4 chips -->
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip"><span class="k">θ</span><b id="stageTheta">0.0°</b></span>
+          <span class="chip"><span class="k">e</span><b class="ok" id="stageE">0.00 V</b></span>
+          <span class="chip"><span class="k">Φ</span><b class="dim" id="stageFlux">最大（中性面）</b></span>
+          <span class="chip"><span class="k">U₂</span><b id="tfU2">24.0 V</b></span>
+        </div>
+
+        <!-- 图例：主画面左下角一行 -->
+        <div class="hud hud-legend" id="legend" aria-label="图例">
+          <span><i class="sw sw-field"></i>磁感线 B</span>
+          <span><i class="sw sw-neutral"></i>中性面</span>
+          <span><i class="sw sw-current"></i>感应电流方向</span>
+        </div>
+
+        <!-- 参数：默认左下角，可拖动、记忆位置、双击标题折叠，面板内分「发电机 / 变压器」两组 -->
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="参数调节">
+          <div class="panel-grip" title="拖动移动面板，双击折叠">
+            <h4>参数</h4>
+            <button type="button" class="grip-fold" id="gripFold" aria-expanded="true"
+                    aria-controls="ctrlPanel" aria-label="折叠参数面板">▾</button>
+          </div>
+          <h4>交流发电机</h4>
+          <div class="field">
+            <label for="rpmSlider"><span>转速 N<sub>r</sub></span><span id="rpmValue">60 r/min</span></label>
+            <input id="rpmSlider" type="range" min="30" max="240" step="10" value="60" />
+          </div>
+          <div class="field">
+            <label for="turnsSlider"><span>线圈匝数 N</span><span id="turnsValue">100 匝</span></label>
+            <input id="turnsSlider" type="range" min="20" max="200" step="10" value="100" />
+          </div>
+          <div class="field">
+            <label for="bSlider"><span>磁感应强度 B</span><span id="bValue">0.50 T</span></label>
+            <input id="bSlider" type="range" min="0.10" max="1.00" step="0.05" value="0.50" />
+          </div>
+          <div class="field">
+            <label for="areaSlider"><span>线圈面积 S</span><span id="areaValue">0.020 m²</span></label>
+            <input id="areaSlider" type="range" min="0.005" max="0.050" step="0.005" value="0.020" />
+          </div>
+
+          <h4>变压器</h4>
+          <div class="field">
+            <label for="n1Slider"><span>原线圈匝数 n₁</span><span id="n1Value">200 匝</span></label>
+            <input id="n1Slider" type="range" min="50" max="500" step="10" value="200" />
+          </div>
+          <div class="field">
+            <label for="n2Slider"><span>副线圈匝数 n₂</span><span id="n2Value">400 匝</span></label>
+            <input id="n2Slider" type="range" min="50" max="1000" step="10" value="400" />
+          </div>
+          <div class="field">
+            <label for="u1Slider"><span>输入电压 U₁</span><span id="u1Value">12 V</span></label>
+            <input id="u1Slider" type="range" min="3" max="36" step="1" value="12" />
+          </div>
+          <div class="field">
+            <label for="rSlider"><span>负载电阻 R</span><span id="rValue">20 Ω</span></label>
+            <input id="rSlider" type="range" min="5" max="100" step="5" value="20" />
+          </div>
+
+          <h4>显示与操作</h4>
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="showField" checked /><span>磁感线与中性面</span></label>
+            <label class="toggle"><input type="checkbox" id="showFlux" checked /><span>Φ/Φ<sub>m</sub> 曲线（虚线）</span></label>
+          </div>
+          <div class="btn-row">
+            <button type="button" id="pauseBtn">暂停</button>
+            <button type="button" class="primary" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数 ◂</button>
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" aria-label="结论、假设与课堂问题">?</button>
+
+        <!-- 结论 / 实时数据 / 符号 / 模型假设 / 课堂问题：默认折叠 -->
+        <section class="drawer" id="drawer" hidden aria-label="结论、模型假设与课堂观察">
+          <h3>结论</h3>
+          <p>线圈经过中性面时磁通量最大、感应电动势为零；正弦交变电流的峰值与有效值满足 E = E<sub>m</sub>/√2；理想变压器按匝数比变压、按反比变流。</p>
+          <p class="eq">e = E<sub>m</sub> sin ωt，E<sub>m</sub> = NBSω，E = E<sub>m</sub>/√2；U₁/U₂ = n₁/n₂，P₁ = P₂</p>
+
+          <h3>实时数据</h3>
+          <p>峰值 E<sub>m</sub> = <span id="mEm">6.28 V</span>；有效值 E = <span id="mErms">4.44 V</span></p>
+          <p><span id="mFreq">f = 1.00 Hz</span>；<span id="mOmega">ω = 2πf = 6.28 rad/s，T = 1.00 s</span></p>
+          <p><span id="mInst">e = 0.00 V</span> — <span id="mInstNote">线圈位于中性面，磁通量正向最大，感应电动势为零</span></p>
+          <p>变压器：<span id="mU2">U₂ = 24.0 V</span>，<span id="mI2">I₂ = 1.20 A，I₁ = 2.40 A</span></p>
+          <p>I₂ = <span id="tfI2">1.20 A</span>，I₁ = <span id="tfI1">2.40 A</span>，P₁ = P₂ = <span id="tfPower">28.8 W</span>，匝数比 <span id="tfRatio">200 : 400（升压）</span></p>
+
+          <h3>符号与角度</h3>
+          <p>θ 为线圈法线 n 与磁感线 B 的夹角，从中性面（θ = 0°）起算；N<sub>r</sub> 为转速，N 为线圈匝数，n₁、n₂ 为变压器原、副线圈匝数。变压器部分单独设置 U₁，与发电机解耦，便于分别观察两组规律。</p>
+
+          <h3>画法说明</h3>
+          <p>画布中的矩形线圈是<strong>画法示意</strong>：线圈绕竖直转轴匀速转动，转轴与磁感线 B 垂直；实际匝数 N（当前 <span id="mTurns">100</span> 匝）由参数滑块决定，图中不按匝数逐圈绘制。</p>
+          <p>中性面是线圈平面与 B 垂直的位置（θ = 0°），此时磁通量最大、感应电动势为零。变压器绕组圈数同样仅示意、不按比例，铁芯理想且无漏磁。</p>
+
+          <h3>模型假设</h3>
+          <p>理想变压器，忽略漏磁、铁芯涡流损耗与线圈电阻；电压、电流均为有效值；发电机线圈为矩形、匀速转动，磁场为匀强磁场；从线圈经过中性面开始计时，故 e = E<sub>m</sub> sin ωt。</p>
+
+          <h3>课堂观察</h3>
+          <ol>
+            <li>线圈经过中性面时，e 为什么等于 0？此时穿过线圈的磁通量是最大还是最小？</li>
+            <li>把转速提高到原来的 2 倍，峰值 E<sub>m</sub> 和有效值 E 各变为原来的几倍？波形周期怎样变化？</li>
+            <li>保持 U₁ 不变，只增大 n₂，U₂ 怎样变化？此时 I₂ 与 I₁ 哪个大？为什么？</li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var TAU = Math.PI * 2;
+      var DEG = 180 / Math.PI;
+
+      var acCanvas = document.getElementById("acCanvas");
+      var acCtx = acCanvas.getContext("2d");
+      var tfCanvas = document.getElementById("tfCanvas");
+      var tfCtx = tfCanvas.getContext("2d");
+
+      /* 逻辑坐标系不变：#acCanvas 1000×562，#tfCanvas 680×320。
+         位图按「CSS 显示尺寸 × devicePixelRatio（≤3）」重算，绘制时用 setTransform
+         把逻辑坐标映射上去，所以画布铺满舞台后不会模糊、也不会变形。
+         画布 CSS 盒子的宽高比由 #acCanvas / #tfCanvas 的 aspect-ratio 锁定，
+         因此位图缩放是各向同性的，指针换算只需 LW / rect.width。 */
+      var views = {
+        ac: { canvas: acCanvas, ctx: acCtx, w: 1000, h: 562 },
+        tf: { canvas: tfCanvas, ctx: tfCtx, w: 680, h: 320 }
+      };
+
+      function syncBackingStore(v) {
+        var r = v.canvas.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) { return false; }   // 标签页隐藏：不绘制
+        var dpr = Math.min(window.devicePixelRatio || 1, 3);
+        var w = Math.max(1, Math.round(r.width * dpr));
+        var h = Math.max(1, Math.round(r.height * dpr));
+        if (v.canvas.width !== w || v.canvas.height !== h) {
+          v.canvas.width = w;
+          v.canvas.height = h;
+        }
+        return true;
+      }
+
+      // 每个绘制入口的第一行：先同步位图与映射，之后一律按逻辑坐标绘制
+      function beginFrame(v) {
+        var ok = syncBackingStore(v);
+        v.ctx.setTransform(v.canvas.width / v.w, 0, 0, v.canvas.height / v.h, 0, 0);
+        return ok;
+      }
+
+      // 指针一律换算成逻辑坐标。本页没有画布指针交互（拖动只发生在 DOM 参数面板上），
+      // 保留这一个入口：以后给画布加叠加层/命中测试时直接用，禁止再写 canvas.width / rect.width
+      function toLogical(v, evt) {
+        var r = v.canvas.getBoundingClientRect();
+        return {
+          x: (evt.clientX - r.left) * (v.w / r.width),
+          y: (evt.clientY - r.top) * (v.h / r.height)
+        };
+      }
+
+      var COLORS = {
+        fieldLine: "rgba(226,232,240,0.16)",
+        fieldHead: "rgba(226,232,240,0.42)",
+        coilFront: "#f8fafc",
+        coilBack: "#5b6b82",
+        neutral: "#fb923c",
+        current: "#fbbf24",
+        wave: "#22c55e",
+        flux: "rgba(147,197,253,0.85)",
+        peak: "#fbbf24",
+        rms: "#fb923c",
+        axis: "rgba(148,163,184,0.55)",
+        muted: "#8b97ab",
+        ink: "#e5eaf3",
+        copper: "#d97706"
+      };
+
+      var DEFAULTS = {
+        rpm: 60,
+        turns: 100,
+        B: 0.5,
+        area: 0.02,
+        n1: 200,
+        n2: 400,
+        U1: 12,
+        R: 20
+      };
+
+      var params = {
+        rpm: DEFAULTS.rpm,
+        turns: DEFAULTS.turns,
+        B: DEFAULTS.B,
+        area: DEFAULTS.area,
+        n1: DEFAULTS.n1,
+        n2: DEFAULTS.n2,
+        U1: DEFAULTS.U1,
+        R: DEFAULTS.R
+      };
+
+      var state = {
+        theta: 0,
+        playing: true,
+        lastTs: 0,
+        showField: true,
+        showFlux: true
+      };
+
+      var ui = {
+        rpmSlider: document.getElementById("rpmSlider"),
+        turnsSlider: document.getElementById("turnsSlider"),
+        bSlider: document.getElementById("bSlider"),
+        areaSlider: document.getElementById("areaSlider"),
+        n1Slider: document.getElementById("n1Slider"),
+        n2Slider: document.getElementById("n2Slider"),
+        u1Slider: document.getElementById("u1Slider"),
+        rSlider: document.getElementById("rSlider"),
+        showField: document.getElementById("showField"),
+        showFlux: document.getElementById("showFlux"),
+        pauseBtn: document.getElementById("pauseBtn"),
+        resetBtn: document.getElementById("resetBtn")
+      };
+
+      var out = {
+        rpmValue: document.getElementById("rpmValue"),
+        turnsValue: document.getElementById("turnsValue"),
+        bValue: document.getElementById("bValue"),
+        areaValue: document.getElementById("areaValue"),
+        n1Value: document.getElementById("n1Value"),
+        n2Value: document.getElementById("n2Value"),
+        u1Value: document.getElementById("u1Value"),
+        rValue: document.getElementById("rValue"),
+        stageTheta: document.getElementById("stageTheta"),
+        stageE: document.getElementById("stageE"),
+        stageFlux: document.getElementById("stageFlux"),
+        mEm: document.getElementById("mEm"),
+        mErms: document.getElementById("mErms"),
+        mFreq: document.getElementById("mFreq"),
+        mOmega: document.getElementById("mOmega"),
+        mTurns: document.getElementById("mTurns"),
+        mInst: document.getElementById("mInst"),
+        mInstNote: document.getElementById("mInstNote"),
+        mU2: document.getElementById("mU2"),
+        mI2: document.getElementById("mI2"),
+        tfU2: document.getElementById("tfU2"),
+        tfI2: document.getElementById("tfI2"),
+        tfI1: document.getElementById("tfI1"),
+        tfPower: document.getElementById("tfPower"),
+        tfRatio: document.getElementById("tfRatio")
+      };
+
+      /* ---------- 物理模型 ---------- */
+
+      function derive() {
+        var f = params.rpm / 60;
+        var omega = TAU * f;
+        var phiMax = params.turns * params.B * params.area;
+        var Em = phiMax * omega;
+        var Erms = Em / Math.SQRT2;
+        var T = 1 / f;
+        return { f: f, omega: omega, phiMax: phiMax, Em: Em, Erms: Erms, T: T };
+      }
+
+      function deriveTransformer() {
+        var ratio = params.n2 / params.n1;
+        var U2 = params.U1 * ratio;
+        var I2 = U2 / params.R;
+        var I1 = I2 * ratio;
+        var P = U2 * I2;
+        return { ratio: ratio, U2: U2, I2: I2, I1: I1, P: P };
+      }
+
+      /* ---------- 绘图工具 ---------- */
+
+      function chipLabel(ctx, str, x, y, size, color, align) {
+        ctx.save();
+        ctx.font = "bold " + size + 'px "Microsoft YaHei", "PingFang SC", Arial';
+        var tw = ctx.measureText(str).width;
+        var left = align === "right" ? x - tw : x;
+        ctx.fillStyle = "rgba(8,12,20,0.82)";
+        ctx.fillRect(left - 5, y - 9, tw + 10, 18);
+        ctx.fillStyle = color;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(str, left, y);
+        ctx.restore();
+      }
+
+      function label(ctx, str, x, y, size, color, align, weight) {
+        ctx.save();
+        ctx.font = (weight || "bold") + " " + size + 'px "Microsoft YaHei", "PingFang SC", Arial';
+        ctx.fillStyle = color;
+        ctx.textAlign = align || "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(str, x, y);
+        ctx.restore();
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function segment(ctx, x1, y1, x2, y2, color, width, dash) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width || 2;
+        ctx.lineCap = "round";
+        if (dash) { ctx.setLineDash(dash); }
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function arrow(ctx, x1, y1, x2, y2, color, width, head) {
+        var angle = Math.atan2(y2 - y1, x2 - x1);
+        var h = head || 9;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width || 2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - h * Math.cos(angle - Math.PI / 7), y2 - h * Math.sin(angle - Math.PI / 7));
+        ctx.lineTo(x2 - h * Math.cos(angle + Math.PI / 7), y2 - h * Math.sin(angle + Math.PI / 7));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      /* ---------- 线圈的三维投影 ----------
+         磁感线 B 沿 x 方向，同时带有朝向观察者的分量：
+         B̂ = (cosβ, 0, sinβ)，β = 42°。
+         转轴 â = (0, 1, 0) 与 B 垂直；屏幕横轴为 x，纵轴为 y。
+         线圈法线 n(θ) = cosθ·B̂ + sinθ·ŵ，ŵ = (sinβ, 0, -cosβ)。
+         于是 n(θ)·B̂ = cosθ，磁通量 Φ = NBS·cosθ，
+         e = -dΦ/dt = NBSω·sinθ，θ = ωt。θ = 0 时线圈处于中性面。 */
+
+      var BETA = 42 * Math.PI / 180;
+      var CB = Math.cos(BETA);
+      var SB = Math.sin(BETA);
+
+      function coilAxes(theta) {
+        var mx = -Math.sin(theta) * CB + Math.cos(theta) * SB;
+        var nx = Math.cos(theta) * CB + Math.sin(theta) * SB;
+        return { mx: mx, nx: nx };
+      }
+
+      var COIL = { w: 2.6, h: 3.4, t: 0.26 };
+      var VIEW = { cx: 300, cy: 284, s: 68 };
+
+      function project(a, b, c, axes) {
+        return {
+          x: VIEW.cx + VIEW.s * (a * axes.mx + c * axes.nx),
+          y: VIEW.cy - VIEW.s * b
+        };
+      }
+
+      function drawFieldLines(ctx) {
+        var rows = [120, 188, 256, 324, 392, 460];
+        var i;
+        for (i = 0; i < rows.length; i += 1) {
+          var y = rows[i];
+          segment(ctx, 34, y, 596, y, COLORS.fieldLine, 1.4);
+          var marks = [96, 300, 504];
+          var j;
+          for (j = 0; j < marks.length; j += 1) {
+            arrow(ctx, marks[j] - 26, y, marks[j] + 12, y, COLORS.fieldHead, 1.4, 6);
+          }
+        }
+        // B 标在磁感线顶端左侧：贴着左端但高于参数面板的默认位置
+        label(ctx, "B", 44, 94, 15, "rgba(226,232,240,0.72)", "center");
+      }
+
+      function drawNeutralPlane(ctx) {
+        var hw = (COIL.w / 2) * SB;
+        var hh = COIL.h / 2;
+        var x1 = VIEW.cx - VIEW.s * hw;
+        var x2 = VIEW.cx + VIEW.s * hw;
+        var y1 = VIEW.cy - VIEW.s * hh;
+        var y2 = VIEW.cy + VIEW.s * hh;
+        ctx.save();
+        ctx.fillStyle = "rgba(251,146,60,0.09)";
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.setLineDash([7, 6]);
+        ctx.strokeStyle = "rgba(251,146,60,0.7)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x1, y2);
+        ctx.moveTo(x2, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.restore();
+        label(ctx, "中性面", VIEW.cx, y1 - 22, 13, "#fdba74", "center");
+      }
+
+      function drawAxis(ctx) {
+        segment(ctx, VIEW.cx, 116, VIEW.cx, 470, "rgba(148,163,184,0.28)", 1.5, [5, 7]);
+      }
+
+      function drawCoil(ctx, theta, eFrac) {
+        var axes = coilAxes(theta);
+        var sign = eFrac >= 0 ? 1 : -1;
+        var amp = Math.abs(eFrac);
+        var hw = COIL.w / 2;
+        var hh = COIL.h / 2;
+        var ht = COIL.t / 2;
+        var back = [
+          project(-hw, -hh, -ht, axes),
+          project(hw, -hh, -ht, axes),
+          project(hw, hh, -ht, axes),
+          project(-hw, hh, -ht, axes)
+        ];
+        var front = [
+          project(-hw, -hh, ht, axes),
+          project(hw, -hh, ht, axes),
+          project(hw, hh, ht, axes),
+          project(-hw, hh, ht, axes)
+        ];
+        var i;
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        ctx.strokeStyle = COLORS.coilBack;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (i = 0; i < 4; i += 1) {
+          var a1 = back[i];
+          var a2 = back[(i + 1) % 4];
+          ctx.moveTo(a1.x, a1.y);
+          ctx.lineTo(a2.x, a2.y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(148,163,184,0.55)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (i = 0; i < 4; i += 1) {
+          ctx.moveTo(back[i].x, back[i].y);
+          ctx.lineTo(front[i].x, front[i].y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = COLORS.coilFront;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        for (i = 0; i < 4; i += 1) {
+          var b1 = front[i];
+          var b2 = front[(i + 1) % 4];
+          ctx.moveTo(b1.x, b1.y);
+          ctx.lineTo(b2.x, b2.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 感应电流方向：e > 0 时，+m 一侧电流向上（屏幕 y 减小），-m 一侧电流向下
+        var sideA = project(hw, 0, 0, axes);
+        var sideB = project(-hw, 0, 0, axes);
+        if (amp < 0.05) {
+          label(ctx, "i = 0", VIEW.cx, VIEW.cy + 126, 13, "#fdba74", "center");
+          return;
+        }
+        var len = (0.35 + 0.65 * amp) * 0.66 * VIEW.s;
+        var upA = -sign * len;
+        var upB = sign * len;
+        arrow(ctx, sideA.x, sideA.y - upA / 2, sideA.x, sideA.y + upA / 2, COLORS.current, 4, 11);
+        arrow(ctx, sideB.x, sideB.y - upB / 2, sideB.x, sideB.y + upB / 2, COLORS.current, 4, 11);
+      }
+
+      function drawNormal(ctx, theta) {
+        var axes = coilAxes(theta);
+        if (Math.abs(axes.nx) < 0.22) { return; }
+        var len = 1.5 * VIEW.s * axes.nx;
+        var x0 = VIEW.cx;
+        var y0 = VIEW.cy;
+        arrow(ctx, x0, y0, x0 + len, y0, "rgba(250,204,21,0.85)", 2.4, 10);
+        var halfW = VIEW.s * (COIL.w / 2 * Math.abs(axes.mx) + COIL.t / 2 * Math.abs(axes.nx));
+        var tip = x0 + len;
+        if (len > 0) {
+          label(ctx, "法线 n", Math.max(tip + 10, x0 + halfW + 8), y0 - 15, 12.5, "rgba(250,204,21,0.9)", "left");
+        } else {
+          label(ctx, "法线 n", Math.min(tip - 10, x0 - halfW - 8), y0 - 15, 12.5, "rgba(250,204,21,0.9)", "right");
+        }
+      }
+
+      function drawRotationHint(ctx) {
+        label(ctx, "ω", VIEW.cx + 22, 124, 16, "#cbd5e1", "center");
+      }
+
+      /* ---------- e–t 波形 ---------- */
+
+      var PLOT = { x0: 646, x1: 972, y0: 104, y1: 470 };
+
+      function drawWavePanel(ctx, d) {
+        var Em = d.Em;
+        var T = d.T;
+        var midY = (PLOT.y0 + PLOT.y1) / 2;
+        var halfH = (PLOT.y1 - PLOT.y0) / 2 - 12;
+        var span = 2 * T;
+        var scale = 1.18 * Em;
+
+        function xOf(t) { return PLOT.x0 + (t / span) * (PLOT.x1 - PLOT.x0); }
+        function yOf(e) { return midY - (e / scale) * halfH; }
+
+        ctx.save();
+        ctx.fillStyle = "rgba(12,16,24,0.92)";
+        ctx.fillRect(PLOT.x0 - 26, PLOT.y0 - 34, PLOT.x1 - PLOT.x0 + 46, PLOT.y1 - PLOT.y0 + 66);
+        ctx.strokeStyle = "rgba(148,163,184,0.32)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(PLOT.x0 - 26, PLOT.y0 - 34, PLOT.x1 - PLOT.x0 + 46, PLOT.y1 - PLOT.y0 + 66);
+        ctx.restore();
+
+        label(ctx, "e–t 图像", (PLOT.x0 + PLOT.x1) / 2, PLOT.y0 - 16, 13, "#e2e8f0", "center");
+
+        // 网格
+        var k;
+        for (k = 0; k <= 8; k += 1) {
+          var gx = xOf(span * k / 8);
+          segment(ctx, gx, PLOT.y0, gx, PLOT.y1, "rgba(148,163,184,0.16)", 1);
+        }
+
+        // 零线与峰值、有效值
+        segment(ctx, PLOT.x0, midY, PLOT.x1, midY, COLORS.axis, 1.6);
+        segment(ctx, PLOT.x0, yOf(Em), PLOT.x1, yOf(Em), "rgba(251,191,36,0.7)", 1.4, [6, 5]);
+        segment(ctx, PLOT.x0, yOf(-Em), PLOT.x1, yOf(-Em), "rgba(251,191,36,0.7)", 1.4, [6, 5]);
+        segment(ctx, PLOT.x0, yOf(d.Erms), PLOT.x1, yOf(d.Erms), "rgba(251,146,60,0.75)", 1.4, [4, 4]);
+        segment(ctx, PLOT.x0, yOf(-d.Erms), PLOT.x1, yOf(-d.Erms), "rgba(251,146,60,0.75)", 1.4, [4, 4]);
+
+        chipLabel(ctx, "Em = " + Em.toFixed(2) + " V", PLOT.x1 - 4, yOf(Em) - 12, 12, "#fbbf24", "right");
+        chipLabel(ctx, "Erms = " + d.Erms.toFixed(2) + " V", PLOT.x1 - 4, yOf(d.Erms) - 12, 12, "#fb923c", "right");
+
+        // 中性面对应的时刻：e = 0
+        for (k = 0; k <= 4; k += 1) {
+          var tx = xOf(T * k / 2);
+          segment(ctx, tx, PLOT.y0, tx, PLOT.y1, "rgba(251,146,60,0.4)", 1.2, [4, 5]);
+          ctx.save();
+          ctx.fillStyle = "#fb923c";
+          ctx.beginPath();
+          ctx.arc(tx, midY, 3.4, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+        // 中性面位置用橙点标在零线上（图例见上方）
+
+        // Φ/Φm–t 曲线：无量纲，按峰值等高绘制，只用于对照相位
+        if (state.showFlux) {
+          ctx.save();
+          ctx.strokeStyle = COLORS.flux;
+          ctx.lineWidth = 1.8;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          var i;
+          for (i = 0; i <= 320; i += 1) {
+            var tt = span * i / 320;
+            var phiRatio = Math.cos(d.omega * tt);
+            var px = xOf(tt);
+            var py = yOf(Em * phiRatio);
+            if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // e(t) 正弦曲线
+        ctx.save();
+        ctx.strokeStyle = COLORS.wave;
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        var j;
+        for (j = 0; j <= 480; j += 1) {
+          var t2 = span * j / 480;
+          var e2 = Em * Math.sin(d.omega * t2);
+          var qx = xOf(t2);
+          var qy = yOf(e2);
+          if (j === 0) { ctx.moveTo(qx, qy); } else { ctx.lineTo(qx, qy); }
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 时间轴刻度
+        for (k = 0; k <= 4; k += 1) {
+          var tk = T * k / 2;
+          label(ctx, tk.toFixed(2), xOf(tk), PLOT.y1 + 20, 11.5, COLORS.muted, "center");
+        }
+        label(ctx, "t / s", PLOT.x1 + 4, PLOT.y1 + 38, 12, COLORS.muted, "right");
+
+        // 当前时刻光标
+        var phase = state.theta % (2 * TAU);
+        var tc = span * phase / (2 * TAU);
+        var ec = Em * Math.sin(phase);
+        var cxp = xOf(tc);
+        var cyp = yOf(ec);
+        segment(ctx, cxp, PLOT.y0, cxp, PLOT.y1, "rgba(226,232,240,0.35)", 1.2, [3, 4]);
+        segment(ctx, PLOT.x0, cyp, cxp, cyp, "rgba(226,232,240,0.22)", 1, [3, 4]);
+        ctx.save();
+        ctx.fillStyle = COLORS.wave;
+        ctx.shadowColor = "rgba(34,197,94,0.75)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(cxp, cyp, 5.2, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+
+        // 瞬时值标签：带底色，避免与大数值标注互相压字
+        var instText = "e = " + ec.toFixed(2) + " V";
+        ctx.save();
+        ctx.font = 'bold 12px "Microsoft YaHei", "PingFang SC", Arial';
+        var tw = ctx.measureText(instText).width;
+        var ly = ec >= 0 ? Math.min(cyp + 18, PLOT.y1 - 12) : Math.max(cyp - 18, PLOT.y0 + 12);
+        var lx = cxp > (PLOT.x0 + PLOT.x1) / 2 ? cxp - 12 - tw : cxp + 12;
+        lx = Math.max(PLOT.x0 + 4, Math.min(lx, PLOT.x1 - tw - 4));
+        ctx.fillStyle = "rgba(8,12,20,0.82)";
+        ctx.fillRect(lx - 5, ly - 9, tw + 10, 18);
+        ctx.fillStyle = "#86efac";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(instText, lx, ly);
+        ctx.restore();
+
+        // 图例
+        segment(ctx, PLOT.x0, PLOT.y0 - 40, PLOT.x0 + 22, PLOT.y0 - 40, COLORS.wave, 2.6);
+        label(ctx, "e", PLOT.x0 + 26, PLOT.y0 - 40, 11.5, "#86efac", "left");
+        if (state.showFlux) {
+          ctx.save();
+          ctx.setLineDash([5, 5]);
+          segment(ctx, PLOT.x0 + 74, PLOT.y0 - 40, PLOT.x0 + 96, PLOT.y0 - 40, COLORS.flux, 1.8);
+          ctx.restore();
+          label(ctx, "Φ/Φm", PLOT.x0 + 100, PLOT.y0 - 40, 11.5, "#93c5fd", "left");
+        }
+        ctx.save();
+        ctx.fillStyle = "#fb923c";
+        ctx.beginPath();
+        ctx.arc(PLOT.x1 - 92, PLOT.y0 - 40, 3.6, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+        label(ctx, "中性面 e = 0", PLOT.x1, PLOT.y0 - 40, 11.5, "#fdba74", "right");
+      }
+
+      /* ---------- 变压器 ---------- */
+
+      function drawTransformer(d, phaseSign) {
+        var v = views.tf;
+        if (!beginFrame(v)) { return; }      // 位图 + 逻辑坐标映射
+        var ctx = v.ctx;
+        ctx.fillStyle = "#080a0e";
+        ctx.fillRect(0, 0, v.w, v.h);
+
+        var coreOuter = { x: 215, y: 70, w: 250, h: 205 };
+        var gap = 42;
+
+        // 铁芯（口字形）
+        ctx.save();
+        var grad = ctx.createLinearGradient(coreOuter.x, coreOuter.y, coreOuter.x + coreOuter.w, coreOuter.y + coreOuter.h);
+        grad.addColorStop(0, "#64748b");
+        grad.addColorStop(0.5, "#94a3b8");
+        grad.addColorStop(1, "#526073");
+        ctx.fillStyle = grad;
+        ctx.fillRect(coreOuter.x, coreOuter.y, coreOuter.w, coreOuter.h);
+        ctx.fillStyle = "#080a0e";
+        ctx.fillRect(coreOuter.x + gap, coreOuter.y + gap, coreOuter.w - 2 * gap, coreOuter.h - 2 * gap);
+        ctx.strokeStyle = "rgba(226,232,240,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(coreOuter.x, coreOuter.y, coreOuter.w, coreOuter.h);
+        ctx.strokeRect(coreOuter.x + gap, coreOuter.y + gap, coreOuter.w - 2 * gap, coreOuter.h - 2 * gap);
+        ctx.restore();
+
+        label(ctx, "铁芯", coreOuter.x + coreOuter.w / 2, coreOuter.y + coreOuter.h + 26, 13, "rgba(203,213,225,0.85)", "center");
+
+        // 线圈匝数决定画出多少圈，只是示意
+        var primaryTurns = Math.max(4, Math.min(12, Math.round(params.n1 / 42)));
+        var secondaryTurns = Math.max(4, Math.min(12, Math.round(params.n2 / 42)));
+
+        function winding(x, count, side) {
+          var y0 = 100;
+          var y1 = 246;
+          var step = (y1 - y0) / (count - 1);
+          ctx.save();
+          ctx.strokeStyle = COLORS.copper;
+          ctx.lineWidth = 4;
+          ctx.lineCap = "round";
+          var i;
+          for (i = 0; i < count; i += 1) {
+            var cy = y0 + i * step;
+            ctx.beginPath();
+            if (side < 0) {
+              ctx.arc(x, cy, 9, -Math.PI / 2, Math.PI / 2, true);
+            } else {
+              ctx.arc(x, cy, 9, -Math.PI / 2, Math.PI / 2, false);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+          return { y0: y0, y1: y1 };
+        }
+
+        var pW = winding(coreOuter.x, primaryTurns, -1);
+        var sW = winding(coreOuter.x + coreOuter.w, secondaryTurns, 1);
+
+        // 原线圈回路
+        var srcX = 120;
+        var srcY = 175;
+        ctx.save();
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(coreOuter.x, pW.y0);
+        ctx.lineTo(srcX, pW.y0);
+        ctx.lineTo(srcX, srcY - 24);
+        ctx.moveTo(srcX, srcY + 24);
+        ctx.lineTo(srcX, pW.y1);
+        ctx.lineTo(coreOuter.x, pW.y1);
+        ctx.stroke();
+        ctx.restore();
+
+        // 交流电源
+        ctx.save();
+        ctx.fillStyle = "#0b1220";
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(srcX, srcY, 24, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        var i2;
+        for (i2 = 0; i2 <= 40; i2 += 1) {
+          var px = srcX - 13 + 26 * i2 / 40;
+          var py = srcY + 7 * Math.sin(i2 / 40 * TAU);
+          if (i2 === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 副线圈回路与负载
+        var loadX = 575;
+        ctx.save();
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(coreOuter.x + coreOuter.w, sW.y0);
+        ctx.lineTo(loadX, sW.y0);
+        ctx.lineTo(loadX, 128);
+        ctx.moveTo(loadX, 192);
+        ctx.lineTo(loadX, sW.y1);
+        ctx.lineTo(coreOuter.x + coreOuter.w, sW.y1);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "#f8fafc";
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2.4;
+        ctx.fillRect(loadX - 17, 128, 34, 64);
+        ctx.strokeRect(loadX - 17, 128, 34, 64);
+        ctx.restore();
+        label(ctx, "R", loadX, 160, 15, "#111827", "center");
+
+        // 电流方向：随交流正负半周反向
+        var pL = srcX + 26;
+        var pR = coreOuter.x - 30;
+        var sL = coreOuter.x + coreOuter.w + 30;
+        var sR = loadX - 26;
+        if (phaseSign > 0) {
+          arrow(ctx, pL, pW.y0, pR, pW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, pR, pW.y1, pL, pW.y1, COLORS.current, 2.6, 9);
+          arrow(ctx, sL, sW.y0, sR, sW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, sR, sW.y1, sL, sW.y1, COLORS.current, 2.6, 9);
+        } else {
+          arrow(ctx, pR, pW.y0, pL, pW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, pL, pW.y1, pR, pW.y1, COLORS.current, 2.6, 9);
+          arrow(ctx, sR, sW.y0, sL, sW.y0, COLORS.current, 2.6, 9);
+          arrow(ctx, sL, sW.y1, sR, sW.y1, COLORS.current, 2.6, 9);
+        }
+
+        // 文字标注
+        label(ctx, "原线圈", 215, 38, 14, "#e2e8f0", "center");
+        label(ctx, "n₁ = " + params.n1 + " 匝", 215, 58, 13, "#fbbf24", "center");
+        label(ctx, "副线圈", 465, 38, 14, "#e2e8f0", "center");
+        label(ctx, "n₂ = " + params.n2 + " 匝", 465, 58, 13, "#fbbf24", "center");
+        label(ctx, "U₁ = " + params.U1 + " V", srcX, 288, 13, "#e2e8f0", "center");
+        label(ctx, "U₂ = " + d.U2.toFixed(1) + " V", loadX, 288, 13, "#7dd3fc", "center");
+        label(ctx, "R = " + params.R + " Ω", loadX + 66, 160, 12.5, "#cbd5e1", "center");
+        label(ctx, "I₁", 168, 84, 14, "#fbbf24", "center");
+        label(ctx, "I₂", 522, 84, 14, "#fbbf24", "center");
+
+        var isStepUp = params.n2 > params.n1;
+        var isStepDown = params.n2 < params.n1;
+        var kindText = isStepUp ? "升压变压器" : (isStepDown ? "降压变压器" : "隔离变压器（n₁ = n₂）");
+        label(ctx, kindText, 340, 172, 15, isStepUp ? "#fb923c" : (isStepDown ? "#7dd3fc" : "#e2e8f0"), "center");
+      }
+
+      /* ---------- 数据读出 ---------- */
+
+      var lastText = {};
+
+      function setText(node, value) {
+        if (lastText[node.id] !== value) {
+          node.textContent = value;
+          lastText[node.id] = value;
+        }
+      }
+
+      function describePhase(deg) {
+        var d = ((deg % 360) + 360) % 360;
+        if (d < 3.5 || d > 356.5) {
+          return { short: "正向最大（中性面）", long: "线圈位于中性面：磁通量正向最大，感应电动势为零" };
+        }
+        if (Math.abs(d - 180) < 3.5) {
+          return { short: "反向最大（中性面）", long: "线圈再次经过中性面：磁通量反向最大，感应电动势为零" };
+        }
+        if (Math.abs(d - 90) < 3.5) {
+          return { short: "为零（平面 ∥ B）", long: "线圈平面与磁感线平行：磁通量为零，感应电动势达到正向最大值" };
+        }
+        if (Math.abs(d - 270) < 3.5) {
+          return { short: "为零（平面 ∥ B）", long: "线圈平面再次与磁感线平行：磁通量为零，感应电动势达到反向最大值" };
+        }
+        if (d < 90) {
+          return { short: "正向减小", long: "线圈离开中性面：磁通量正向减小，感应电动势增大（e > 0）" };
+        }
+        if (d < 180) {
+          return { short: "反向增大", long: "线圈由平行位置转向中性面：磁通量反向增大，感应电动势减小（e > 0）" };
+        }
+        if (d < 270) {
+          return { short: "反向减小", long: "线圈越过中性面：磁通量反向减小，感应电动势反向增大（e < 0）" };
+        }
+        return { short: "正向增大", long: "线圈由平行位置转向中性面：磁通量正向增大，感应电动势反向减小（e < 0）" };
+      }
+
+      function updateReadouts(d, tf) {
+        var phase = state.theta % TAU;
+        var e = d.Em * Math.sin(phase);
+        var deg = phase * DEG;
+        var info = describePhase(deg);
+
+        setText(out.rpmValue, params.rpm + " r/min");
+        setText(out.turnsValue, params.turns + " 匝");
+        setText(out.bValue, params.B.toFixed(2) + " T");
+        setText(out.areaValue, params.area.toFixed(3) + " m²");
+        setText(out.n1Value, params.n1 + " 匝");
+        setText(out.n2Value, params.n2 + " 匝");
+        setText(out.u1Value, params.U1 + " V");
+        setText(out.rValue, params.R + " Ω");
+
+        setText(out.stageTheta, deg.toFixed(1) + "°");
+        setText(out.stageE, e.toFixed(2) + " V");
+        setText(out.stageFlux, info.short);
+
+        setText(out.mEm, d.Em.toFixed(2) + " V");
+        setText(out.mErms, d.Erms.toFixed(2) + " V");
+        setText(out.mFreq, "f = " + d.f.toFixed(2) + " Hz");
+        setText(out.mOmega, "ω = 2πf = " + d.omega.toFixed(2) + " rad/s，T = " + d.T.toFixed(2) + " s");
+        setText(out.mInst, "e = " + e.toFixed(2) + " V");
+        setText(out.mTurns, String(params.turns));
+        setText(out.mInstNote, info.long);
+
+        setText(out.mU2, "U₂ = " + tf.U2.toFixed(1) + " V");
+        setText(out.mI2, "I₂ = " + tf.I2.toFixed(2) + " A，I₁ = " + tf.I1.toFixed(2) + " A");
+
+        setText(out.tfU2, tf.U2.toFixed(1) + " V");
+        setText(out.tfI2, tf.I2.toFixed(2) + " A");
+        setText(out.tfI1, tf.I1.toFixed(2) + " A");
+        setText(out.tfPower, tf.P.toFixed(1) + " W");
+        var ratioText = params.n1 + " : " + params.n2;
+        if (params.n2 > params.n1) { ratioText += "（升压）"; }
+        else if (params.n2 < params.n1) { ratioText += "（降压）"; }
+        else { ratioText += "（隔离）"; }
+        setText(out.tfRatio, ratioText);
+      }
+
+      /* ---------- 主渲染 ----------
+         只绘制当前标签页的画布：隐藏的画布既不重算尺寸也不绘制。 */
+
+      var activeScene = "ac";
+
+      function drawGeneratorScene(d) {
+        var v = views.ac;
+        if (!beginFrame(v)) { return; }      // 位图 + 逻辑坐标映射
+        var ctx = v.ctx;
+        var phase = state.theta % TAU;
+        var e = d.Em * Math.sin(phase);
+        var eFrac = d.Em > 0 ? e / d.Em : 0;
+
+        ctx.fillStyle = "#080a0e";
+        ctx.fillRect(0, 0, v.w, v.h);
+
+        if (state.showField) { drawFieldLines(ctx); }
+        drawAxis(ctx);
+        if (state.showField) { drawNeutralPlane(ctx); }
+        drawRotationHint(ctx);
+        drawCoil(ctx, phase, eFrac);
+        drawNormal(ctx, phase);
+        drawWavePanel(ctx, d);
+      }
+
+      function drawActiveScene(d) {
+        if (!d) { d = derive(); }
+        var tf = deriveTransformer();
+        if (activeScene === "ac") {
+          drawGeneratorScene(d);
+        } else {
+          drawTransformer(tf, Math.sin(state.theta % TAU) >= 0 ? 1 : -1);
+        }
+        updateReadouts(d, tf);
+      }
+
+      /* ---------- 动画循环 ---------- */
+
+      function frame(ts) {
+        if (!state.lastTs) { state.lastTs = ts; }
+        var dt = (ts - state.lastTs) / 1000;
+        state.lastTs = ts;
+        if (dt > 0.12) { dt = 0.12; }
+        var d = derive();
+        if (state.playing) {
+          state.theta = (state.theta + d.omega * dt) % (2 * TAU);
+        }
+        drawActiveScene(d);
+        window.requestAnimationFrame(frame);
+      }
+
+      /* ---------- 交互 ---------- */
+
+      function readControls() {
+        params.rpm = Number(ui.rpmSlider.value);
+        params.turns = Number(ui.turnsSlider.value);
+        params.B = Number(ui.bSlider.value);
+        params.area = Number(ui.areaSlider.value);
+        params.n1 = Number(ui.n1Slider.value);
+        params.n2 = Number(ui.n2Slider.value);
+        params.U1 = Number(ui.u1Slider.value);
+        params.R = Number(ui.rSlider.value);
+      }
+
+      function syncControls() {
+        ui.rpmSlider.value = String(params.rpm);
+        ui.turnsSlider.value = String(params.turns);
+        ui.bSlider.value = String(params.B);
+        ui.areaSlider.value = String(params.area);
+        ui.n1Slider.value = String(params.n1);
+        ui.n2Slider.value = String(params.n2);
+        ui.u1Slider.value = String(params.U1);
+        ui.rSlider.value = String(params.R);
+      }
+
+      [ui.rpmSlider, ui.turnsSlider, ui.bSlider, ui.areaSlider,
+        ui.n1Slider, ui.n2Slider, ui.u1Slider, ui.rSlider].forEach(function (slider) {
+        slider.addEventListener("input", function () {
+          readControls();
+          drawActiveScene();
+        });
+      });
+
+      ui.showField.addEventListener("change", function () {
+        state.showField = ui.showField.checked;
+        drawActiveScene();
+      });
+
+      ui.showFlux.addEventListener("change", function () {
+        state.showFlux = ui.showFlux.checked;
+        drawActiveScene();
+      });
+
+      ui.pauseBtn.addEventListener("click", function () {
+        state.playing = !state.playing;
+        ui.pauseBtn.textContent = state.playing ? "暂停" : "继续";
+      });
+
+      ui.resetBtn.addEventListener("click", function () {
+        params.rpm = DEFAULTS.rpm;
+        params.turns = DEFAULTS.turns;
+        params.B = DEFAULTS.B;
+        params.area = DEFAULTS.area;
+        params.n1 = DEFAULTS.n1;
+        params.n2 = DEFAULTS.n2;
+        params.U1 = DEFAULTS.U1;
+        params.R = DEFAULTS.R;
+        state.theta = 0;
+        state.playing = true;
+        state.showField = true;
+        state.showFlux = true;
+        ui.showField.checked = true;
+        ui.showFlux.checked = true;
+        ui.pauseBtn.textContent = "暂停";
+        lastText = {};
+        syncControls();
+        drawActiveScene();
+      });
+
+      // ---------------- 外壳交互：标签页 / 面板 / 抽屉 / 键盘 ----------------
+      var shell = {
+        frame: document.querySelector(".stage-frame"),
+        panel: document.getElementById("ctrlPanel"),
+        fold: document.getElementById("gripFold"),
+        toggle: document.getElementById("ctrlToggle"),
+        more: document.getElementById("moreBtn"),
+        drawer: document.getElementById("drawer")
+      };
+
+      var tablist = document.querySelector('[role="tablist"]');
+      var tabEls = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
+      var sceneEls = {
+        ac: document.getElementById("panelAc"),
+        tf: document.getElementById("panelTf")
+      };
+
+      /* 切换标签页：隐藏的一块 display:none 且不再绘制，显示的一块重算尺寸后重绘 */
+      function setScene(name, focusTab) {
+        if (!sceneEls[name]) { return; }
+        activeScene = name;
+        var i;
+        for (i = 0; i < tabEls.length; i += 1) {
+          var on = tabEls[i].getAttribute("data-scene") === name;
+          tabEls[i].setAttribute("aria-selected", on ? "true" : "false");
+          tabEls[i].tabIndex = on ? 0 : -1;
+          if (on && focusTab) { tabEls[i].focus(); }
+        }
+        sceneEls.ac.hidden = name !== "ac";
+        sceneEls.tf.hidden = name !== "tf";
+        // 刚显示出来的画布会被 beginFrame() 按新的 CSS 尺寸重设位图并重画
+        drawActiveScene();
+      }
+
+      tabEls.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          setScene(tab.getAttribute("data-scene"), false);
+        });
+      });
+
+      tablist.addEventListener("keydown", function (ev) {
+        var cur = tabEls.indexOf(document.activeElement);
+        if (cur < 0) { return; }
+        var next = -1;
+        if (ev.key === "ArrowRight") { next = (cur + 1) % tabEls.length; }
+        else if (ev.key === "ArrowLeft") { next = (cur - 1 + tabEls.length) % tabEls.length; }
+        else if (ev.key === "Home") { next = 0; }
+        else if (ev.key === "End") { next = tabEls.length - 1; }
+        if (next < 0) { return; }
+        ev.preventDefault();
+        setScene(tabEls[next].getAttribute("data-scene"), true);
+      });
+
+      // ---------------- 参数面板：可拖动 + 位置记忆 ----------------
+      function initDraggablePanel() {
+        var panel = shell.panel;
+        var grip = panel && panel.querySelector(".panel-grip");
+        if (!panel || !grip) { return null; }
+        var KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+
+        function clampToFrame(x, y) {
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          return {
+            x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+            y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+          };
+        }
+        function place(x, y) {
+          var p = clampToFrame(x, y);
+          panel.style.left = p.x + "px";
+          panel.style.top = p.y + "px";
+          panel.style.right = "auto";
+          panel.style.bottom = "auto";
+        }
+        function defaultPlace() {
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          if (!f.height || !r.height) { return; }
+          place(8, f.height - r.height - 52);   // 默认左下角，避开底部图例
+        }
+        function refit() {
+          if (panel.hidden) { return; }
+          if (!userMoved) { defaultPlace(); return; }   // 没被拖过就跟随默认角落
+          if (!panel.style.left) { place(8, 8); return; }
+          place(parseFloat(panel.style.left) || 8, parseFloat(panel.style.top) || 8);
+        }
+
+        var saved = null;
+        try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (err) { saved = null; }
+        if (saved && typeof saved.x === "number" && typeof saved.y === "number") {
+          place(saved.x, saved.y);              // 刷新后恢复上次位置
+        } else {
+          defaultPlace();
+        }
+
+        var dx = 0, dy = 0, dragging = false;
+        var userMoved = !!(saved && typeof saved.x === "number" && typeof saved.y === "number");
+        grip.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0 || e.target.closest("button")) { return; }
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          userMoved = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+          panel.style.bottom = "auto";
+        });
+        grip.addEventListener("pointermove", function (e) {
+          if (!dragging) { return; }
+          var f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+        function endDrag(e) {
+          if (!dragging) { return; }
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture && grip.hasPointerCapture(e.pointerId)) {
+            grip.releasePointerCapture(e.pointerId);
+          }
+          localStorage.setItem(KEY, JSON.stringify({
+            x: parseFloat(panel.style.left),
+            y: parseFloat(panel.style.top)
+          }));
+        }
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+        grip.addEventListener("dblclick", function (e) {
+          if (e.target.closest("button")) { return; }
+          setPanelOpen(shell.panel.hidden);
+        });
+
+        return { refit: refit };
+      }
+
+      var panelDrag = initDraggablePanel();
+
+      function setPanelOpen(open) {
+        shell.panel.hidden = !open;
+        shell.toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        shell.toggle.textContent = open ? "参数 ▾" : "参数 ▸";
+        if (shell.fold) { shell.fold.setAttribute("aria-expanded", open ? "true" : "false"); }
+        if (open && panelDrag) { panelDrag.refit(); }
+      }
+
+      function setDrawerOpen(open) {
+        shell.drawer.hidden = !open;
+        shell.more.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      shell.toggle.addEventListener("click", function () { setPanelOpen(shell.panel.hidden); });
+      shell.more.addEventListener("click", function () { setDrawerOpen(shell.drawer.hidden); });
+      shell.fold.addEventListener("click", function () { setPanelOpen(false); });
+
+      // 窗口尺寸变化：面板重新夹回画面内，显示中的画布重设位图并重画
+      window.addEventListener("resize", function () {
+        if (panelDrag) { panelDrag.refit(); }
+        drawActiveScene();
+      });
+
+      window.addEventListener("keydown", function (ev) {
+        var tag = ev.target && ev.target.tagName;
+        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON") { return; }
+        if (ev.code === "Space") {
+          ev.preventDefault();
+          ui.pauseBtn.click();
+        } else if (ev.key === "r" || ev.key === "R") {
+          ev.preventDefault();
+          ui.resetBtn.click();
+        } else if (ev.key === "p" || ev.key === "P") {
+          ev.preventDefault();
+          setPanelOpen(shell.panel.hidden);
+        } else if (ev.key === "?") {
+          ev.preventDefault();
+          setDrawerOpen(shell.drawer.hidden);
+        } else if (ev.key === "Escape") {
+          setDrawerOpen(false);
+        }
+      });
+
+      setPanelOpen(true);
+      setDrawerOpen(false);
+
+      syncControls();
+      setScene("ac", false);
+      window.requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

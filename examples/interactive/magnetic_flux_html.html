@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>磁通量与电磁感应现象</title>
+  <style>
+    :root {
+      --accent: #2dd4bf;
+      --accent-deep: #0f766e;
+      --hud-w: 300px;
+    }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: #070d11; overflow: hidden;
+           font: 14px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #eaf2f5; }
+
+    * { box-sizing: border-box; }
+
+    .app  { height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; }
+
+    /* 16:9 等比舞台：同时受宽高约束 */
+    .stage-frame { position: relative; aspect-ratio: 16 / 9;
+                   width: min(100%, calc((100vh - 16px) * 16 / 9));
+                   border-radius: 12px; overflow: hidden; background: #0b141a; }
+
+    .stage-frame > canvas { display: block; width: 100%; height: 100%; }
+
+    #fluxCanvas { cursor: grab; touch-action: none; }
+    #fluxCanvas.dragging { cursor: grabbing; }
+
+    .hud { position: absolute; z-index: 3; backdrop-filter: blur(6px);
+           border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+           background: rgba(12, 24, 30, .72); color: #eaf2f5; }
+
+    .hud-readout { left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+                   padding: 6px 10px; font-size: 12.5px; }
+    .hud-readout b { font-size: 14px; color: #7fd6e4; }
+    .hud-readout .chip { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+    .hud-readout .chip + .chip { padding-left: 8px; border-left: 1px solid rgba(255,255,255,.16); }
+    .hud-readout .chip.on b { color: #ffd166; }
+
+    .hud-legend { left: 12px; bottom: 12px; max-width: 62%; padding: 6px 10px; font-size: 12px;
+                  color: #cfe3e9; display: flex; align-items: center; gap: 12px; white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; }
+    .hud-legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+    /* 面板压成两列短卡片：高度低于线圈上沿，任何时刻都不遮物理主体 */
+    .hud-panel { right: 12px; top: 12px; width: var(--hud-w); max-height: calc(100% - 24px);
+                 overflow-y: auto; padding: 6px 10px; font-size: 12px; }
+    .hud-panel[hidden] { display: none; }
+
+    .hud-toggle { position: absolute; right: 12px; top: 12px; z-index: 4;
+                  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px;
+                  border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5; }
+    .hud-toggle[aria-expanded="true"] { right: 324px; }   /* 面板展开时让到面板左边 */
+
+    .hud-more { position: absolute; right: 12px; bottom: 12px; z-index: 4;
+                width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 700;
+                border: 1px solid rgba(255,255,255,.2); background: rgba(12,24,30,.8); color: #eaf2f5;
+                font-family: inherit; font-size: 15px; line-height: 1; }
+    .hud-more[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+
+    .drawer { position: absolute; z-index: 5; right: 12px; bottom: 56px; width: min(420px, 72%);
+              max-height: 60%; overflow-y: auto; padding: 14px 16px; border-radius: 12px;
+              background: rgba(10, 20, 26, .95); border: 1px solid rgba(255,255,255,.16); font-size: 13px; }
+    .drawer h3 { margin: 10px 0 4px; font-size: 13px; color: #7fd6e4; }
+    .drawer h3:first-child { margin-top: 0; }
+    .drawer p, .drawer li { color: #cfe3e9; margin: 4px 0; }
+    .drawer ul { margin: 4px 0; padding-left: 18px; }
+    .drawer .dim { color: #93a6ae; font-size: 12px; }
+    .drawer .metric-value { font-size: 16px; font-weight: 700; }
+    .drawer .metric-value.active { color: #ffd166; }
+    .drawer .metric-value.neutral { color: #7fd6e4; }
+    .drawer .metric-value.idle { color: #94a3b8; }
+    .drawer #phiChart { display: block; width: 100%; height: auto; border-radius: 6px;
+                        background: #0a1018; margin: 8px 0 4px; }
+
+    /* ---- 面板内部：两列紧凑卡片 ---- */
+    .hud-panel .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+    .hud-panel .field { margin-top: 5px; }
+    .hud-panel .field:first-child { margin-top: 0; }
+    .field-label { margin-bottom: 3px; color: #cfe3e9; font-size: 11.5px; }
+    .field label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 1px;
+                   color: #cfe3e9; font-size: 11.5px; line-height: 1.35; }
+    .field label b { color: #7fd6e4; font-weight: 700; white-space: nowrap; }
+    input[type="range"] { width: 100%; height: 16px; accent-color: var(--accent); display: block; }
+
+    .scene-buttons { display: grid; gap: 5px; }
+
+    .hud-panel button { min-height: 26px; padding: 2px 6px; border-radius: 7px; font-family: inherit;
+                        border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
+                        color: #eaf2f5; font-size: 11.5px; font-weight: 600; cursor: pointer;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hud-panel button:hover { background: rgba(255,255,255,.15); }
+    .hud-panel button:disabled { opacity: .45; cursor: not-allowed; }
+    .scene-btn.active, .hud-panel button.primary { background: var(--accent-deep); border-color: var(--accent); color: #ffffff; }
+
+    .toggles { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; }
+    .toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #cfe3e9; user-select: none; }
+    .toggle input { width: 14px; height: 14px; accent-color: var(--accent); }
+
+    .row { display: flex; gap: 6px; margin-top: 6px; }
+    .row button { flex: 1; }
+
+    /* ---- 参数面板：首行拖动条（可拖动、可记忆位置） ---- */
+    .hud-panel { cursor: default; }
+    .hud-panel .panel-grip { cursor: grab; user-select: none; display: flex; align-items: center;
+                             justify-content: space-between; margin: -2px 0 6px; }
+    .hud-panel .panel-grip:active { cursor: grabbing; }
+    .hud-panel.dragging { opacity: .96; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+    .panel-grip .grip-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #9fe8de; }
+    .hud-panel .grip-collapse { flex: 0 0 auto; width: 24px; height: 18px; min-height: 18px; padding: 0;
+                                font-size: 14px; line-height: 1; background: transparent; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    @media (max-width: 1100px) {
+      .hud-panel { width: 272px; }
+      .hud-toggle[aria-expanded="true"] { right: 296px; }
+    }
+
+    @media (max-width: 900px) {
+      .hud-panel { width: 250px; font-size: 11.5px; }
+      .hud-toggle[aria-expanded="true"] { right: 274px; }
+      .hud-legend { gap: 8px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="stage">
+      <div class="stage-frame">
+        <canvas id="fluxCanvas" width="1600" height="900"></canvas>
+
+        <div class="hud hud-readout" aria-label="实时读数">
+          <span class="chip">场景 <b id="stageScene">线圈平移进出磁场</b></span>
+          <span class="chip">Φ <b id="stageFlux">2.25 mWb →</b></span>
+          <span class="chip">θ <b id="stageTheta">0°</b></span>
+          <span class="chip" id="currentChip">电流 <b id="stageCurrent">无感应电流</b></span>
+        </div>
+
+        <div class="hud hud-legend" id="legend">
+          <span>Φ = B·S·cosθ</span>
+          <span><i class="swatch" style="background:#34d399"></i>线圈</span>
+          <span><i class="swatch" style="background:#ffd166"></i>有感应电流</span>
+          <span>×/⊙：B 向里/向外</span>
+          <span>θ：n 与 B 的夹角</span>
+        </div>
+
+        <aside class="hud hud-panel" id="ctrlPanel" aria-label="场景与参数">
+          <div class="panel-grip" id="panelGrip">
+            <span class="grip-title">参数</span>
+            <button type="button" class="grip-collapse" id="panelCollapse" title="收起参数（P）" aria-label="收起参数">−</button>
+          </div>
+
+          <div class="cols">
+            <div>
+              <div class="field">
+                <label for="bSlider">磁场 B <b id="bValue">150 mT</b></label>
+                <input id="bSlider" type="range" min="20" max="300" step="10" value="150" />
+              </div>
+              <div class="field">
+                <label for="sSlider">面积 S <b id="sValue">150 cm²</b></label>
+                <input id="sSlider" type="range" min="60" max="300" step="10" value="150" />
+              </div>
+              <div class="field">
+                <label for="thetaSlider">夹角 θ <b id="thetaValue">0°</b></label>
+                <input id="thetaSlider" type="range" min="0" max="90" step="1" value="0" />
+              </div>
+            </div>
+            <div>
+              <div class="field-label">场景</div>
+              <div class="scene-buttons" role="group" aria-label="磁通量场景">
+                <button type="button" class="scene-btn active" data-scene="translate">线圈平移进出磁场</button>
+                <button type="button" class="scene-btn" data-scene="rotate">线圈绕轴转动</button>
+                <button type="button" class="scene-btn" data-scene="static">线圈静止在磁场中</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="bOutToggle" /><span>B 取向外（⊙）</span></label>
+            <label class="toggle"><input type="checkbox" id="showAxis" checked /><span>显示转轴与法线</span></label>
+          </div>
+
+          <div class="row">
+            <button type="button" class="primary" id="playBtn">暂停动画</button>
+            <button type="button" id="resetBtn">重置</button>
+          </div>
+        </aside>
+
+        <button class="hud-toggle" id="ctrlToggle" aria-expanded="true" aria-controls="ctrlPanel">参数</button>
+
+        <button class="hud-more" id="moreBtn" aria-expanded="false" aria-controls="drawer" title="结论与课堂问题">?</button>
+
+        <section class="drawer" id="drawer" aria-label="结论与课堂问题" hidden>
+          <h3>结论</h3>
+          <p><b>穿过回路的磁通量发生变化，回路中才有感应电流。</b> Φ = B·S·cosθ，B、S、θ 任一变化都可能改变 Φ。</p>
+
+          <h3>当前判定</h3>
+          <p><span id="currentValue" class="metric-value neutral">无感应电流</span></p>
+          <p id="currentNote">穿过回路的磁通量没有变化。</p>
+          <p class="dim">Φ = <span id="phiValue">2.25 mWb</span>　<span id="phiTrend">变化趋势：几乎不变 →</span>　S⊥ = Φ/B = <span id="areaValue">150 cm²</span></p>
+          <p class="dim" id="areaNote">线圈全部处于磁场中，S⊥ = S·cosθ。</p>
+
+          <h3>Φ–t 曲线（最近 6 s）</h3>
+          <canvas id="phiChart" width="600" height="220"></canvas>
+
+          <h3>模型假设</h3>
+          <p>匀强磁场；线圈为平面单匝闭合回路；线圈上下边不越过磁场上下边界；线圈电阻恒定，不讨论电流的定量大小，只判断感应电流的有无和相对强弱。本课不讨论感应电流的方向（楞次定律）。</p>
+
+          <h3>课堂观察</h3>
+          <ul>
+            <li>线圈整体在匀强磁场中平移时，Φ 变不变？灯泡亮不亮？</li>
+            <li>把 θ 从 0° 慢慢转到 90°，Φ 怎样变化？灯泡在什么阶段最亮？</li>
+            <li>线圈静止在场中，只改变 B 或 S，灯泡会不会亮？由此归纳产生感应电流的条件。</li>
+          </ul>
+
+          <h3>当前场景</h3>
+          <p id="sceneTip">线圈在匀强磁场中水平平移：完全在磁场内时 Φ 不变，灯泡不亮；进入或离开边界时 Φ 变化，灯泡被点亮。</p>
+          <p class="dim">快捷键：空格 播放/暂停 · R 重置 · P 参数 · ? 说明</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var canvas = document.getElementById("fluxCanvas");
+      var ctx = canvas.getContext("2d");
+      var chartCanvas = document.getElementById("phiChart");
+      var cctx = chartCanvas.getContext("2d");
+
+      /* 逻辑画布 = 原 canvas.width / height，坐标、图形、字号一律不变；
+         位图尺寸 = CSS 尺寸 × 设备像素比，由 syncBackingStore() 每帧同步。 */
+      var LW = 1600;
+      var LH = 900;
+      var CW = LW;
+      var CH = LH;
+      var CX0 = CW / 2;
+      var CY0 = CH / 2;
+
+      function syncBackingStore() {
+        var r = canvas.getBoundingClientRect();
+        var dpr = Math.min(window.devicePixelRatio || 1, 3);
+        var w = Math.max(1, Math.round(r.width * dpr));
+        var h = Math.max(1, Math.round(r.height * dpr));
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      }
+
+      // 每个绘制入口的第一行：先把映射设好，之后一律用逻辑坐标画
+      function beginFrame() {
+        syncBackingStore();
+        ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+      }
+
+      // 指针一律换算成逻辑坐标，禁止再用 canvas.width / rect.width
+      function toLogical(e) {
+        var r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * (LW / r.width),
+                 y: (e.clientY - r.top) * (LH / r.height) };
+      }
+
+      var FIELD_X = 0.30;
+      var FIELD_Y = 0.175;
+      var VIEW_X = 0.58;
+      var VIEW_Y = 0.326;
+      var SCALE = CW / (2 * VIEW_X);
+      var AMP = 0.45;
+      var TRANS_PERIOD = 4.2;
+      var ROT_PERIOD = 5.2;
+      var DEG = Math.PI / 180;
+
+      var C = {
+        bg: "#080a0e",
+        ink: "#f8fafc",
+        sub: "#cbd5e1",
+        muted: "#94a3b8",
+        dim: "#64748b",
+        mark: "rgba(147, 180, 216, 0.55)",
+        fieldFill: "rgba(59, 130, 246, 0.08)",
+        border: "rgba(148, 163, 184, 0.45)",
+        edge: "rgba(251, 146, 60, 0.80)",
+        coil: "#34d399",
+        normal: "#ffffff",
+        lamp: "#ffd166",
+        warn: "#fb923c"
+      };
+
+      var SCENES = {
+        translate: {
+          name: "线圈平移进出磁场",
+          tip: "线圈在匀强磁场中水平平移：完全在磁场内时 Φ 不变，灯泡不亮；进入或离开磁场边界时 Φ 变化，灯泡被点亮。可直接拖动线圈。"
+        },
+        rotate: {
+          name: "线圈绕轴转动",
+          tip: "线圈位置不变，绕竖直转轴转动，θ 从 0° 变到 90° 再转回：Φ = B·S·cosθ 随之变化，灯泡随磁通量变化的快慢改变亮度。拖动 θ 滑块会暂停自动转动。"
+        },
+        static: {
+          name: "线圈静止在磁场中",
+          tip: "线圈静止在匀强磁场中，位置、θ、B、S 都不变时 Φ 保持不变，灯泡不亮。若拖动 B、S 或 θ 滑块使 Φ 变化，灯泡会再次点亮。"
+        }
+      };
+
+      var DEFAULTS = {
+        scene: "translate",
+        bmT: 150,
+        scm2: 150,
+        thetaDeg: 0
+      };
+
+      var ui = {
+        sceneButtons: Array.prototype.slice.call(document.querySelectorAll(".scene-btn")),
+        bSlider: document.getElementById("bSlider"),
+        bValue: document.getElementById("bValue"),
+        sSlider: document.getElementById("sSlider"),
+        sValue: document.getElementById("sValue"),
+        thetaSlider: document.getElementById("thetaSlider"),
+        thetaValue: document.getElementById("thetaValue"),
+        bOutToggle: document.getElementById("bOutToggle"),
+        showAxis: document.getElementById("showAxis"),
+        playBtn: document.getElementById("playBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        phiValue: document.getElementById("phiValue"),
+        phiTrend: document.getElementById("phiTrend"),
+        areaValue: document.getElementById("areaValue"),
+        areaNote: document.getElementById("areaNote"),
+        currentValue: document.getElementById("currentValue"),
+        currentNote: document.getElementById("currentNote"),
+        sceneTip: document.getElementById("sceneTip"),
+        stageScene: document.getElementById("stageScene"),
+        stageFlux: document.getElementById("stageFlux"),
+        stageTheta: document.getElementById("stageTheta"),
+        stageCurrent: document.getElementById("stageCurrent"),
+        currentChip: document.getElementById("currentChip")
+      };
+
+      var state = {
+        scene: DEFAULTS.scene,
+        B: DEFAULTS.bmT / 1000,
+        S: DEFAULTS.scm2 * 1e-4,
+        theta: 0,
+        bOut: false,
+        showAxis: true,
+        xc: 0,
+        phase: 0,
+        playing: true,
+        dragging: false,
+        dragOffset: 0,
+        time: 0,
+        phi: 0,
+        rate: 0,
+        trendRate: 0,
+        trend: 0,
+        level: 0,
+        hasCurrent: false,
+        uiTimer: 0
+      };
+
+      var hist = [];
+      var chartHist = [];
+
+      function clamp(v, min, max) {
+        return Math.min(max, Math.max(min, v));
+      }
+
+      function px(x, y) {
+        return { x: CX0 + x * SCALE, y: CY0 - y * SCALE };
+      }
+
+      /* ---------- 物理模型 ---------- */
+
+      function coilGeom() {
+        var R = Math.sqrt(state.S / Math.PI);
+        return { R: R, a: R * Math.abs(Math.cos(state.theta)), b: R };
+      }
+
+      function partialArea(u) {
+        if (u >= 1) return 0;
+        if (u <= -1) return Math.PI;
+        return Math.acos(u) - u * Math.sqrt(1 - u * u);
+      }
+
+      function overlapArea(a, b, xc) {
+        if (a <= 1e-9) return 0;
+        var u1 = (-FIELD_X - xc) / a;
+        var u2 = (FIELD_X - xc) / a;
+        var area = a * b * (partialArea(u1) - partialArea(u2));
+        return clamp(area, 0, Math.PI * a * b);
+      }
+
+      function coilPlacement() {
+        // 判据必须用"画出来的椭圆水平半轴" a = R|cosθ|，而不是 R
+        var g = coilGeom();
+        var left = state.xc - g.a;
+        var right = state.xc + g.a;
+        if (right <= -FIELD_X || left >= FIELD_X) return "outside";
+        if (left >= -FIELD_X && right <= FIELD_X) return "inside";
+        return "partial";
+      }
+
+      function rateRef() {
+        // 各场景实际最大 |ΔΦ/Δt| 的量级，用于灯泡亮度归一化
+        var g = coilGeom();
+        var vMax = AMP * (Math.PI * 2 / TRANS_PERIOD);
+        var wMax = 45 * DEG * (Math.PI * 2 / ROT_PERIOD);
+        if (state.scene === "rotate") return Math.max(1e-9, state.B * state.S * wMax);
+        if (state.scene === "translate") return Math.max(1e-9, state.B * 2 * g.a * vMax);
+        return Math.max(1e-9, state.B * state.S);
+      }
+
+      function fluxNow() {
+        var g = coilGeom();
+        return state.B * overlapArea(g.a, g.b, state.xc);
+      }
+
+      function rateOver(arr, win) {
+        if (arr.length < 3) return 0;
+        var last = arr[arr.length - 1];
+        var ref = arr[0];
+        for (var i = arr.length - 1; i >= 0; i -= 1) {
+          if (last.t - arr[i].t <= win) {
+            ref = arr[i];
+          } else {
+            break;
+          }
+        }
+        var dt = last.t - ref.t;
+        if (dt < 0.03) return 0;
+        return (last.phi - ref.phi) / dt;
+      }
+
+      function resetDynamics() {
+        hist.length = 0;
+        chartHist.length = 0;
+        state.rate = 0;
+        state.trendRate = 0;
+        state.trend = 0;
+        state.level = 0;
+        state.hasCurrent = false;
+        state.phi = fluxNow();
+        hist.push({ t: state.time, phi: state.phi });
+        chartHist.push({ t: state.time, phi: state.phi });
+        updatePanels();
+      }
+
+      /* ---------- 每帧更新 ---------- */
+
+      function update(dt) {
+        if (state.playing) {
+          if (state.scene === "translate") {
+            state.phase += dt;
+            state.xc = AMP * Math.sin((state.phase / TRANS_PERIOD) * Math.PI * 2);
+          } else if (state.scene === "rotate") {
+            state.phase += dt;
+            var u = (state.phase / ROT_PERIOD) * Math.PI * 2;
+            var deg = 45 - 45 * Math.cos(u);
+            state.theta = clamp(deg, 0, 90) * DEG;
+            ui.thetaSlider.value = String(Math.round(deg));
+          }
+        }
+
+        if (state.scene !== "translate") {
+          state.xc = 0;
+        }
+
+        state.time += dt;
+        state.phi = fluxNow();
+
+        hist.push({ t: state.time, phi: state.phi });
+        while (hist.length > 2 && state.time - hist[0].t > 1.6) hist.shift();
+        chartHist.push({ t: state.time, phi: state.phi });
+        while (chartHist.length > 2 && state.time - chartHist[0].t > 6.2) chartHist.shift();
+
+        state.rate = rateOver(hist, 0.05);
+        state.trendRate = rateOver(hist, 0.55);
+
+        var scale = Math.max(1e-9, state.B * state.S);
+        var th = Math.max(2e-6, 0.05 * scale);
+        var absRate = Math.abs(state.rate);
+
+        if (state.hasCurrent) {
+          if (absRate < th * 0.75) state.hasCurrent = false;
+        } else if (absRate > th) {
+          state.hasCurrent = true;
+        }
+        state.level = state.hasCurrent ? clamp(absRate / (0.9 * rateRef()), 0.15, 1) : 0;
+
+        if (state.trendRate > th * 0.7) {
+          state.trend = 1;
+        } else if (state.trendRate < -th * 0.7) {
+          state.trend = -1;
+        } else {
+          state.trend = 0;
+        }
+
+        state.uiTimer += dt;
+        if (state.uiTimer >= 0.05) {
+          state.uiTimer = 0;
+          updatePanels();
+        }
+      }
+
+      /* ---------- 绘图工具 ---------- */
+
+      function drawArrow(x1, y1, x2, y2, color, width, head) {
+        var len = Math.hypot(x2 - x1, y2 - y1);
+        if (!Number.isFinite(len) || len < 1) return;
+        var ang = Math.atan2(y2 - y1, x2 - x1);
+        var hl = Math.min(head, Math.max(6, len * 0.45));
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - hl * Math.cos(ang - Math.PI / 6), y2 - hl * Math.sin(ang - Math.PI / 6));
+        ctx.lineTo(x2 - hl * Math.cos(ang + Math.PI / 6), y2 - hl * Math.sin(ang + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function label(text, x, y, opts) {
+        var o = opts || {};
+        ctx.save();
+        ctx.font = (o.bold ? "bold " : "") + (o.size || 22) + "px 'Microsoft YaHei', 'PingFang SC', Arial";
+        ctx.fillStyle = o.color || C.sub;
+        ctx.textAlign = o.align || "left";
+        ctx.textBaseline = o.baseline || "alphabetic";
+        ctx.fillText(text, x, y);
+        ctx.restore();
+      }
+
+      /* ---------- 场景绘制 ---------- */
+
+      function drawField() {
+        var tl = px(-FIELD_X, FIELD_Y);
+        var br = px(FIELD_X, -FIELD_Y);
+        var w = br.x - tl.x;
+        var h = br.y - tl.y;
+
+        ctx.save();
+        ctx.fillStyle = C.fieldFill;
+        ctx.fillRect(tl.x, tl.y, w, h);
+
+        var cols = 9;
+        var rows = 8;
+        for (var i = 0; i < cols; i += 1) {
+          var wx = -FIELD_X + ((i + 0.5) * 2 * FIELD_X) / cols;
+          for (var j = 0; j < rows; j += 1) {
+            var wy = -FIELD_Y + ((j + 0.5) * 2 * FIELD_Y) / rows;
+            var p = px(wx, wy);
+            ctx.strokeStyle = C.mark;
+            ctx.lineWidth = 2.4;
+            ctx.lineCap = "round";
+            if (state.bOut) {
+              // ⊙：圆 + 中心实心点，表示 B 垂直纸面向外
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 5.6, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+              ctx.fillStyle = C.mark;
+              ctx.fill();
+            } else {
+              var arm = 7;
+              ctx.beginPath();
+              ctx.moveTo(p.x - arm, p.y - arm);
+              ctx.lineTo(p.x + arm, p.y + arm);
+              ctx.moveTo(p.x + arm, p.y - arm);
+              ctx.lineTo(p.x - arm, p.y + arm);
+              ctx.stroke();
+            }
+          }
+        }
+
+        ctx.setLineDash([12, 9]);
+        ctx.strokeStyle = C.border;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(tl.x, tl.y, w, h);
+        ctx.setLineDash([]);
+
+        ctx.strokeStyle = C.edge;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(tl.x, tl.y - 14);
+        ctx.lineTo(tl.x, br.y + 14);
+        ctx.moveTo(br.x, tl.y - 14);
+        ctx.lineTo(br.x, br.y + 14);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(tl.x - 22, CY0);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = "#fb923c";
+        ctx.font = "bold 21px 'Microsoft YaHei', 'PingFang SC', Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("磁场边界", 0, 0);
+        ctx.restore();
+      }
+
+      function drawCoil() {
+        var g = coilGeom();
+        var c = px(state.xc, 0);
+        var aPx = Math.max(g.a * SCALE, 2.2);
+        var bPx = g.b * SCALE;
+
+        if (state.showAxis) {
+          ctx.save();
+          ctx.setLineDash([8, 8]);
+          ctx.strokeStyle = "rgba(148, 163, 184, 0.55)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(c.x, c.y - bPx * 1.42);
+          ctx.lineTo(c.x, c.y + bPx * 1.42);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+
+          label("转轴", c.x, c.y - bPx * 1.42 - 10, {
+            size: 20,
+            color: C.muted,
+            align: "center",
+            baseline: "bottom"
+          });
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(c.x, c.y, aPx, bPx, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(8, 10, 14, 0.18)";
+        ctx.fill();
+        ctx.shadowColor = "rgba(52, 211, 153, 0.35)";
+        ctx.shadowBlur = 12;
+        ctx.strokeStyle = C.coil;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawNormal() {
+        var g = coilGeom();
+        var c = px(state.xc, 0);
+        var ct = Math.abs(Math.cos(state.theta));
+        var st = Math.abs(Math.sin(state.theta));
+        var r = 9 + 7 * ct;
+
+        // 法线的"垂直纸面"分量：θ=90° 时 ct=0，必须完全消失
+        if (ct >= 0.06) {
+          ctx.save();
+          ctx.globalAlpha = 0.68 * ct;
+          ctx.strokeStyle = C.normal;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+          var k = r * 0.6;
+          if (state.bOut) {
+            ctx.fillStyle = C.normal;
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(c.x - k, c.y - k);
+            ctx.lineTo(c.x + k, c.y + k);
+            ctx.moveTo(c.x + k, c.y - k);
+            ctx.lineTo(c.x - k, c.y + k);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        var alpha = Math.min(1, st * 2.4);
+        if (st > 0.03) {
+          var len = g.b * SCALE * 1.15 * st;
+          var x2 = c.x + r + 6 + len;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          drawArrow(c.x + r + 6, c.y, x2, c.y, C.normal, 3.5, 15);
+          ctx.restore();
+          label("n", clamp(x2 + 10, 24, CW - 44), c.y - 12, {
+            size: 24,
+            color: C.normal,
+            bold: true,
+            align: "left",
+            baseline: "middle"
+          });
+        } else {
+          label("n", clamp(c.x + r + 10, 24, CW - 44), c.y - r - 4, {
+            size: 24,
+            color: C.normal,
+            bold: true,
+            align: "left",
+            baseline: "middle"
+          });
+        }
+      }
+
+      function drawLamp() {
+        var g = coilGeom();
+        var p = px(state.xc, -g.b);
+        var glow = state.level;
+        var lit = glow > 0.02;
+
+        ctx.save();
+        if (lit) {
+          var grad = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 62);
+          grad.addColorStop(0, "rgba(255, 209, 102, " + (0.55 * glow).toFixed(3) + ")");
+          grad.addColorStop(1, "rgba(255, 209, 102, 0)");
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 62, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+        ctx.fillStyle = lit ? "rgba(255, 209, 102, " + (0.25 + 0.6 * glow).toFixed(3) + ")" : "#111827";
+        ctx.fill();
+        ctx.strokeStyle = lit ? "#ffe9a8" : "#64748b";
+        ctx.lineWidth = 2.6;
+        ctx.stroke();
+
+        ctx.strokeStyle = lit ? "#7c4a12" : "#94a3b8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 6, p.y - 5);
+        ctx.lineTo(p.x - 2, p.y + 4);
+        ctx.lineTo(p.x + 2, p.y - 4);
+        ctx.lineTo(p.x + 6, p.y + 5);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      /* 原画布内的图例/判定/θ 示意图/假设文字已移入 HUD 与「?」抽屉，
+         画布只保留物理标注（磁场边界、线圈、法线、灯泡）。 */
+
+      /* ---------- Φ–t 曲线 ---------- */
+
+      function drawChart() {
+        var W = chartCanvas.width;
+        var H = chartCanvas.height;
+        var maxPhi = 12;
+        var padL = 46;
+        var padR = 18;
+        var padT = 16;
+        var padB = 30;
+
+        cctx.clearRect(0, 0, W, H);
+        cctx.fillStyle = "#0a1018";
+        cctx.fillRect(0, 0, W, H);
+
+        var tNow = state.time;
+        var tStart = tNow - 6;
+
+        function xOf(t) {
+          return padL + ((t - tStart) / 6) * (W - padL - padR);
+        }
+
+        function yOf(p) {
+          return H - padB - clamp(p, 0, maxPhi) / maxPhi * (H - padT - padB);
+        }
+
+        cctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
+        cctx.lineWidth = 1;
+        cctx.font = "22px 'Microsoft YaHei', Arial";
+        cctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+        cctx.textAlign = "right";
+        cctx.textBaseline = "middle";
+        var marks = [0, 4, 8, 12];
+        for (var i = 0; i < marks.length; i += 1) {
+          var yy = yOf(marks[i]);
+          cctx.beginPath();
+          cctx.moveTo(padL, yy);
+          cctx.lineTo(W - padR, yy);
+          cctx.stroke();
+          cctx.fillText(String(marks[i]), padL - 10, yy);
+        }
+
+        cctx.textAlign = "left";
+        cctx.fillText("Φ/mWb", padL + 6, padT + 4);
+        cctx.textAlign = "right";
+        cctx.fillText("t/s", W - padR, H - 8);
+
+        if (chartHist.length > 1) {
+          cctx.strokeStyle = "#ffd166";
+          cctx.lineWidth = 3;
+          cctx.lineJoin = "round";
+          cctx.beginPath();
+          var started = false;
+          for (var k = 0; k < chartHist.length; k += 1) {
+            var pt = chartHist[k];
+            if (pt.t < tStart) continue;
+            var xx = xOf(pt.t);
+            var yv = yOf(pt.phi * 1000);
+            if (!started) {
+              cctx.moveTo(xx, yv);
+              started = true;
+            } else {
+              cctx.lineTo(xx, yv);
+            }
+          }
+          cctx.stroke();
+
+          var lastPt = chartHist[chartHist.length - 1];
+          cctx.fillStyle = "#fff3c4";
+          cctx.beginPath();
+          cctx.arc(xOf(lastPt.t), yOf(lastPt.phi * 1000), 5, 0, Math.PI * 2);
+          cctx.fill();
+        }
+      }
+
+      /* ---------- 面板文字 ---------- */
+
+      function trendText(trend) {
+        if (trend > 0) return "增大 ↑";
+        if (trend < 0) return "减小 ↓";
+        return "几乎不变 →";
+      }
+
+      function updatePanels() {
+        var phiMWb = state.phi * 1000;
+        var deg = Math.round(state.theta / DEG);
+        var trend = trendText(state.trend);
+
+        ui.bValue.textContent = Math.round(state.B * 1000) + " mT";
+        ui.sValue.textContent = Math.round(state.S * 1e4) + " cm²";
+        ui.thetaValue.textContent = deg + "°";
+
+        ui.phiValue.textContent = phiMWb.toFixed(2) + " mWb";
+        ui.phiValue.className = "metric-value " + (state.hasCurrent ? "active" : "neutral");
+        ui.phiTrend.textContent = "变化趋势：" + trend;
+
+        var areaCm2 = state.B > 1e-6 ? (state.phi / state.B) * 1e4 : 0;
+        ui.areaValue.textContent = areaCm2.toFixed(0) + " cm²";
+        var where = coilPlacement();
+        var ct = Math.abs(Math.cos(state.theta));
+        if (ct < 0.01) {
+          ui.areaNote.textContent = "线圈平面与 B 平行，有效面积为零，Φ = 0。";
+        } else if (where === "outside") {
+          ui.areaNote.textContent = "线圈整体在磁场外，场内有磁通量的面积为 0。";
+        } else if (where === "partial") {
+          ui.areaNote.textContent = "线圈只有一部分在磁场中，S⊥ 为场内那部分的有效面积。";
+        } else {
+          ui.areaNote.textContent = "线圈全部处于磁场中，S⊥ = S·cosθ。";
+        }
+
+        ui.currentValue.textContent = state.hasCurrent ? "有感应电流" : "无感应电流";
+        ui.currentValue.className = "metric-value " + (state.hasCurrent ? "active" : "idle");
+        if (state.hasCurrent) {
+          ui.currentNote.textContent = "磁通量正在变化，回路中出现感应电流，灯泡被点亮。";
+        } else if (ct < 0.01) {
+          ui.currentNote.textContent = "线圈平面与 B 平行，Φ = 0 且保持不变。";
+        } else if (where === "outside") {
+          ui.currentNote.textContent = "线圈整体在磁场外，磁通量为 0 且保持不变。";
+        } else {
+          ui.currentNote.textContent = "穿过回路的磁通量没有变化，回路中没有感应电流。";
+        }
+
+        ui.stageFlux.textContent = phiMWb.toFixed(2) + " mWb " + trend.charAt(trend.length - 1);
+        ui.stageTheta.textContent = deg + "°";
+        ui.stageCurrent.textContent = state.hasCurrent ? "有感应电流" : "无感应电流";
+        ui.currentChip.classList.toggle("on", state.hasCurrent);
+      }
+
+      /* ---------- 主渲染 ---------- */
+
+      function render() {
+        beginFrame();
+        ctx.clearRect(0, 0, CW, CH);
+        ctx.fillStyle = C.bg;
+        ctx.fillRect(0, 0, CW, CH);
+
+        drawField();
+        drawCoil();
+        if (state.showAxis) drawNormal();
+        drawLamp();
+        drawChart();
+      }
+
+      /* ---------- 交互 ---------- */
+
+      /* 视口尺寸 / 系统缩放变化后：重设位图并立即重画 */
+      window.addEventListener("resize", function () { render(); });
+      window.addEventListener("orientationchange", function () { render(); });
+
+      function syncPlayButton() {
+        if (state.scene === "static") {
+          ui.playBtn.textContent = "无自动动画";
+          ui.playBtn.disabled = true;
+          return;
+        }
+        ui.playBtn.disabled = false;
+        ui.playBtn.textContent = state.playing ? "暂停动画" : "播放动画";
+      }
+
+      function syncPhaseFromState() {
+        // 恢复播放时把动画相位对到当前状态，避免位置/θ 跳变引发假电流
+        if (state.scene === "translate") {
+          var s = clamp(state.xc / AMP, -1, 1);
+          state.phase = (Math.asin(s) * TRANS_PERIOD) / (Math.PI * 2);
+        } else if (state.scene === "rotate") {
+          var c = clamp(1 - (state.theta / DEG) / 45, -1, 1);
+          state.phase = (Math.acos(c) * ROT_PERIOD) / (Math.PI * 2);
+        }
+      }
+
+      function setScene(name) {
+        state.scene = name;
+        state.phase = 0;
+        state.xc = 0;
+        if (name === "rotate") {
+          // 先归零 θ，再记录 Φ，否则会闪一帧"Φ 从 B·S·cosθ 跳到 B·S"的假电流
+          state.theta = 0;
+          ui.thetaSlider.value = "0";
+        }
+        state.playing = name !== "static";
+        ui.sceneButtons.forEach(function (btn) {
+          btn.classList.toggle("active", btn.dataset.scene === name);
+        });
+        ui.sceneTip.textContent = SCENES[name].tip;
+        ui.stageScene.textContent = SCENES[name].name;
+        resetDynamics();
+        syncPlayButton();
+      }
+
+      function hitLoop(p) {
+        if (state.scene !== "translate") return false;
+        var g = coilGeom();
+        var c = px(state.xc, 0);
+        var aPx = Math.max(g.a * SCALE, 14);
+        var bPx = g.b * SCALE;
+        var dx = (p.x - c.x) / aPx;
+        var dy = (p.y - c.y) / bPx;
+        return dx * dx + dy * dy <= 1.25;
+      }
+
+      canvas.addEventListener("pointerdown", function (event) {
+        var p = toLogical(event);
+        if (!hitLoop(p)) return;
+        state.dragging = true;
+        state.playing = false;
+        state.dragOffset = state.xc - (p.x - CX0) / SCALE;
+        canvas.classList.add("dragging");
+        canvas.setPointerCapture(event.pointerId);
+        syncPlayButton();
+      });
+
+      canvas.addEventListener("pointermove", function (event) {
+        if (!state.dragging) return;
+        var p = toLogical(event);
+        state.xc = clamp((p.x - CX0) / SCALE + state.dragOffset, -0.46, 0.46);
+      });
+
+      canvas.addEventListener("pointerup", function () {
+        state.dragging = false;
+        canvas.classList.remove("dragging");
+      });
+
+      canvas.addEventListener("pointercancel", function () {
+        state.dragging = false;
+        canvas.classList.remove("dragging");
+      });
+
+      ui.sceneButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          setScene(button.dataset.scene);
+        });
+      });
+
+      ui.bSlider.addEventListener("input", function () {
+        state.B = Number(ui.bSlider.value) / 1000;
+        updatePanels();
+      });
+
+      ui.sSlider.addEventListener("input", function () {
+        state.S = Number(ui.sSlider.value) * 1e-4;
+        updatePanels();
+      });
+
+      ui.thetaSlider.addEventListener("input", function () {
+        state.theta = Number(ui.thetaSlider.value) * DEG;
+        if (state.scene === "rotate") {
+          state.playing = false;
+          syncPlayButton();
+        }
+        updatePanels();
+      });
+
+      ui.bOutToggle.addEventListener("change", function () {
+        state.bOut = ui.bOutToggle.checked;
+      });
+
+      ui.showAxis.addEventListener("change", function () {
+        state.showAxis = ui.showAxis.checked;
+      });
+
+      ui.playBtn.addEventListener("click", function () {
+        if (state.scene === "static") return;
+        state.playing = !state.playing;
+        if (state.playing) {
+          syncPhaseFromState();
+          resetDynamics();
+        }
+        syncPlayButton();
+      });
+
+      ui.resetBtn.addEventListener("click", function () {
+        state.B = DEFAULTS.bmT / 1000;
+        state.S = DEFAULTS.scm2 * 1e-4;
+        state.theta = DEFAULTS.thetaDeg * DEG;
+        state.xc = 0;
+        state.phase = 0;
+        state.bOut = false;
+        state.showAxis = true;
+        state.time = 0;
+        ui.bSlider.value = String(DEFAULTS.bmT);
+        ui.sSlider.value = String(DEFAULTS.scm2);
+        ui.thetaSlider.value = String(DEFAULTS.thetaDeg);
+        ui.bOutToggle.checked = false;
+        ui.showAxis.checked = true;
+        setScene(DEFAULTS.scene);
+      });
+
+      /* ---------- 外壳：参数面板折叠 / 说明抽屉 / 快捷键 ---------- */
+
+      var ctrlPanel = document.getElementById("ctrlPanel");
+      var ctrlToggle = document.getElementById("ctrlToggle");
+      var drawer = document.getElementById("drawer");
+      var moreBtn = document.getElementById("moreBtn");
+
+      /* ---------- 参数面板：拖动 + 位置记忆（拖动事件只落在 grip 上，不进入画布） ---------- */
+
+      function initDraggablePanel() {
+        var panel = ctrlPanel;
+        var grip = panel && panel.querySelector(".panel-grip");
+        var collapseBtn = document.getElementById("panelCollapse");
+        if (!panel || !grip) return function () {};
+        var KEY = "hud-panel-pos:" + location.pathname.split("/").pop();
+        var dragged = false;
+
+        function clampToFrame(x, y) {
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          return {
+            x: Math.min(Math.max(8, x), Math.max(8, f.width - r.width - 8)),
+            y: Math.min(Math.max(8, y), Math.max(8, f.height - r.height - 8))
+          };
+        }
+
+        function place(x, y) {
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+          var p = clampToFrame(x, y);
+          panel.style.left = p.x + "px";
+          panel.style.top = p.y + "px";
+          panel.style.right = "auto";
+        }
+
+        function readSaved() {
+          try {
+            return JSON.parse(localStorage.getItem(KEY) || "null");
+          } catch (err) {
+            return null;
+          }
+        }
+
+        var saved = readSaved();
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+          dragged = true;
+          place(saved.x, saved.y);          // 恢复上次位置；无记录则用 CSS 默认角落
+        }
+
+        var dx = 0;
+        var dy = 0;
+        var dragging = false;
+
+        grip.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0) return;
+          if (e.target.closest && e.target.closest("button")) return;   // 折叠按钮不触发拖动
+          var f = panel.parentElement.getBoundingClientRect();
+          var r = panel.getBoundingClientRect();
+          dx = e.clientX - r.left;
+          dy = e.clientY - r.top;
+          dragging = true;
+          panel.classList.add("dragging");
+          grip.setPointerCapture(e.pointerId);
+          panel.style.left = (r.left - f.left) + "px";
+          panel.style.top = (r.top - f.top) + "px";
+          panel.style.right = "auto";
+          e.preventDefault();
+        });
+
+        grip.addEventListener("pointermove", function (e) {
+          if (!dragging) return;
+          var f = panel.parentElement.getBoundingClientRect();
+          place(e.clientX - f.left - dx, e.clientY - f.top - dy);
+        });
+
+        function endDrag(e) {
+          if (!dragging) return;
+          dragging = false;
+          panel.classList.remove("dragging");
+          if (grip.hasPointerCapture && grip.hasPointerCapture(e.pointerId)) {
+            grip.releasePointerCapture(e.pointerId);
+          }
+          try {
+            localStorage.setItem(KEY, JSON.stringify({
+              x: parseFloat(panel.style.left),
+              y: parseFloat(panel.style.top)
+            }));
+          } catch (err) { /* 隐私模式下无法写入时忽略 */ }
+          dragged = true;
+        }
+
+        grip.addEventListener("pointerup", endDrag);
+        grip.addEventListener("pointercancel", endDrag);
+
+        grip.addEventListener("dblclick", function (e) {
+          if (e.target.closest && e.target.closest("button")) return;
+          document.getElementById("ctrlToggle").click();
+        });
+
+        if (collapseBtn) {
+          collapseBtn.addEventListener("click", function () {
+            ctrlToggle.click();
+          });
+        }
+
+        function reclamp() {
+          if (!dragged || panel.hidden) return;
+          place(parseFloat(panel.style.left), parseFloat(panel.style.top));
+        }
+        window.addEventListener("resize", reclamp);
+        return reclamp;
+      }
+
+      var reclampPanel = initDraggablePanel();
+
+      function setPanelOpen(open) {
+        ctrlPanel.hidden = !open;
+        ctrlToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        ctrlToggle.title = open ? "收起参数（P）" : "展开参数（P）";
+        if (open) reclampPanel();
+      }
+
+      function setDrawerOpen(open) {
+        drawer.hidden = !open;
+        moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        moreBtn.textContent = open ? "×" : "?";
+        moreBtn.title = open ? "收起说明" : "结论与课堂问题";
+      }
+
+      ctrlToggle.addEventListener("click", function () {
+        setPanelOpen(ctrlPanel.hidden);
+      });
+
+      moreBtn.addEventListener("click", function () {
+        setDrawerOpen(drawer.hidden);
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        var tag = event.target && event.target.tagName;
+        var onControl = tag === "INPUT" || tag === "BUTTON" || tag === "SELECT" || tag === "TEXTAREA";
+        if (event.key === " " && !onControl) {
+          event.preventDefault();
+          ui.playBtn.click();
+        } else if ((event.key === "r" || event.key === "R") && !onControl) {
+          event.preventDefault();
+          ui.resetBtn.click();
+        } else if (event.key === "p" || event.key === "P") {
+          event.preventDefault();
+          ctrlToggle.click();
+        } else if (event.key === "?") {
+          event.preventDefault();
+          moreBtn.click();
+        } else if (event.key === "Escape") {
+          setDrawerOpen(false);
+        }
+      });
+
+      setPanelOpen(true);
+      setDrawerOpen(false);
+
+      /* ---------- 主循环 ---------- */
+
+      var lastT = null;
+
+      function frame(now) {
+        if (lastT === null) lastT = now;
+        var dt = (now - lastT) / 1000;
+        lastT = now;
+        if (!Number.isFinite(dt) || dt < 0) dt = 0;
+        dt = Math.min(dt, 0.05);
+        update(dt);
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      ui.stageScene.textContent = SCENES[state.scene].name;
+      ui.sceneTip.textContent = SCENES[state.scene].tip;
+      resetDynamics();
+      syncPlayButton();
+      requestAnimationFrame(frame);
+    }());
+  </script>
+</body>
+</html>
