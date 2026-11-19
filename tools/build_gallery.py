@@ -220,6 +220,7 @@ input[type=search]:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--tea
   background:var(--teal);margin-right:9px;vertical-align:-1px}
 .group[data-group="manim"] .group-title::before{background:var(--amber)}
 .group-sub{margin:0;color:var(--muted);font-size:13px}
+main.wrap{padding-bottom:48px}
 .grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;padding-bottom:8px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
   box-shadow:var(--shadow);display:flex;flex-direction:column;transition:.18s}
@@ -252,8 +253,6 @@ input[type=search]:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--tea
 .btn-ghost:hover{border-color:var(--teal);background:var(--teal-l)}
 .hint{color:var(--muted);font-size:12px}
 .empty{padding:60px 0;text-align:center;color:var(--muted)}
-footer{border-top:1px solid var(--line);background:#fff;padding:26px 0;color:var(--muted);font-size:13px}
-footer code{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);
   background:#16232b;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;opacity:0;
   pointer-events:none;transition:.2s}
@@ -374,12 +373,6 @@ def build_page(reg: dict) -> str:
         if book and book not in books:
             books.append(book)
 
-    book_map: dict[str, list[str]] = {}
-    for c in chapters:
-        book, _, chap = c.partition("·")
-        book_map.setdefault(book.strip(), []).append(chap.strip())
-    coverage = "；".join(f"{b}（{'、'.join(cs)}）" for b, cs in book_map.items())
-
     n_html = sum(1 for r in res if r["type"] == "html")
     n_manim = len(res) - n_html
 
@@ -453,16 +446,6 @@ def build_page(reg: dict) -> str:
 
   <div class="empty" id="empty" hidden>没有匹配的资源，试试换个关键词或清除筛选。</div>
 </main>
-
-<footer>
-  <div class="wrap">
-    <p>{esc(site['intro'])}</p>
-    <p class="coverage">当前覆盖：{coverage}。人教版其余教材（必修第一册、必修第二册、选择性必修第一册、选择性必修第三册）暂无资源。</p>
-    <p>本页由 <code>tools/build_gallery.py</code> 依据 <code>gallery/resources.json</code> 生成。
-       新增资源：在 JSON 中登记一条，然后重跑 <code>python tools/build_gallery.py</code>。
-       Manim 动画渲染后放到 <code>gallery/videos/&lt;id&gt;.mp4</code>（随仓库发布）即可在卡片里播放。</p>
-  </div>
-</footer>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
