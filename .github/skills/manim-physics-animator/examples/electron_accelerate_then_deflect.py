@@ -194,11 +194,10 @@ def point_at(box_group, target, color=SUBST, sw=3.0):
                  max_tip_length_to_length_ratio=0.11)
 
 
-def kill_list(mob, idxs):
-    """取出若干令牌（用于淡出）并从父对象里摘掉；返回可 FadeOut 的 VGroup。"""
-    picked = VGroup(*[mob[i] for i in idxs])
-    mob.remove(*[mob[i] for i in idxs])
-    return picked
+def wrap_rect(tokens, color=SUBST, buff=0.06, sw=2.0):
+    """用一个小方框圈出“刚写进去的那一段”（只取包围盒，不改动原对象）。"""
+    return SurroundingRectangle(VGroup(*tokens), color=color, buff=buff,
+                                stroke_width=sw)
 
 
 # ---------------- 场景
@@ -513,9 +512,10 @@ class ElectronAccelerateThenDeflectScene(Scene):
         self.retarget(E1, E2, [(E1[i], E2[i]) for i in range(7)],
                       drop=[E1[7]], add=[E2[i] for i in range(7, 13)],
                       extra=[FadeOut(a2)], run_time=1.1)
-        ins = VGroup(*E2[7:13])
-        self.play(ins.animate.set_color(SUBST), run_time=0.4)
-        self.play(ins.animate.set_color(INK), FadeOut(b2), run_time=0.5)
+        # 刚写进去的 2eU₀/m 用蓝框闪一下，指明“换成的是这一块”
+        flash = wrap_rect(E2[7:13], SUBST)
+        self.play(Create(flash), run_time=0.45)
+        self.play(FadeOut(flash), FadeOut(b2), run_time=0.5)
         self.say("接下来 e 与 e、m 与 m 各约掉一个", 0.6)
 
         # —— 动态约去：红斜线从左上划到右下
@@ -531,16 +531,12 @@ class ElectronAccelerateThenDeflectScene(Scene):
         self.play(Create(sm_a), Create(sm_b), run_time=0.8)
         self.play(FadeIn(lab_m, shift=DOWN * 0.05), run_time=0.3)
 
-        # —— 划掉的整项淡出，剩下的自己“收口”
+        # —— 划掉的整项随整式一起收走，再写出干净结果
         self.say("被划掉的整项消失，只剩 EL 与 2U₀", 0.6)
-        alive = {i: E2[i] for i in (0, 1, 3, 4, 5, 8, 10, 13)}
-        dead = kill_list(E2, [2, 6, 7, 9, 11, 12])
-        self.play(FadeOut(VGroup(dead, se_n, se_d, sm_a, sm_b, lab_e, lab_m)), run_time=0.85)
-        self.retarget(E2, E3,
-                      [(alive[0], E3[0]), (alive[1], E3[1]), (alive[3], E3[2]),
-                       (alive[4], E3[3]), (alive[5], E3[4]), (alive[8], E3[5]),
-                       (alive[10], E3[6]), (alive[13], E3[7])], run_time=1.0)
+        self.play(FadeOut(VGroup(E2, se_n, se_d, sm_a, sm_b, lab_e, lab_m),
+                         shift=DOWN * 0.04), run_time=0.8)
         ring = SurroundingRectangle(E3, color=KEY, buff=0.14, stroke_width=2.4)
+        self.play(FadeIn(E3, scale=0.97), run_time=0.65)
         self.play(E3.animate.set_color(KEY), Create(ring), run_time=0.7)
         self.play(Circumscribe(E3, color=KEY, run_time=1.0))
         self.say("约干净了：tanθ = EL/(2U₀) —— e、m 全部被约去", 0.8)
