@@ -742,26 +742,40 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         }
       }
 
-      // 坡度箭头：E 指向电势降低的方向
+      // 坡度箭头：贴着曲面，指向电势降低的切向
       if (layers.field) {
-        for (let y = -2.6; y <= 2.6; y += 1.1) {
-          for (let x = -5.0; x <= 5.0; x += 1.1) {
-            const v = field.potential(x, y, 0);
-            if (Math.abs(v) > 4.6) continue;
+        const goldenrod = 0xffd84d;
+        for (let y = -2.4; y <= 2.4; y += 0.95) {
+          for (let x = -4.8; x <= 4.8; x += 0.95) {
+            const phi = field.potential(x, y, 0);
+            if (Math.abs(phi) > 4.6) continue;
             const e = field.field(x, y, 0);
-            const m = Math.hypot(e.x, e.y) || 1;
-            if (m < 0.12) continue;
-            const z = ZMAX * Math.tanh(v * 0.55);
-            const dzdx = (field.potential(x + 0.06, y, 0) - field.potential(x - 0.06, y, 0)) / 0.12 * ZS;
-            const dzdy = (field.potential(x, y + 0.06, 0) - field.potential(x, y - 0.06, 0)) / 0.12 * ZS;
-            const dir = new THREE.Vector3(
-              -e.x / m - dzdx * 0.15,
-              -e.y / m - dzdy * 0.15,
-              -Math.hypot(dzdx, dzdy)
-            ).normalize();
-            const a = new THREE.ArrowHelper(dir, new THREE.Vector3(x, y, z),
-              0.75, 0xffe066, 0.22, 0.12);
-            gTerrainArrows.add(a);
+            const m = Math.hypot(e.x, e.y);
+            if (m < 0.18) continue;
+
+            const ex = e.x / m, ey = e.y / m;                   // 下坡方向 = E 的方向
+            const dpx = (field.potential(x + 0.05, y, 0) - field.potential(x - 0.05, y, 0)) / 0.1;
+            const dpy = (field.potential(x, y + 0.05, 0) - field.potential(x, y - 0.05, 0)) / 0.1;
+            const th = Math.tanh(0.55 * phi);
+            const grad = ZMAX * 0.55 * (1 - th * th);           // dz/dφ
+            const dzdx = grad * dpx, dzdy = grad * dpy;
+
+            const t = new THREE.Vector3(ex, ey, dzdx * ex + dzdy * ey).normalize();
+            const p0 = new THREE.Vector3(x, y, hgt(x, y) + 0.02);
+            const len = 0.5;
+            const p1 = p0.clone().addScaledVector(t, len);
+
+            gTerrainArrows.add(new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints([p0, p1]),
+              new THREE.LineBasicMaterial({ color: goldenrod, transparent: true, opacity: 0.85 })
+            ));
+            const cone = new THREE.Mesh(
+              new THREE.ConeGeometry(0.05, 0.15, 8),
+              new THREE.MeshBasicMaterial({ color: goldenrod })
+            );
+            cone.position.copy(p1);
+            cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), t);
+            gTerrainArrows.add(cone);
           }
         }
       }
