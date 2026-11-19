@@ -49,9 +49,12 @@ def posix(p: str) -> str:
     return p.replace("\\", "/")
 
 
+VIDEO_DIR = ".github/skills/manim-physics-animator/examples/videos"
+
+
 def video_for(rid: str) -> str | None:
-    """找已渲染的 MP4：优先 gallery/videos（随仓库发布），其次 build/videos/manim（本地渲染产物，被 gitignore）。"""
-    for rel in (f"gallery/videos/{rid}.mp4", f"build/videos/manim/{rid}.mp4"):
+    """找已渲染的 MP4：优先 examples/videos（随仓库发布），其次 build/videos/manim（本地渲染产物，被 gitignore）。"""
+    for rel in (f"{VIDEO_DIR}/{rid}.mp4", f"build/videos/manim/{rid}.mp4"):
         if os.path.exists(os.path.join(ROOT, rel)):
             return rel
     return None
