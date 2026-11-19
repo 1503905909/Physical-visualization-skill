@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>电场线（3D）</title>
+<style>
+  :root{--bg:#f4f7f9;--card:#fff;--ink:#12222c;--muted:#5d7480;--teal:#2f7f8f;--teal-l:#e6f2f4;--line:#dde5e9}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.6 "Microsoft YaHei","PingFang SC",-apple-system,sans-serif;
+    display:flex;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.3px}
+  .ro{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .ro span{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--muted)}
+  .ro b{color:var(--ink);font-weight:600;margin-left:5px}
+  .view{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px}
+  .view button{border:0;background:transparent;padding:5px 14px;border-radius:999px;font:inherit;font-size:12.5px;
+    color:var(--muted);cursor:pointer}
+  .view button.on{background:var(--teal);color:#fff}
+  main{flex:1;display:flex;gap:14px;padding:14px 18px;min-height:0}
+  .stage-col{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .stage{flex:1;background:#070a0e;border-radius:14px;overflow:hidden;position:relative;min-height:0;
+    box-shadow:0 8px 24px rgba(16,42,52,.12)}
+  #stage3d{position:absolute;inset:0;overflow:hidden}
+  #stage3d canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+  .legend{display:flex;gap:16px;justify-content:center;color:var(--muted);font-size:12.5px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px}
+  .lg-line{background:#4fb6cf}.lg-neg{background:#4d6bff}.lg-pos{background:#ff4d5a}.lg-warm{background:#ff8a5c}
+  aside{width:250px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;overflow:auto}
+  .grp{margin-bottom:16px}
+  .grp>p{margin:0 0 8px;font-size:12px;color:var(--muted);letter-spacing:.3px}
+  .scenes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .scenes button{padding:7px 6px;border:1px solid var(--line);background:#fff;border-radius:8px;font:inherit;
+    font-size:12px;color:var(--ink);cursor:pointer}
+  .scenes button.on{background:var(--teal);border-color:var(--teal);color:#fff}
+  .scenes button:last-child{grid-column:1/-1}
+  .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
+  .row b{color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--teal)}
+  .tog{display:flex;align-items:center;gap:7px;font-size:12.5px;margin:6px 0;color:var(--ink)}
+  .tog input{accent-color:var(--teal)}
+  .tip{color:var(--muted);font-size:12px;line-height:1.6;margin-top:10px}
+  @media(max-width:900px){main{flex-direction:column}aside{width:auto}}
+</style>
+</head>
+<body>
+<header>
+  <h1>电场线（3D）</h1>
+  <div class="view" role="group" aria-label="视角">
+    <button id="btn2d" class="on">2D 剖面</button>
+    <button id="btn3d">3D 立体</button>
+  </div>
+  <div class="ro">
+    <span>场景<b id="roScene">正点电荷</b></span>
+    <span>场线<b id="roLines">--</b></span>
+    <span>透视线<b id="roMode">2D 剖面</b></span>
+  </div>
+</header>
+
+<main>
+  <div class="stage-col">
+    <div class="stage"><div id="stage3d"></div></div>
+    <div class="legend">
+      <span><i class="lg-line"></i>电场线</span>
+      <span><i class="lg-pos"></i>正电荷</span>
+      <span><i class="lg-neg"></i>负电荷</span>
+      <span><i class="lg-warm"></i>等势面（可关）</span>
+    </div>
+  </div>
+
+  <aside>
+    <div class="grp">
+      <p>场景</p>
+      <div class="scenes" id="scenes">
+        <button data-scene="singlePositive" class="on">正点电荷</button>
+        <button data-scene="singleNegative">负点电荷</button>
+        <button data-scene="dipole">等量异种</button>
+        <button data-scene="samePositive">等量同种</button>
+        <button data-scene="uniform">匀强电场</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p>参数</p>
+      <div class="row"><span>场线密度</span><b id="dnTxt">12</b></div>
+      <input id="density" type="range" min="6" max="24" step="2" value="12">
+      <div class="row"><span>等势面层数</span><b id="lvTxt">5</b></div>
+      <input id="levels" type="range" min="3" max="11" step="2" value="5">
+    </div>
+
+    <div class="grp">
+      <p>显示</p>
+      <label class="tog"><input type="checkbox" id="field" checked>电场线</label>
+      <label class="tog"><input type="checkbox" id="equip" checked>等势面</label>
+      <label class="tog"><input type="checkbox" id="heat">电势色图（截面）</label>
+    </div>
+
+    <p class="tip" id="tip"></p>
+  </aside>
+</main>
+
+<script src="three.min.js"></script>
+<script src="engine.js"></script>
+<script>
+(function () {
+  const roScene = document.getElementById('roScene');
+  const roLines = document.getElementById('roLines');
+  const roMode = document.getElementById('roMode');
+  const tip = document.getElementById('tip');
+
+  const lab = window.ElectricLab.init(document.getElementById('stage3d'), {
+    mode: 'field',
+    scene: 'singlePositive',
+    onScene: ({ scene }) => {
+      roScene.textContent = scene.name;
+      tip.textContent = scene.tip;
+    }
+  });
+
+  // 按当前状态同步按钮（支持 ?view=3d&scene=xxx 直达）
+  (function syncUI() {
+    const is3d = lab.state.view === '3d';
+    document.getElementById('btn3d').classList.toggle('on', is3d);
+    document.getElementById('btn2d').classList.toggle('on', !is3d);
+    document.querySelectorAll('#scenes button').forEach(b =>
+      b.classList.toggle('on', b.dataset.scene === lab.state.scene));
+    document.getElementById('roMode').textContent = is3d ? '3D 立体（可拖动）' : '2D 剖面';
+  })();
+
+  document.querySelectorAll('#scenes button').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#scenes button').forEach(b => b.classList.toggle('on', b === btn));
+      lab.setScene(btn.dataset.scene);
+      roLines.textContent = '--';
+    };
+  });
+
+  document.getElementById('btn2d').onclick = () => {
+    lab.setView('2d');
+    roMode.textContent = '2D 剖面';
+    document.getElementById('btn2d').classList.add('on');
+    document.getElementById('btn3d').classList.remove('on');
+  };
+  document.getElementById('btn3d').onclick = () => {
+    lab.setView('3d');
+    roMode.textContent = '3D 立体（可拖动）';
+    document.getElementById('btn3d').classList.add('on');
+    document.getElementById('btn2d').classList.remove('on');
+  };
+
+  const dn = document.getElementById('density');
+  dn.oninput = () => {
+    document.getElementById('dnTxt').textContent = dn.value;
+    lab.setDensity(+dn.value);
+  };
+  const lv = document.getElementById('levels');
+  lv.oninput = () => {
+    document.getElementById('lvTxt').textContent = lv.value;
+    lab.setLevels(+lv.value);
+  };
+  document.getElementById('field').onchange = e => lab.setLayer('field', e.target.checked);
+  document.getElementById('equip').onchange = e => lab.setLayer('equip', e.target.checked);
+  document.getElementById('heat').onchange = e => lab.setLayer('heat', e.target.checked);
+})();
+</script>
+</body>
+</html>

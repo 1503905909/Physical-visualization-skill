@@ -13,7 +13,11 @@
       "chapter": "必修三 · 第九章",
       "chapterName": "静电场及其应用",
       "topic": "库仑定律",
-      "tags": ["静电力", "反平方", "拖拽"],
+      "tags": [
+        "静电力",
+        "反平方",
+        "拖拽"
+      ],
       "desc": "拖动两个电荷，实时读出静电力大小与方向；力箭头与 F 成正比，可直接验证 F ∝ q₁q₂ 与 F ∝ 1/r²。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/coulombs_law_html.html",
       "thumb": "gallery/thumbs/coulombs_law_html.png"
@@ -25,8 +29,13 @@
       "chapter": "必修三 · 第九章",
       "chapterName": "静电场及其应用",
       "topic": "电场线",
-      "tags": ["电场线", "场强", "试探电荷"],
-      "desc": "切换正电荷、负电荷、等量同种与等量异种，观察场线分布与试探电荷受力方向；场线延伸到画面边界，条数与标注一致。",
+      "tags": [
+        "2D/3D",
+        "电场线",
+        "场强",
+        "试探电荷"
+      ],
+      "desc": "支持 2D 剖面 / 3D 立体的电场线演示：正电荷、负电荷、等量异种、等量同种、匀强电场五种场景，可拖动旋转看空间分布，场线密度与等势面可调。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/electric_field_lines_html.html",
       "thumb": "gallery/thumbs/electric_field_lines_html.png"
     },
@@ -37,8 +46,13 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "电势、等势面",
-      "tags": ["电势", "等势面", "电势差"],
-      "desc": "电势色图叠加等势线，拖动探针比较电势大小与场强方向；等势线条数随滑块真实变化，数值可复算。",
+      "tags": [
+        "2D/3D",
+        "电势",
+        "等势面",
+        "电势差"
+      ],
+      "desc": "2D / 3D 可切换的电势与等势面演示：三种场景外新增负点电荷与等量同种，探针可拖动读电势；3D 下等势面是绕轴的回转面，能直观看出「等势面 ⊥ 电场线」。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/electric_potential_equipotential_html.html",
       "thumb": "gallery/thumbs/electric_potential_equipotential_html.png"
     },
@@ -49,7 +63,11 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "带电粒子的运动",
-      "tags": ["偏转量", "y = UL²/4dU₀", "打板判定"],
+      "tags": [
+        "偏转量",
+        "y = UL²/4dU₀",
+        "打板判定"
+      ],
       "desc": "全部真实单位：加速电压 U₀、偏转电压 U、板长 L、板距 d，偏转量直接给出毫米数并标注占半板距的比例；电子、质子、α 粒子在同一 U₀ 下偏转相同。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/charged_particle_uniform_field_html.html",
       "thumb": "gallery/thumbs/charged_particle_uniform_field_html.png"
@@ -61,7 +79,11 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "电容器",
-      "tags": ["电容", "U 不变", "Q 不变"],
+      "tags": [
+        "电容",
+        "U 不变",
+        "Q 不变"
+      ],
       "desc": "同一板间距变化，在「接通电源（U 不变）」与「断开电源（Q 不变）」两种情形下对比 C、Q、E 与电场能。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/capacitor_html.html",
       "thumb": "gallery/thumbs/capacitor_html.png"
@@ -73,7 +95,11 @@
       "chapter": "必修三 · 第十三章",
       "chapterName": "电磁感应与电磁波初步",
       "topic": "磁通量",
-      "tags": ["磁通量", "感应电流", "线圈"],
+      "tags": [
+        "磁通量",
+        "感应电流",
+        "线圈"
+      ],
       "desc": "线圈平移进出磁场、绕轴转动或静止，实时计算 Φ = BS·cosθ 并判断是否产生感应电流。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/magnetic_flux_html.html",
       "thumb": "gallery/thumbs/magnetic_flux_html.png"
@@ -85,7 +111,11 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "回旋加速器",
-      "tags": ["直线过缝", "√n", "周期"],
+      "tags": [
+        "直线过缝",
+        "√n",
+        "周期"
+      ],
       "desc": "D 形盒内做半圆偏转、缝隙内沿直线加速（轨迹是半圆 + 直线交替，不是同心圆）；半径严格按 √n 增长，周期与速率无关，改变 B、U 或粒子种类可对比。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/cyclotron_html.html",
       "thumb": "gallery/thumbs/cyclotron_html.png"
@@ -97,7 +127,11 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "质谱仪",
-      "tags": ["速度选择器", "同位素", "半圆偏转"],
+      "tags": [
+        "速度选择器",
+        "同位素",
+        "半圆偏转"
+      ],
       "desc": "速度选择器筛出 v = E/B₁ 的离子，再经偏转磁场做半圆；切换同位素对比两条轨迹与落点间距。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/mass_spectrometer_html.html",
       "thumb": "gallery/thumbs/mass_spectrometer_html.png"
@@ -109,7 +143,11 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "洛伦兹力",
-      "tags": ["qvB", "r=mv/qB", "方向判断"],
+      "tags": [
+        "qvB",
+        "r=mv/qB",
+        "方向判断"
+      ],
       "desc": "正负电荷 × 磁场两种方向的四种组合，实时显示 r、T、F 与绕行方向，可用来核对左手定则。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/lorentz_force_html.html",
       "thumb": "gallery/thumbs/lorentz_force_html.png"
@@ -121,7 +159,11 @@
       "chapter": "选必二 · 第三章",
       "chapterName": "交变电流",
       "topic": "交变电流、变压器",
-      "tags": ["正弦交流", "有效值", "变压器"],
+      "tags": [
+        "正弦交流",
+        "有效值",
+        "变压器"
+      ],
       "desc": "线圈在匀强磁场中匀速转动，实时画出 e–t 正弦波形与 Φ 相位关系；下方为理想变压器的电压电流比。",
       "path": ".github/skills/physics-interactive-sim-lab/examples/alternating_current_transformer_html.html",
       "thumb": "gallery/thumbs/alternating_current_transformer_html.png"
@@ -133,7 +175,11 @@
       "chapter": "必修三 · 第九章",
       "chapterName": "静电场及其应用",
       "topic": "库仑定律",
-      "tags": ["力箭头", "反平方", "公式推导"],
+      "tags": [
+        "力箭头",
+        "反平方",
+        "公式推导"
+      ],
       "desc": "用动画展示电荷正负、力箭头方向、距离变化与反平方关系，适合课堂导入。",
       "path": ".github/skills/manim-physics-animator/examples/coulombs_law.py",
       "scene": "CoulombsLawScene"
@@ -145,7 +191,10 @@
       "chapter": "必修三 · 第九章",
       "chapterName": "静电场及其应用",
       "topic": "电场线",
-      "tags": ["二维到三维", "典型分布"],
+      "tags": [
+        "二维到三维",
+        "典型分布"
+      ],
       "desc": "先呈现教材式平面辐射图，再过渡到三维空间分布，强调场线方向与疏密。",
       "path": ".github/skills/manim-physics-animator/examples/electric_field_lines.py",
       "scene": "ElectricFieldLinesScene"
@@ -157,7 +206,11 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "电势、等势面",
-      "tags": ["等势线", "垂直关系", "三维等势面"],
+      "tags": [
+        "等势线",
+        "垂直关系",
+        "三维等势面"
+      ],
       "desc": "平面等势线到透明等势面，讲清电势、电场方向与二者垂直关系。",
       "path": ".github/skills/manim-physics-animator/examples/electric_potential_equipotential.py",
       "scene": "ElectricPotentialEquipotentialScene"
@@ -169,7 +222,11 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "带电粒子的运动",
-      "tags": ["分步解题", "类平抛", "E = 2E₀tanθ"],
+      "tags": [
+        "分步解题",
+        "类平抛",
+        "E = 2E₀tanθ"
+      ],
       "desc": "30 秒分步解题：读图 → 判断受力 → 建立模型（加速段匀加速、偏转段类平抛）→ 推导 tanθ = qEL/(mv₀²) → 代入 v₀² 得 E = 2E₀tanθ（θ=30° 时约 1.15E₀）→ 量纲与极限检验。",
       "path": ".github/skills/manim-physics-animator/examples/charged_particle_uniform_field.py",
       "scene": "ChargedParticleUniformFieldScene"
@@ -181,7 +238,11 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "带电粒子的运动",
-      "tags": ["教材第5题", "动能定理", "速度合成"],
+      "tags": [
+        "教材第5题",
+        "动能定理",
+        "速度合成"
+      ],
       "desc": "按教材第十章第 5 节第 5 题制作：电子经 1000 V 加速后垂直进入 5000 N/C 匀强电场，分两段推出出射速度与夹角——v_y/v₀ = 3/20、v出 = (√409/20)v₀、θ = arctan(3/20)。",
       "path": ".github/skills/manim-physics-animator/examples/electron_accelerate_then_deflect.py",
       "scene": "ElectronAccelerateThenDeflectScene"
@@ -193,7 +254,11 @@
       "chapter": "必修三 · 第十章",
       "chapterName": "静电场中的能量",
       "topic": "电容器",
-      "tags": ["充电过程", "参数影响", "两种情形"],
+      "tags": [
+        "充电过程",
+        "参数影响",
+        "两种情形"
+      ],
       "desc": "充电过程中电荷积累与场线出现，再对比 U 不变与 Q 不变两种情形下改变 d 的结论。",
       "path": ".github/skills/manim-physics-animator/examples/capacitor.py",
       "scene": "CapacitorScene"
@@ -205,7 +270,10 @@
       "chapter": "必修三 · 第十三章",
       "chapterName": "电磁感应与电磁波初步",
       "topic": "磁通量",
-      "tags": ["Φ=BScosθ", "产生条件"],
+      "tags": [
+        "Φ=BScosθ",
+        "产生条件"
+      ],
       "desc": "磁通量概念、线圈转动与进出磁场，归纳产生感应电流的条件（不涉及楞次定律）。",
       "path": ".github/skills/manim-physics-animator/examples/magnetic_flux.py",
       "scene": "MagneticFluxScene"
@@ -217,7 +285,11 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "回旋加速器",
-      "tags": ["D 形盒", "缝隙加速", "r ∝ √n"],
+      "tags": [
+        "D 形盒",
+        "缝隙加速",
+        "r ∝ √n"
+      ],
       "desc": "46 秒带字幕讲解：缝内直线加速、盒内半圆偏转；从静止累计加速 n 次后 r ∝ √n，固定粒子与匀强磁场下周期 T = 2πm/(qB) 不随速度改变（非相对论）。",
       "path": ".github/skills/manim-physics-animator/examples/cyclotron.py",
       "scene": "CyclotronScene"
@@ -229,7 +301,11 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "质谱仪",
-      "tags": ["速度选择", "半圆偏转", "质量测定"],
+      "tags": [
+        "速度选择",
+        "半圆偏转",
+        "质量测定"
+      ],
       "desc": "装置结构、速度选择器原理、半圆偏转与落点，导出 m = qB₁B₂x/(2E)。",
       "path": ".github/skills/manim-physics-animator/examples/mass_spectrometer.py",
       "scene": "MassSpectrometerScene"
@@ -241,7 +317,11 @@
       "chapter": "选必二 · 第一章",
       "chapterName": "安培力与洛伦兹力",
       "topic": "洛伦兹力",
-      "tags": ["安培力微观解释", "方向判断", "周期与速率无关"],
+      "tags": [
+        "安培力微观解释",
+        "方向判断",
+        "周期与速率无关"
+      ],
       "desc": "从定向移动电荷解释安培力，再做方向判断与圆周运动，最后对比三个速率的周期。",
       "path": ".github/skills/manim-physics-animator/examples/lorentz_force.py",
       "scene": "LorentzForceScene"
@@ -253,7 +333,11 @@
       "chapter": "选必二 · 第二章",
       "chapterName": "电磁感应",
       "topic": "法拉第定律、楞次定律",
-      "tags": ["ε=nΔΦ/Δt", "感应电流方向", "阻碍"],
+      "tags": [
+        "ε=nΔΦ/Δt",
+        "感应电流方向",
+        "阻碍"
+      ],
       "desc": "磁铁插入拔出线圈，电流计偏转与回零；定量给出平均感应电动势，并对比磁通量增大与减小时的电流方向。",
       "path": ".github/skills/manim-physics-animator/examples/faraday_lenz.py",
       "scene": "FaradayLenzScene"
