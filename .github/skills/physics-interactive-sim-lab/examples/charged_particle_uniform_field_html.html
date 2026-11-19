@@ -308,10 +308,10 @@
 
     /* —— 逻辑坐标系与画布内的固定版面（LAYOUT.md「高清渲染」）——
        960×540 逻辑坐标（逻辑坐标与指针映射都不变，只重排画布内的元件）。
-       版面四段：①加速区 21~187 ｜ 过渡带 187~260（占画布宽 7.6%）｜
-       ②偏转区 260 → 260+L ｜ 出板区（速度三角形 + y 标尺，标尺随出板点走）。 */
+       版面四段：①加速区 23~201 ｜ 过渡带 201~281（占画布宽 8.3%）｜
+       ②偏转区 281 → 281+L ｜ 出板区（速度三角形 + y 标尺，标尺在出板点右侧 145 px）。 */
     const LW = 960, LH = 540;
-    const VIEW = { left: 260, midY: 316, pxPerM: 4600, plateThick: 24, panelLimit: LW - 14 };
+    const VIEW = { left: 281, midY: 330, pxPerM: 5000, plateThick: 24, panelLimit: LW - 14 };
 
     /* 面板左缘（逻辑坐标）：窗口越大，面板占的逻辑宽度越小，出板区可用宽度随之变化。 */
     function fitRightEdge() {
@@ -326,14 +326,27 @@
       VIEW.panelLimit = clamp(limit, 520, LW - 14);
     }
 
-    /* y 标尺位置：出板点右侧 86 px，不贴最右；空间不足时右移到面板前，但始终留在出板点右侧 */
-    function yRulerX(g) {
-      return clamp(g.right + 86, g.right + 46, VIEW.panelLimit - 34);
+    /* 极板比例：默认 5000 px/m（1 cm = 50 px）；L 很长或窗口很窄时自动收缩，
+       保证「极板右缘 + y 标尺 + 标签」始终落在参数面板左侧。 */
+    function plateScale(L) {
+      const room = (VIEW.panelLimit - 34 - 150) - VIEW.left;
+      return clamp(room / Math.max(L, 1e-4), 2500, VIEW.pxPerM);
     }
 
-    /* 加速区：示意画法。极板中心开孔（半高 13 px），粒子从孔中通过；
-       两板板心 30 / 178（板厚 17），粒子行程 124 px 只用于动画，不是题目条件。 */
-    const ACC = { left: 30, right: 178, inset: 12, halfH: 120, holeHalf: 13, thick: 17 };
+    /* y 标尺位置：出板点右侧 145 px（B 方案），空间不足时向面板前收，但始终在出板点右侧 */
+    function yRulerX(g) {
+      return Math.min(g.right + 145, Math.max(g.right + 40, VIEW.panelLimit - 34));
+    }
+
+    /* L 标尺的纵坐标：板距越大，标尺越贴近下板（给画布底边留 ≥10 px） */
+    function lDimY(g, m) {
+      const k = clamp(58 - (m.d * 100 - 2) * 6, 40, 58);
+      return g.bottomInner + VIEW.plateThick + k;
+    }
+
+    /* 加速区：示意画法。极板中心开孔（半高 14 px），粒子从孔中通过；
+       两板板心 32 / 201（板厚 18），粒子行程只用于动画，不是题目条件。 */
+    const ACC = { left: 32, right: 201, inset: 13, halfH: 130, holeHalf: 14, thick: 18 };
 
     const PARTICLES = {
       electron: { label: "电子",   m: 9.109e-31, q: -1.602e-19 },
@@ -484,11 +497,14 @@
         }
       }
 
-      /* 加速段：画面尺度 70 px 视为加速区长度，只用于动画时间，不是题目条件 */
-      const accelGapM = (ACC.right - ACC.left - 2 * ACC.inset) / VIEW.pxPerM;
+      /* 极板比例：默认 5000 px/m，L 很长时自动缩小（见 plateScale） */
+      const scale = plateScale(L);
+
+      /* 加速段：画面尺度视为加速区长度，只用于动画时间，不是题目条件 */
+      const accelGapM = (ACC.right - ACC.left - 2 * ACC.inset) / scale;
       const Eacc = U0 / accelGapM;                 // 示意场强，用于力箭头大小
       const tAcc = (2 * accelGapM) / v0;           // 由静止到 v₀ 的时间
-      const driftM = (VIEW.left - (ACC.right - ACC.inset)) / VIEW.pxPerM;
+      const driftM = (VIEW.left - (ACC.right - ACC.inset)) / scale;
       const tDrift = driftM / v0;                  // 极板间的无场段（很短）
       const tEntry = tAcc + tDrift;
       const tEndTotal = tEntry + tEnd;
@@ -498,7 +514,7 @@
       const theta = Math.atan2(vyEnd, v0);
 
       return {
-        p, L, d, U0, U, v0, E, a, tExit, yExit, halfGap,
+        p, L, d, U0, U, v0, E, a, tExit, yExit, halfGap, scale,
         hits, tHit, tEnd, yEnd, tAcc, tDrift, tEntry, tEndTotal,
         vyEnd, vEnd, theta, Eacc,
         plateName: a >= 0 ? "下极板" : "上极板",
@@ -507,10 +523,10 @@
     }
 
     function geom(m) {
-      const gapPx = m.d * VIEW.pxPerM;
+      const gapPx = m.d * m.scale;
       return {
         left: VIEW.left,
-        right: VIEW.left + m.L * VIEW.pxPerM,
+        right: VIEW.left + m.L * m.scale,
         midY: VIEW.midY,
         topInner: VIEW.midY - gapPx / 2,
         bottomInner: VIEW.midY + gapPx / 2,
@@ -525,7 +541,7 @@
     /* 位置：先加速（x ∝ t²），再短无场段（匀速），再偏转（x 匀速、y ∝ t²）。 */
     function posAt(g, m, t) {
       const pt = clamp(t, 0, m.tEndTotal);
-      const vScreen = m.v0 * VIEW.pxPerM;
+      const vScreen = m.v0 * m.scale;
       const x0 = g.accelLeft + ACC.inset;
       const x1 = g.accelRight - ACC.inset;
       if (pt <= m.tAcc) {
@@ -537,7 +553,7 @@
       }
       const tau = pt - m.tEntry;
       const frac = m.tEnd > 0 ? tau / m.tEnd : 0;
-      return { x: g.left + vScreen * tau, y: g.midY + m.yEnd * frac * frac * VIEW.pxPerM };
+      return { x: g.left + vScreen * tau, y: g.midY + m.yEnd * frac * frac * m.scale };
     }
 
     /* —— 绘图工具 —— */
@@ -724,7 +740,8 @@
       ctx.restore();
     }
 
-    /* 极板极性：符号画在两板上、下侧靠近右端处（距板面 20 px），既不压板面也不进过渡带 */
+    /* 极板极性：默认画在两板外侧（上板上方 / 下板下方，距板面 32 px）；
+       板距很大时上/下净空不够，就贴到各自板的右端外侧，始终与所属极板紧邻。 */
     function drawPolarity(g, m) {
       const neutral = m.U === 0;
       const topPositive = m.U > 0;
@@ -733,15 +750,19 @@
       const topSign = neutral ? "0" : topPositive ? "+" : "−";
       const botSign = neutral ? "0" : topPositive ? "−" : "+";
       const x = g.right - 34;
+      const aboveRoom = (g.topInner - VIEW.plateThick) - 150;          // 上板顶 → 标题行下沿
+      const belowRoom = lDimY(g, m) - (g.bottomInner + VIEW.plateThick); // 下板底 → L 标尺
 
       ctx.save();
       ctx.font = "bold 20px Arial";
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
       ctx.fillStyle = topCol;
-      ctx.fillText(topSign, x, g.topInner - VIEW.plateThick - 32);
+      if (aboveRoom >= 45) ctx.fillText(topSign, x, g.topInner - VIEW.plateThick - 32);
+      else { ctx.textAlign = "left"; ctx.fillText(topSign, g.right + 20, g.topInner - 12); ctx.textAlign = "center"; }
       ctx.fillStyle = botCol;
-      ctx.fillText(botSign, x, g.bottomInner + VIEW.plateThick + 32);
+      if (belowRoom >= 50) ctx.fillText(botSign, x, g.bottomInner + VIEW.plateThick + 32);
+      else { ctx.textAlign = "left"; ctx.fillText(botSign, g.right + 20, g.bottomInner + 12); }
       ctx.restore();
     }
 
@@ -772,7 +793,7 @@
       ctx.lineCap = "round";
 
       /* L：极板下方，引出线到标尺，数值放在标尺右端（不上压极板、不与 d 抢位） */
-      const yL = plateBottom + 58;
+      const yL = lDimY(g, m);
       ctx.save();
       ctx.globalAlpha = 0.5;
       ctx.lineWidth = 1.1;
@@ -821,7 +842,7 @@
 
       /* y：出板处相对中线的竖直位移。标尺放在出板点右侧 86 px（不贴最右），
          中线与出板水平各一条虚线一直连到标尺上，标尺长度严格等于两者高度差。 */
-      const yPx = m.yEnd * VIEW.pxPerM;
+      const yPx = m.yEnd * m.scale;
       if (Math.abs(yPx) >= 8) {
         const xR = yRulerX(g);
         const x0 = g.right;
@@ -973,7 +994,7 @@
           const vx0 = vLen;
           const vy0 = vLen * (vyNow / m.v0);
           const ox = p.x + 2;
-          const availX = Math.min(yRulerX(g) - 18 - ox, 74);
+          const availX = Math.min(yRulerX(g) - 30 - ox, 104);
           let scale = availX < vx0 ? Math.max(0, availX / vx0) : 1;
 
           // 还在板间时，竖直分量不能穿板：等比缩小；放不下就不画
@@ -1092,10 +1113,10 @@
         // 出板后 + 细三角：出板水平线与 y 标尺占住出板点右侧，
         // 四个标签沿虚线框上方排成一行（左→右 v_y / θ / vₓ / v），各自对得上箭头
         const rowY = cornerY + dirY * 31;
-        drawSubLabel("v", "y", ox + 24, rowY, "#ff8fb0", "left");
-        drawCanvasLabel(thetaText, ox + 62, rowY, "#7fd6e4", "center");
-        drawCanvasLabel("vₓ", ox + 84, rowY, "rgba(255,255,255,0.92)", "center");
-        drawCanvasLabel("v", ox + 112, rowY, "rgba(255,255,255,0.94)", "left");
+        drawSubLabel("v", "y", ox + 22, rowY, "#ff8fb0", "left");
+        drawCanvasLabel(thetaText, ox + 61, rowY, "#7fd6e4", "center");
+        drawCanvasLabel("vₓ", ox + 92, rowY, "rgba(255,255,255,0.92)", "center");
+        drawCanvasLabel("v", ox + 121, rowY, "rgba(255,255,255,0.94)", "left");
         return;
       }
 
@@ -1236,6 +1257,7 @@
 
     /* —— 渲染主循环 —— */
     function render() {
+      fitRightEdge();                 // 极板比例与 y 标尺都依赖面板左缘，先更新
       const m = derive();
       updateOutputs(m);
       beginFrame();
