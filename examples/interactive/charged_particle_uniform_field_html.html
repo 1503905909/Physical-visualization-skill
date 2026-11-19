@@ -306,17 +306,34 @@
     const canvas = document.getElementById("motionCanvas");
     const ctx = canvas.getContext("2d");
 
-    /* —— 逻辑坐标系与画布内的固定布局（LAYOUT.md「高清渲染」）——
-       960×540 逻辑坐标；偏转极板左缘 306，最长 320px（L = 10 cm），右缘 626；
-       左侧 190~300 为加速区（左板 202、右板 292），右侧 640~780 留标尺与参数面板列。 */
+    /* —— 逻辑坐标系与画布内的固定版面（LAYOUT.md「高清渲染」）——
+       960×540 逻辑坐标（逻辑坐标与指针映射都不变，只重排画布内的元件）。
+       版面四段：①加速区 21~187 ｜ 过渡带 187~260（占画布宽 7.6%）｜
+       ②偏转区 260 → 260+L ｜ 出板区（速度三角形 + y 标尺，标尺随出板点走）。 */
     const LW = 960, LH = 540;
-    const VIEW = { left: 306, midY: 252, pxPerM: 3200, plateThick: 20, textRight: 700 };
-    // 速度矢量允许画到 760：L = 10 cm 时也不会被右边界截短而改变夹角；仍在参数面板左侧
-    const VEC_RIGHT = 760;
+    const VIEW = { left: 260, midY: 316, pxPerM: 4600, plateThick: 24, panelLimit: LW - 14 };
 
-    /* 加速区：示意画法。极板中心开孔（半高 16 px），粒子从孔中通过；
-       粒子行程 70 px（两端各留 10 px 给极板厚度），只用于动画，不是题目条件。 */
-    const ACC = { left: 202, right: 292, inset: 10, halfH: 70, holeHalf: 16 };
+    /* 面板左缘（逻辑坐标）：窗口越大，面板占的逻辑宽度越小，出板区可用宽度随之变化。 */
+    function fitRightEdge() {
+      const r = canvas.getBoundingClientRect();
+      if (!r.width) return;
+      const panelEl = document.getElementById("ctrlPanel");
+      let limit = LW - 14;
+      if (panelEl && !panelEl.hidden) {
+        const pr = panelEl.getBoundingClientRect();
+        if (pr.width > 0) limit = Math.min(limit, (pr.left - r.left) * (LW / r.width) - 8);
+      }
+      VIEW.panelLimit = clamp(limit, 520, LW - 14);
+    }
+
+    /* y 标尺位置：出板点右侧 86 px，不贴最右；空间不足时右移到面板前，但始终留在出板点右侧 */
+    function yRulerX(g) {
+      return clamp(g.right + 86, g.right + 46, VIEW.panelLimit - 34);
+    }
+
+    /* 加速区：示意画法。极板中心开孔（半高 13 px），粒子从孔中通过；
+       两板板心 30 / 178（板厚 17），粒子行程 124 px 只用于动画，不是题目条件。 */
+    const ACC = { left: 30, right: 178, inset: 12, halfH: 120, holeHalf: 13, thick: 17 };
 
     const PARTICLES = {
       electron: { label: "电子",   m: 9.109e-31, q: -1.602e-19 },
@@ -390,6 +407,7 @@
 
     function beginFrame() {
       syncBackingStore();
+      fitRightEdge();                       // 先按面板实际占位确定标尺右界
       ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
     }
 
@@ -561,54 +579,33 @@
       ctx.closePath();
     }
 
-    function drawTag(lines, x, y, color, maxRight) {
-      const bound = maxRight || VIEW.textRight;
-      ctx.save();
-      ctx.font = "bold 15px Microsoft YaHei, Arial";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      const padX = 9, padY = 7, lineH = 21;
-      const textW = Math.max.apply(null, lines.map(line => ctx.measureText(line).width));
-      const boxW = textW + padX * 2;
-      const boxH = lines.length * lineH + padY * 2;
-      const bx = clamp(x, 8, Math.max(8, bound - boxW));
-      const by = clamp(y, 8, Math.max(8, LH - 8 - boxH));
-      ctx.fillStyle = "rgba(8,10,14,0.88)";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5;
-      roundRectPath(bx, by, boxW, boxH, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = color;
-      lines.forEach((line, index) => ctx.fillText(line, bx + padX, by + padY + index * lineH));
-      ctx.restore();
-      return { x: bx, y: by, w: boxW, h: boxH };
-    }
 
-    /* —— 场景 —— */
+    /* —— 版面：左加速区 → 中过渡带 → 右偏转区 → 最右出板区 ——
+       全部坐标以 960×540 逻辑像素计：内容左缘 ~8、右缘 ~778（参数面板自 782 起，只在
+       y < 面板底边时遮挡），上下留白由“区域标题行 / L、y 标尺”撑开，不放空。 */
     function drawScene(m) {
       const g = geom(m);
       ctx.clearRect(0, 0, LW, LH);
-      const bg = ctx.createRadialGradient(LW * 0.42, LH * 0.44, 40, LW * 0.42, LH * 0.44, 660);
-      bg.addColorStop(0, "#0d1a23");
+      const bg = ctx.createRadialGradient(LW * 0.46, LH * 0.5, 60, LW * 0.46, LH * 0.5, 760);
+      bg.addColorStop(0, "#0e1c25");
       bg.addColorStop(1, "#06090c");
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, LW, LH);
 
+      drawGuide(g, m);
       drawAccelRegion(g, m);
       drawField(g, m);
       drawPlate(g, "top", m);
       drawPlate(g, "bottom", m);
-      drawGuide(g, m);
-      // 标尺先画：让轨迹与矢量压在上面，避免标尺像“穿过”粒子运动线
+      drawPolarity(g, m);
       drawDimensions(g, m);
       drawPath(g, m);
       drawParticle(g, m);
+      drawRegionHeaders(g, m);
       if (m.hits && state.progress >= 1 - 1e-9) drawImpact(g, m);
-      drawHint();
     }
 
-    /* 加速区：两块开孔竖板 + 极性符号 + 场强方向；极性随粒子电性翻转，保证受力恒向右 */
+    /* 加速区（示意）：两块开孔竖板 + 极性符号 + 场强箭头；极性随粒子电性翻转，保证受力恒向右 */
     function drawAccelRegion(g, m) {
       const negative = m.p.q < 0;                       // 负粒子：左板负、右板正
       const leftSign = negative ? "−" : "+";
@@ -617,18 +614,19 @@
       const rightCol = negative ? "#ff5d6c" : "#6b7cff";
       const leftFill = negative ? "rgba(107,124,255,0.18)" : "rgba(255,93,108,0.16)";
       const rightFill = negative ? "rgba(255,93,108,0.16)" : "rgba(107,124,255,0.18)";
+      const half = ACC.thick / 2;
       const holeTop = g.midY - ACC.holeHalf;
       const holeBottom = g.midY + ACC.holeHalf;
 
       ctx.save();
 
-      /* 两块板都在中线处开孔：粒子从孔中通过，而不是从实心金属板里穿过去 */
+      // 两块板都在中线处开孔：粒子从孔中通过，而不是从实心金属板里穿过去
       const perforatedPlate = (x, col, fill) => {
         ctx.fillStyle = fill;
         ctx.strokeStyle = col;
         ctx.lineWidth = 2;
         [[g.accelTop, holeTop], [holeBottom, g.accelBottom]].forEach(([y0, y1]) => {
-          roundRectPath(x - 7, y0, 14, y1 - y0, 5);
+          roundRectPath(x - half, y0, ACC.thick, y1 - y0, 4);
           ctx.fill();
           ctx.stroke();
         });
@@ -636,90 +634,76 @@
       perforatedPlate(g.accelLeft, leftCol, leftFill);
       perforatedPlate(g.accelRight, rightCol, rightFill);
 
-      // 孔缘细线：明确这是开孔，不是极板断裂
-      ctx.strokeStyle = "rgba(220,235,240,0.34)";
-      ctx.lineWidth = 1.2;
+      // 孔口上下各一道亮线：让“从孔里穿出”一眼可见
+      ctx.strokeStyle = "rgba(226,240,244,0.6)";
+      ctx.lineWidth = 1.4;
       [g.accelLeft, g.accelRight].forEach((x) => {
         ctx.beginPath();
-        ctx.moveTo(x - 9, holeTop); ctx.lineTo(x + 9, holeTop);
-        ctx.moveTo(x - 9, holeBottom); ctx.lineTo(x + 9, holeBottom);
+        ctx.moveTo(x - half - 3, holeTop); ctx.lineTo(x + half + 3, holeTop);
+        ctx.moveTo(x - half - 3, holeBottom); ctx.lineTo(x + half + 3, holeBottom);
         ctx.stroke();
       });
 
-      // 极性符号放在孔的上方，避免压在孔口/粒子上
-      const signY = g.midY - 42;
-      ctx.font = "bold 22px Arial";
-      ctx.textAlign = "center";
+      // 极性符号：紧贴各自极板内侧 8 px、垂直居中偏上，一眼看出属于哪块板
+      ctx.font = "bold 20px Arial";
       ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
       ctx.fillStyle = leftCol;
-      ctx.fillText(leftSign, g.accelLeft, signY);
+      ctx.fillText(leftSign, g.accelLeft + half + 8, g.midY - 52);
+      ctx.textAlign = "right";
       ctx.fillStyle = rightCol;
-      ctx.fillText(rightSign, g.accelRight, signY);
+      ctx.fillText(rightSign, g.accelRight - half - 8, g.midY - 52);
 
-      // 场强箭头：由正板指向负板（负粒子时由右向左）
-      const yA = g.midY - 34, yB = g.midY + 34;
-      const xInL = g.accelLeft + 16, xInR = g.accelRight - 16;
+      // 场强箭头：由正板指向负板，画在孔的上下两侧（孔内留空，不与粒子抢位置）
+      const yA = g.midY - 80, yB = g.midY + 80;
+      const xL = g.accelLeft + half + 4, xR = g.accelRight - half - 4;
+      const fieldCol = "rgba(255,255,255,0.26)";
       if (negative) {
-        drawArrow(xInR, yA, xInL, yA, "rgba(255,255,255,0.32)", 1.6, 7);
-        drawArrow(xInR, yB, xInL, yB, "rgba(255,255,255,0.32)", 1.6, 7);
+        drawArrow(xR, yA, xL, yA, fieldCol, 1.5, 7);
+        drawArrow(xR, yB, xL, yB, fieldCol, 1.5, 7);
       } else {
-        drawArrow(xInL, yA, xInR, yA, "rgba(255,255,255,0.32)", 1.6, 7);
-        drawArrow(xInL, yB, xInR, yB, "rgba(255,255,255,0.32)", 1.6, 7);
+        drawArrow(xL, yA, xR, yA, fieldCol, 1.5, 7);
+        drawArrow(xL, yB, xR, yB, fieldCol, 1.5, 7);
       }
 
-      // 标题：右对齐到偏转极板左缘，避免大板距时压到上极板
-      ctx.font = "12.5px Microsoft YaHei, Arial";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = "rgba(143,227,240,0.92)";
-      ctx.fillText(`加速区 U₀ = ${Math.round(state.U0)} V · E${negative ? "向左" : "向右"}，受力向右`,
-                   g.left - 6, g.accelTop - 12);
-
-      // 起点与“静止”标注：标签放在板的右侧，避免压在金属板上
+      // 起点：静止标记（不加文字，避免与标题抢位置）
       ctx.strokeStyle = "rgba(200,220,228,0.7)";
       ctx.lineWidth = 1.4;
       ctx.beginPath();
       ctx.arc(g.accelLeft + ACC.inset, g.midY, 5, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.font = "11px Microsoft YaHei, Arial";
-      ctx.fillStyle = "rgba(159,182,191,0.9)";
-      ctx.textAlign = "left";
-      ctx.fillText("静止", g.accelLeft + ACC.inset + 10, g.midY + 30);
       ctx.restore();
     }
 
+    /* 场线横坐标（绘制与标签避让共用同一套计算，保证“字不压场线”） */
+    function fieldLineXs(g, m) {
+      const sign = m.E > 0 ? 1 : m.E < 0 ? -1 : 0;
+      if (sign === 0) return [];
+      const startX = g.left + 84;
+      const endX = g.right - 24;
+      const span = endX - startX;
+      if (span < 60) return [(g.left + g.right) / 2 + 10];
+      const n = Math.max(2, Math.round(span / 92));
+      const xs = [];
+      for (let i = 0; i < n; i += 1) xs.push(startX + (span * i) / (n - 1));
+      return xs;
+    }
+
+    /* 偏转区场线：虚线箭头，与实线的速度/力箭头区分 */
     function drawField(g, m) {
       const gap = g.gapPx;
       const sign = m.E > 0 ? 1 : m.E < 0 ? -1 : 0;
-
-      // 电场数值与方向：贴在极板上方，随板距一起移动
-      ctx.save();
-      ctx.font = "13.5px Microsoft YaHei, Arial";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = "rgba(143,227,240,0.92)";
-      const eText = sign === 0
-        ? "E = 0（无偏转）"
-        : `E = ${fmtSci(Math.abs(m.E), 2)} V/m ${sign > 0 ? "↓" : "↑"}`;
-      ctx.fillText(eText, g.left + 24, g.topInner - 30);
-      ctx.restore();
-
       if (sign === 0) return;
 
-      const pad = Math.min(16, gap * 0.24);
+      const pad = Math.min(18, gap * 0.22);
       const yA = sign > 0 ? g.topInner + pad : g.bottomInner - pad;
       const yB = sign > 0 ? g.bottomInner - pad : g.topInner + pad;
 
-      const wide = (g.right - g.left) > 190;
-      const startX = g.left + (wide ? 82 : 46);
-      const endX = g.right - 14;
-      const n = Math.max(1, Math.round((endX - startX) / 86));
       ctx.save();
-      ctx.setLineDash([4, 6]);   // 虚线场线：与实线速度/力箭头区分，避免叠在一起时误读
-      for (let i = 0; i < n; i += 1) {
-        const x = n === 1 ? (startX + endX) / 2 : startX + ((endX - startX) * i) / (n - 1);
-        drawArrow(x, yA, x, yB, "rgba(255,255,255,0.26)", 1.5, 7);
-      }
+      ctx.setLineDash([4, 6]);
+      fieldLineXs(g, m).forEach((x) => {
+        drawArrow(x, yA, x, yB, "rgba(255,255,255,0.24)", 1.5, 7);
+      });
       ctx.restore();
     }
 
@@ -737,41 +721,170 @@
       ctx.strokeStyle = col;
       ctx.lineWidth = 2;
       ctx.stroke();
+      ctx.restore();
+    }
 
-      ctx.fillStyle = col;
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "left";
+    /* 极板极性：符号画在两板上、下侧靠近右端处（距板面 20 px），既不压板面也不进过渡带 */
+    function drawPolarity(g, m) {
+      const neutral = m.U === 0;
+      const topPositive = m.U > 0;
+      const topCol = neutral ? "#9fb6bf" : topPositive ? "#ff5d6c" : "#6b7cff";
+      const botCol = neutral ? "#9fb6bf" : topPositive ? "#6b7cff" : "#ff5d6c";
+      const topSign = neutral ? "0" : topPositive ? "+" : "−";
+      const botSign = neutral ? "0" : topPositive ? "−" : "+";
+      const x = g.right - 34;
+
+      ctx.save();
       ctx.font = "bold 20px Arial";
-      const signText = neutral ? "0" : positive ? "+" : "−";
-      const labelY = y + VIEW.plateThick / 2 + 1;
-      const wide = (g.right - g.left) > 190;
-      ctx.fillText(signText, g.left + (wide ? 14 : 10), labelY);
-      if (wide) {
-        ctx.font = "13px Microsoft YaHei, Arial";
-        ctx.fillText("极板", g.left + 36, labelY);
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillStyle = topCol;
+      ctx.fillText(topSign, x, g.topInner - VIEW.plateThick - 32);
+      ctx.fillStyle = botCol;
+      ctx.fillText(botSign, x, g.bottomInner + VIEW.plateThick + 32);
+      ctx.restore();
+    }
+
+    /* 中线（虚线）＋出板水平参考：中线只画到右板端，避让出板矢量与 y 标尺 */
+    function drawGuide(g, m) {
+      if (!controls.showGhosts.checked) return;
+      ctx.save();
+      ctx.setLineDash([7, 7]);
+      ctx.strokeStyle = "rgba(255,255,255,0.20)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(ACC.left - 6, g.midY);
+      ctx.lineTo(g.right, g.midY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+
+    /* 极板长 L、板距 d、出板位移 y 的标尺 */
+    function drawDimensions(g, m) {
+      const green = "#7ee0a1";
+      const plateBottom = g.bottomInner + VIEW.plateThick;
+
+      ctx.save();
+      ctx.strokeStyle = green;
+      ctx.fillStyle = green;
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = "round";
+
+      /* L：极板下方，引出线到标尺，数值放在标尺右端（不上压极板、不与 d 抢位） */
+      const yL = plateBottom + 58;
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(g.left, plateBottom); ctx.lineTo(g.left, yL + 8);
+      ctx.moveTo(g.right, plateBottom); ctx.lineTo(g.right, yL + 8);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.moveTo(g.left, yL); ctx.lineTo(g.right, yL);
+      ctx.moveTo(g.left, yL - 7); ctx.lineTo(g.left, yL + 7);
+      ctx.moveTo(g.right, yL - 7); ctx.lineTo(g.right, yL + 7);
+      ctx.stroke();
+      const armL = Math.min(26, (g.right - g.left) * 0.3);
+      drawArrow(g.left + armL, yL, g.left, yL, green, 1.6, 9);
+      drawArrow(g.right - armL, yL, g.right, yL, green, 1.6, 9);
+      const lx = g.right + 20;
+      if (lx + 12 <= VIEW.panelLimit - 40) {
+        drawCanvasLabel("L", lx, yL, green, "left");
+      } else {
+        drawCanvasLabel("L", (g.left + g.right) / 2, yL + 34, green, "center");
+      }
+
+      /* d：两板左端外侧做竖直标尺（不夹在板间），数值放在上极板上方 */
+      const xD = g.left - 28;
+      const armD = Math.min(20, g.gapPx * 0.3);
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(g.left, g.topInner); ctx.lineTo(xD - 5, g.topInner);
+      ctx.moveTo(g.left, g.bottomInner); ctx.lineTo(xD - 5, g.bottomInner);
+      ctx.stroke();
+      ctx.restore();
+      ctx.beginPath();
+      ctx.moveTo(xD, g.topInner); ctx.lineTo(xD, g.bottomInner);
+      ctx.moveTo(xD - 5, g.topInner); ctx.lineTo(xD + 5, g.topInner);
+      ctx.moveTo(xD - 5, g.bottomInner); ctx.lineTo(xD + 5, g.bottomInner);
+      ctx.stroke();
+      if (armD >= 6) {
+        drawArrow(xD, g.topInner + armD, xD, g.topInner, green, 1.5, 8);
+        drawArrow(xD, g.bottomInner - armD, xD, g.bottomInner, green, 1.5, 8);
+      }
+      drawCanvasLabel("d", xD, g.topInner - 26, green, "center");
+
+      /* y：出板处相对中线的竖直位移。标尺放在出板点右侧 86 px（不贴最右），
+         中线与出板水平各一条虚线一直连到标尺上，标尺长度严格等于两者高度差。 */
+      const yPx = m.yEnd * VIEW.pxPerM;
+      if (Math.abs(yPx) >= 8) {
+        const xR = yRulerX(g);
+        const x0 = g.right;
+        const y0 = g.midY, y1 = g.midY + yPx;
+        const dir = yPx > 0 ? 1 : -1;
+
+        ctx.save();
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = "rgba(255,209,102,0.55)";
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0); ctx.lineTo(xR, y0);      // 中线 → 标尺（贯穿）
+        ctx.moveTo(x0, y1); ctx.lineTo(xR, y1);      // 出板水平 → 标尺（贯穿）
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.strokeStyle = "#ffd166";
+        ctx.fillStyle = "#ffd166";
+        ctx.beginPath();
+        ctx.moveTo(xR, y0); ctx.lineTo(xR, y1);
+        ctx.moveTo(xR - 6, y0); ctx.lineTo(xR + 6, y0);
+        ctx.moveTo(xR - 6, y1); ctx.lineTo(xR + 6, y1);
+        ctx.stroke();
+        const armY = Math.min(12, Math.abs(yPx) * 0.35);
+        if (armY >= 4) {
+          drawArrow(xR, y0 + dir * armY, xR, y0, "#ffd166", 1.4, 6);
+          drawArrow(xR, y1 - dir * armY, xR, y1, "#ffd166", 1.4, 6);
+        }
+        // 数值放在标尺远端（远离出板点的一侧）外侧
+        drawCanvasLabel("y", xR, y0 - dir * 30, "#ffd166", "center");
       }
       ctx.restore();
     }
 
-    function drawGuide(g, m) {
-      if (!controls.showGhosts.checked) return;
-      const end = posAt(g, m, m.tEndTotal);
+    /* 区域标题行：左右两区各一行标题，中间用细箭头连接，表达“先加速、再偏转” */
+    function drawRegionHeaders(g, m) {
+      const headerY = clamp(g.topInner - VIEW.plateThick - 42, 118, 142);
+      const accTitle = "① 加速区 U₀";
+      const eDir = m.E > 0 ? "↓" : m.E < 0 ? "↑" : "";
+      const fieldTitle = m.E === 0 ? "② 偏转区  E = 0" : `② 偏转区  E ${eDir}`;
+      const accX = (ACC.left + ACC.right) / 2;
+      const fieldX = (g.left + g.right) / 2;
+
       ctx.save();
-      ctx.setLineDash([7, 7]);
-      ctx.strokeStyle = "rgba(255,255,255,0.24)";
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(g.accelLeft - 20, g.midY);
-      ctx.lineTo(g.right + 26, g.midY);
-      ctx.stroke();
-      if (Math.abs(end.y - g.midY) > 3) {
-        ctx.beginPath();
-        ctx.moveTo(end.x, g.midY);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
+      ctx.font = "600 13.5px Microsoft YaHei, Arial";
+      ctx.textBaseline = "middle";
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(143,227,240,0.95)";
+      ctx.fillText(accTitle, accX, headerY);
+      const accM = ctx.measureText(accTitle);
+
+      ctx.fillStyle = "rgba(143,227,240,0.95)";
+      ctx.fillText(fieldTitle, fieldX, headerY);
+      const fieldM = ctx.measureText(fieldTitle);
       ctx.restore();
+
+      // 顺序箭头：两段标题之间，距文字 18 px 以上
+      const aRight = accX + accM.actualBoundingBoxRight + 20;
+      const bLeft = fieldX - fieldM.actualBoundingBoxLeft - 20;
+      if (bLeft - aRight > 40) {
+        drawArrow(aRight, headerY, bLeft, headerY, "rgba(127,214,228,0.7)", 1.6, 8);
+      }
     }
 
     function drawPath(g, m) {
@@ -783,7 +896,7 @@
       ctx.shadowColor = "rgba(255,209,102,0.35)";
       ctx.shadowBlur = 12;
       ctx.beginPath();
-      const steps = 170;
+      const steps = 180;
       for (let i = 0; i <= steps; i += 1) {
         const p = posAt(g, m, (m.tEndTotal * i) / steps);
         if (i === 0) ctx.moveTo(p.x, p.y);
@@ -793,121 +906,15 @@
       ctx.restore();
     }
 
-    // 板长 L 与板距 d 的绿色标尺（d 放右侧，左侧留给加速区）
-    function drawDimensions(g, m) {
-      const green = "#7ee0a1";
-      const presetOn = state.preset === "book5";
-      ctx.save();
-      ctx.strokeStyle = green;
-      ctx.fillStyle = green;
-      ctx.lineWidth = 1.6;
-      ctx.lineCap = "round";
-
-      // L：极板下方
-      const yL = g.bottomInner + VIEW.plateThick + 24;
-      ctx.beginPath();
-      ctx.moveTo(g.left, yL);
-      ctx.lineTo(g.right, yL);
-      ctx.moveTo(g.left, yL - 7);
-      ctx.lineTo(g.left, yL + 7);
-      ctx.moveTo(g.right, yL - 7);
-      ctx.lineTo(g.right, yL + 7);
-      ctx.stroke();
-      const armL = Math.min(24, (g.right - g.left) * 0.3);
-      drawArrow(g.left + armL, yL, g.left, yL, green, 1.6, 9);
-      drawArrow(g.right - armL, yL, g.right, yL, green, 1.6, 9);
-      ctx.font = "bold 14px Microsoft YaHei, Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText(`L = ${state.Lcm.toFixed(1)} cm`, (g.left + g.right) / 2, yL + 21);
-
-      // d：极板左端、板间画标尺，数值写在极板下方（右侧整段留给出射轨迹与 y 标尺）
-      const xD = g.left + 12;
-      const armD = Math.min(22, g.gapPx * 0.3);
-      ctx.beginPath();
-      ctx.moveTo(xD, g.topInner);
-      ctx.lineTo(xD, g.bottomInner);
-      ctx.moveTo(xD - 6, g.topInner);
-      ctx.lineTo(xD + 6, g.topInner);
-      ctx.moveTo(xD - 6, g.bottomInner);
-      ctx.lineTo(xD + 6, g.bottomInner);
-      ctx.stroke();
-      drawArrow(xD, g.topInner + armD, xD, g.topInner, green, 1.6, 9);
-      drawArrow(xD, g.bottomInner - armD, xD, g.bottomInner, green, 1.6, 9);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.font = "bold 14px Microsoft YaHei, Arial";
-      const dText = `d = ${state.dcm.toFixed(1)} cm`;
-      const dX = g.left + 18;
-      const dY = yL - 8;                      // 极板下方、L 标尺上方
-      ctx.fillText(dText, dX, dY);
-      if (presetOn) {
-        const dW = ctx.measureText(dText).width;
-        ctx.font = "11.5px Microsoft YaHei, Arial";
-        ctx.fillStyle = "rgba(255,196,84,0.9)";
-        ctx.fillText("（网页设定）", dX + dW + 4, dY - 1);
-      }
-
-      // y：从中线量到“粒子当前所在位置”，标尺放在粒子右侧，避免压在轨迹上。
-      // 撞板后粒子已停在板面，y 恒为 d/2，改由撞板读数与标签说明。
-      const cur = posAt(g, m, clamp(state.progress, 0, 1) * m.tEndTotal);
-      const atImpactEnd = m.hits && state.progress >= 1 - 1e-9;
-      const dy = cur.y - g.midY;
-      if (!atImpactEnd && Math.abs(dy) > 4) {
-        const xY = Math.min(g.right + 30, Math.max(g.left + 16, cur.x + 30));
-        const dirY = dy > 0 ? 1 : -1;
-        const gold = "#ffd166";
-        ctx.save();
-        // 粒子当前位置的水平引线（与标尺顶端对齐）
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = "rgba(255,209,102,0.55)";
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(cur.x + 9, cur.y);
-        ctx.lineTo(xY, cur.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.strokeStyle = gold;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(xY, g.midY);
-        ctx.lineTo(xY, cur.y);
-        ctx.moveTo(xY - 5, g.midY);
-        ctx.lineTo(xY + 5, g.midY);
-        ctx.moveTo(xY - 5, cur.y);
-        ctx.lineTo(xY + 5, cur.y);
-        ctx.stroke();
-        const armY = Math.min(14, Math.abs(dy) * 0.35);
-        if (armY >= 4) {
-          drawArrow(xY, g.midY + dirY * armY, xY, g.midY, gold, 1.4, 6);
-          drawArrow(xY, cur.y - dirY * armY, xY, cur.y, gold, 1.4, 6);
-        }
-
-        ctx.font = "bold 15px Arial";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.lineJoin = "round";
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = "rgba(6,10,14,0.9)";
-        const labelY = g.midY + dy * (dirY > 0 ? 0.62 : 0.38);
-        ctx.strokeText("y", xY + 9, labelY);
-        ctx.fillStyle = gold;
-        ctx.fillText("y", xY + 9, labelY);
-        ctx.restore();
-      }
-      ctx.restore();
-    }
-
     /* 画布文字：带深色描边，压在轨迹/极板上仍清晰 */
-    function drawCanvasLabel(text, x, y, color, align) {
+    function drawCanvasLabel(text, x, y, color, align, size) {
       ctx.save();
-      ctx.font = "bold 14px Arial";
+      ctx.font = `bold ${size || 15}px Arial, Microsoft YaHei`;
       ctx.textAlign = align || "left";
       ctx.textBaseline = "middle";
       ctx.lineJoin = "round";
       ctx.lineWidth = 4;
-      ctx.strokeStyle = "rgba(6,10,14,0.92)";
+      ctx.strokeStyle = "rgba(6,10,14,0.94)";
       ctx.strokeText(text, x, y);
       ctx.fillStyle = color;
       ctx.fillText(text, x, y);
@@ -917,26 +924,26 @@
     /* 真下标文字（v + 下标 y），替代原来的下划线写法 v_y */
     function drawSubLabel(base, sub, x, y, color, align) {
       ctx.save();
-      ctx.font = "bold 14px Arial";
+      ctx.font = "bold 15px Arial";
       ctx.textBaseline = "middle";
       const bw = ctx.measureText(base).width;
-      ctx.font = "bold 9.5px Arial";
+      ctx.font = "bold 10px Arial";
       const sw = ctx.measureText(sub).width;
       let bx = x;
       if (align === "right") bx = x - bw - sw;
       else if (align === "center") bx = x - (bw + sw) / 2;
       ctx.lineJoin = "round";
       ctx.lineWidth = 4;
-      ctx.strokeStyle = "rgba(6,10,14,0.92)";
-      ctx.font = "bold 14px Arial";
+      ctx.strokeStyle = "rgba(6,10,14,0.94)";
+      ctx.font = "bold 15px Arial";
       ctx.strokeText(base, bx, y);
-      ctx.font = "bold 9.5px Arial";
-      ctx.strokeText(sub, bx + bw + 0.5, y + 4);
-      ctx.font = "bold 14px Arial";
+      ctx.font = "bold 10px Arial";
+      ctx.strokeText(sub, bx + bw + 2, y + 4.5);
+      ctx.font = "bold 15px Arial";
       ctx.fillStyle = color;
       ctx.fillText(base, bx, y);
-      ctx.font = "bold 9.5px Arial";
-      ctx.fillText(sub, bx + bw + 0.5, y + 4);
+      ctx.font = "bold 10px Arial";
+      ctx.fillText(sub, bx + bw + 2, y + 4.5);
       ctx.restore();
     }
 
@@ -950,27 +957,23 @@
       const inField = t > m.tEntry + 1e-12 && t < m.tEntry + m.tEnd - 1e-12;
       const atEnd = state.progress >= 1 - 1e-9;
       const dirY = m.a > 0 ? 1 : m.a < 0 ? -1 : 0;
-      const vLen = clamp(108 + 20 * Math.log10(1 + m.v0 / 1e6), 108, 160);
+      const vLen = clamp(116 + 18 * Math.log10(1 + m.v0 / 1e6), 116, 164);
       let info = null;
 
       if (showVec) {
-        if (inAccel) {
-          // 加速段：F 与 v 同向，只画 v；受力方向由加速区标注给出
-          const vxLen = vLen * (m.tAcc > 0 ? Math.min(1, t / m.tAcc) : 1);
+        if (inAccel || inDrift) {
+          // 加速段与无场段：只画 v（力的方向由加速区标注给出）
+          const grow = inAccel ? (m.tAcc > 0 ? Math.min(1, t / m.tAcc) : 1) : 1;
+          const vxLen = vLen * grow;
           if (vxLen > 6) drawArrow(p.x, p.y, p.x + vxLen, p.y, "rgba(255,255,255,0.88)", 3.2, 10);
           info = { kind: "axis", vxLen };
-        } else if (inDrift) {
-          // 极板之间的无场短段：v 恒定
-          drawArrow(p.x, p.y, p.x + vLen, p.y, "rgba(255,255,255,0.88)", 3.2, 10);
-          info = { kind: "axis", vxLen: vLen };
         } else {
-          // 偏转段：vₓ 恒定、v_y 线性增大；出板后（t = tExit）不再画 F
+          // 偏转段：vₓ 恒定、v_y 线性增大；出板后不再画 F
           const vyNow = Math.abs(m.a) * Math.max(0, t - m.tEntry);
           const vx0 = vLen;
           const vy0 = vLen * (vyNow / m.v0);
-          // 矢量起点相对粒子右移 2 px：仍在粒子圆盘内，但出板时 v_y 不会压到极板端面
           const ox = p.x + 2;
-          const availX = VEC_RIGHT - 4 - ox;
+          const availX = Math.min(yRulerX(g) - 18 - ox, 74);
           let scale = availX < vx0 ? Math.max(0, availX / vx0) : 1;
 
           // 还在板间时，竖直分量不能穿板：等比缩小；放不下就不画
@@ -986,12 +989,12 @@
             const tipX = ox + vxLen;
             const cornerY = p.y + dirY * vyLen;
 
-            // 力箭头只在板间出现（加速段、无场漂移段、出板后都不画）
+            // 力箭头只在板间出现
             const force = Math.abs(m.p.q * m.E);
             let fLen = 0;
             if (inField && force > 0) {
               const room = dirY > 0 ? (g.bottomInner - 3 - p.y) : (p.y - (g.topInner + 3));
-              fLen = Math.min(room, clamp(26 + 14 * Math.log10(1 + force / 1e-15), 26, 96));
+              fLen = Math.min(room, clamp(26 + 14 * Math.log10(1 + force / 1e-15), 26, 92));
             }
 
             // 虚线补全平行四边形
@@ -1007,7 +1010,7 @@
               ctx.restore();
             }
 
-            // F 从粒子左侧 16 px 起画，与 v_y 的水平位置错开；细虚线表示仍作用在粒子上
+            // F 从粒子左侧 16 px 起画，细虚线表示仍作用在粒子上
             if (fLen >= 9) {
               ctx.save();
               ctx.setLineDash([3, 3]);
@@ -1021,17 +1024,16 @@
               drawArrow(p.x - 16, p.y, p.x - 16, p.y + dirY * fLen, "#ffd166", 3.6, 10);
             }
 
-            // vₓ、v_y、v
             drawArrow(ox, p.y, tipX, p.y, "rgba(255,255,255,0.88)", 3.2, 10);
             if (vyLen > 3.5) {
               drawArrow(ox, p.y, ox, cornerY, "#ff8fb0", 3.2, 10);
               drawArrow(ox, p.y, tipX, cornerY, "rgba(255,255,255,0.94)", 2.4, 9);
             }
 
-            // θ 角弧：夹在 v 与 vₓ 之间（不是与 v_y 的夹角）
+            // θ 角弧：夹在 v 与 vₓ 之间
             let arc = null;
             if (vyLen > 5 && vxLen > 18) {
-              const r = clamp(Math.min(vxLen * 0.5, 40), 14, 40);
+              const r = clamp(Math.min(vxLen * 0.42, Math.abs(vyLen) * 1.1 + 14), 22, 44);
               const ang = Math.atan2(dirY * vyLen, vxLen);
               const ex = ox + r * Math.cos(ang);
               const ey = p.y + r * Math.sin(ang);
@@ -1042,8 +1044,7 @@
               ctx.arc(ox, p.y, r, 0, ang, ang < 0);
               ctx.stroke();
               ctx.beginPath();
-              ctx.moveTo(ox + r - 4, p.y);
-              ctx.lineTo(ox + r + 4, p.y);
+              ctx.moveTo(ox + r - 4, p.y); ctx.lineTo(ox + r + 4, p.y);
               ctx.moveTo(ex - 4 * Math.cos(ang), ey - 4 * Math.sin(ang));
               ctx.lineTo(ex + 4 * Math.cos(ang), ey + 4 * Math.sin(ang));
               ctx.stroke();
@@ -1058,7 +1059,7 @@
         }
       }
 
-      // 粒子画在箭头之上：箭头尾部被粒子遮住，不会出现“箭头穿过粒子”的脏边
+      // 粒子画在箭头之上
       ctx.save();
       ctx.shadowColor = m.p.q < 0 ? "rgba(91,140,255,0.55)" : "rgba(255,93,108,0.55)";
       ctx.shadowBlur = 14;
@@ -1078,82 +1079,93 @@
       ctx.restore();
 
       if (!info) return;
-
-      if (info.kind === "axis") {
-        if (info.vxLen > 8) {
-          drawCanvasLabel("v", p.x + info.vxLen * 0.5, p.y - 18, "rgba(255,255,255,0.92)", "center");
-        }
-        return;
-      }
       if (info.kind !== "field") return;
 
-      const { vxLen, vyLen, tipX, cornerY, fLen, arc, ox } = info;
+      const { vxLen, vyLen, tipX, cornerY, arc, ox } = info;
+      const side = dirY === 0 ? -1 : dirY;
+      const limTop = g.topInner + 25, limBot = g.bottomInner - 25;
+      const isExit = !m.hits && state.progress >= 1 - 1e-9;
+      const thetaText = isExit ? "θ" : "θ(t)";
+      const thin = Math.abs(arc ? arc.ang : 0) <= 0.35;
 
-      if (fLen >= 9) {
-        drawCanvasLabel("F", p.x - 24, p.y + dirY * fLen * 0.5, "#ffd166", "right");
+      if (!inField && thin && arc) {
+        // 出板后 + 细三角：出板水平线与 y 标尺占住出板点右侧，
+        // 四个标签沿虚线框上方排成一行（左→右 v_y / θ / vₓ / v），各自对得上箭头
+        const rowY = cornerY + dirY * 31;
+        drawSubLabel("v", "y", ox + 24, rowY, "#ff8fb0", "left");
+        drawCanvasLabel(thetaText, ox + 62, rowY, "#7fd6e4", "center");
+        drawCanvasLabel("vₓ", ox + 84, rowY, "rgba(255,255,255,0.92)", "center");
+        drawCanvasLabel("v", ox + 112, rowY, "rgba(255,255,255,0.94)", "left");
+        return;
       }
 
-      // vₓ 标签放在远离极板的一侧（上偏时放下方，下偏时放上方）
-      const vxLabelY = p.y + (dirY < 0 ? 18 : -18);
-      drawCanvasLabel("vₓ", (ox + tipX) / 2, vxLabelY, "rgba(255,255,255,0.92)", "center");
-
-      if (vyLen > 5) {
-        const vyLx = Math.min(ox + 16, VIEW.textRight - 44);
-        let vyLy = p.y + dirY * Math.max(vyLen * 0.55, 18);
-        if (vyLx < g.right - 1) vyLy = clamp(vyLy, g.topInner + 12, g.bottomInner - 12);
-        drawSubLabel("v", "y", vyLx, vyLy, "#ff8fb0", "left");
-        const vLx = Math.min(tipX + 8, VEC_RIGHT - 2);
-        let vLy = cornerY + dirY * 6;
-        if (vLx < g.right - 1) vLy = clamp(vLy, g.topInner + 10, g.bottomInner - 10);
-        drawCanvasLabel("v", vLx, vLy, "rgba(255,255,255,0.92)", "left");
-      }
+      // 板间飞行 / 大角三角：各标签贴在对应箭头外侧，并按上下极板收边；
+      // 板间还要横向避开虚线场线（否则字会压在场上）
+      const avoidField = (x) => {
+        if (!inField) return x;
+        const xs = fieldLineXs(g, m);
+        if (!xs.length) return x;
+        let bestX = x, bestD = -1;
+        [-36, -18, 0, 18, 36].forEach((d) => {
+          const c = x + d;
+          const dmin = Math.min.apply(null, xs.map((fx) => Math.abs(c - fx)));
+          if (dmin > bestD) { bestD = dmin; bestX = c; }
+        });
+        return bestX;
+      };
+      let vxLabelY = p.y - side * 28;
+      if (inField) vxLabelY = clamp(vxLabelY, limTop, limBot);
+      drawCanvasLabel("vₓ", avoidField(ox + vxLen * 0.72), vxLabelY, "rgba(255,255,255,0.92)", "center");
 
       if (arc) {
-        // 角弧标签放在 v 线的外侧（上偏时在上方，下偏时在下方），避免压住 vₓ 箭头。
-        // 出板时 θ 与读数一致；板间飞行时标 θ(t)，避免把当前角误当成出射角。
-        const lx = ox + (arc.r + 20) * Math.cos(arc.ang);
-        let ly = p.y + (arc.r + 20) * Math.sin(arc.ang) + dirY * 24;
-        if (lx < g.right - 1) ly = clamp(ly, g.topInner + 10, g.bottomInner - 10);
-        const isExit = !m.hits && state.progress >= 1 - 1e-9;
-        drawCanvasLabel(`${isExit ? "θ = " : "θ(t) = "}${arc.deg.toFixed(1)}°`, lx, ly, "#7fd6e4", "left");
+        let tx, ty;
+        if (Math.abs(arc.ang) > 0.35) {
+          // 角够大：贴角平分线外侧，四周都留得开
+          tx = ox + (arc.r + 20) * Math.cos(arc.ang / 2);
+          ty = p.y + (arc.r + 20) * Math.sin(arc.ang / 2);
+        } else {
+          // 细三角又短：角弧夹在 vₓ 与虚线框之间只有 ~20 px，标签退到虚线框外侧
+          tx = ox + 70;
+          ty = cornerY + dirY * 28;
+        }
+        if (inField) ty = clamp(ty, limTop, limBot);
+        drawCanvasLabel(thetaText, avoidField(tx), ty, "#7fd6e4", "center");
+      }
+
+      if (vyLen > 5) {
+        // v_y：细三角标在竖直箭头尖端正外侧（沿箭头方向退出 26 px），胖三角标在箭头右侧
+        const fat = Math.abs(vyLen) >= 48;
+        if (fat) {
+          drawSubLabel("v", "y", ox + 20, p.y + dirY * vyLen * 0.52, "#ff8fb0", "left");
+        } else {
+          drawSubLabel("v", "y", ox + 22, cornerY + dirY * 28, "#ff8fb0", "left");
+        }
+        // v：标在合矢量箭头尖端外侧
+        drawCanvasLabel("v", tipX + 20, cornerY + dirY * 18, "rgba(255,255,255,0.94)", "left");
       }
     }
 
     function drawImpact(g, m) {
       const p = posAt(g, m, m.tEndTotal);
+      const dir = m.yEnd > 0 ? 1 : -1;
       ctx.save();
       ctx.strokeStyle = "#ff5d5d";
       ctx.lineWidth = 2.5;
       ctx.setLineDash([5, 4]);
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
       for (let i = 0; i < 4; i += 1) {
         const angle = Math.PI / 4 + (i * Math.PI) / 2;
         ctx.beginPath();
-        ctx.moveTo(p.x + Math.cos(angle) * 21, p.y + Math.sin(angle) * 21);
-        ctx.lineTo(p.x + Math.cos(angle) * 29, p.y + Math.sin(angle) * 29);
+        ctx.moveTo(p.x + Math.cos(angle) * 20, p.y + Math.sin(angle) * 20);
+        ctx.lineTo(p.x + Math.cos(angle) * 28, p.y + Math.sin(angle) * 28);
         ctx.stroke();
       }
       ctx.restore();
 
-      // 撞板信息固定在画布上方空白处，避免大角度时压住极板、L/d 标尺或电场标注
-      drawTag([
-        `撞板 · 距入口 x = ${(m.xHit * 100).toFixed(1)} cm`,
-        `t = ${fmtTime(m.tHit)}`
-      ], 560, 56, "#ff8a8a", 720);
-    }
 
-    /* 底部一行观察提示（非推导，首屏唯一的解释性文字） */
-    function drawHint() {
-      ctx.save();
-      ctx.font = "12px Microsoft YaHei, Arial";
-      ctx.fillStyle = "rgba(143,163,189,0.72)";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText("只改一个量看变化：U ↑ 偏转 ↑ ｜ U₀ ↑ 偏转 ↓ ｜ U = 0 时轨迹为直线", VIEW.left, 496);
-      ctx.restore();
     }
 
     /* —— 读数与面板文字 —— */
